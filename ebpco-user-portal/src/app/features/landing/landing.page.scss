@@ -1,0 +1,539 @@
+// Landing — redesigned as a civic/LGU-branded official portal page.
+// Scoped tokens below use exact hex values from the agreed design
+// direction rather than the app's slightly-different global tokens
+// (--gray-900, --gray-500, --border-medium, --gold-500), so this page's
+// palette matches the brief precisely without touching those shared
+// variables (used across ~20 other pages). .btn-primary/.btn-secondary and
+// .accent-bar are intentionally left alone for the same reason — Log
+// In/Register/Get Started/existing-account get their own scoped classes
+// below instead of reusing the shared button classes.
+:host {
+  display: block;
+  --lp-brand-red: #c81e2c;
+  --lp-brand-red-dark: #a91622;
+  --lp-brand-gold: #d89a00;
+  --lp-brand-green: #168a45;
+  --lp-ink: #101828;
+  --lp-ink-secondary: #344054;
+  --lp-body: #667085;
+  --lp-muted: #98a2b3;
+  --lp-surface: #ffffff;
+  --lp-page-bg: #fcfafa;
+  --lp-border: #eaecf0;
+  --lp-soft-red: #fcebed;
+  --lp-soft-gold: #fff5d9;
+  --lp-soft-green: #eaf6ee;
+}
+
+.lp-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--lp-page-bg);
+  overflow-x: hidden;
+}
+
+// ---------------------------------------------------------------------------
+// Navbar
+// ---------------------------------------------------------------------------
+.lp-nav {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 96px;
+  padding: 0 56px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  animation: lp-fade 500ms ease both;
+}
+
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: inherit;
+  text-decoration: none;
+}
+.lp-brand:hover { text-decoration: none; }
+.lp-brand-seal {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.lp-brand-text {
+  font-size: 23px;
+  font-weight: 700;
+  color: var(--lp-ink);
+  white-space: nowrap;
+}
+.lp-brand-accent { color: var(--lp-brand-red); }
+
+.lp-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lp-nav-link {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--lp-brand-red);
+  text-decoration: none;
+  padding: 8px 4px;
+}
+.lp-nav-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+.lp-btn-login {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--lp-border);
+  border-radius: 11px;
+  padding: 13px 20px;
+  color: var(--lp-ink);
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.lp-btn-login:hover {
+  text-decoration: none;
+  background: var(--lp-page-bg);
+  border-color: #d0d5dd;
+}
+
+.lp-btn-register {
+  display: inline-flex;
+  align-items: center;
+  background: var(--lp-brand-red);
+  border: none;
+  border-radius: 11px;
+  padding: 14px 24px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+.lp-btn-register:hover {
+  text-decoration: none;
+  background: var(--lp-brand-red-dark);
+  transform: translateY(-1px);
+}
+
+.lp-nav-link:focus-visible,
+.lp-btn-login:focus-visible,
+.lp-btn-register:focus-visible,
+.lp-cta-primary:focus-visible,
+.lp-cta-secondary:focus-visible,
+.lp-process-link:focus-visible {
+  outline: 2px solid var(--lp-brand-red-dark);
+  outline-offset: 3px;
+}
+
+// ---------------------------------------------------------------------------
+// Main / decoration
+// ---------------------------------------------------------------------------
+.lp-main {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 76px 24px 64px;
+  background: radial-gradient(circle at 50% 35%, rgba(200, 30, 44, 0.025), transparent 42%), var(--lp-page-bg);
+}
+
+.lp-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.lp-decor-building {
+  position: absolute;
+  left: 0;
+  bottom: 20px;
+  width: min(30vw, 520px);
+  height: auto;
+  color: var(--lp-brand-red);
+  opacity: 0.06;
+  // Fades toward the right so it recedes behind the hero text rather than
+  // competing with it; a single gradient mask keeps this robust across
+  // browsers (a two-layer mask-composite here is fragile/inconsistent).
+  -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 55%, transparent 92%);
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 55%, transparent 92%);
+}
+.lp-decor-dots {
+  position: absolute;
+  right: 6%;
+  top: 33%;
+  width: 168px;
+  height: 96px;
+  background-image: radial-gradient(circle, rgba(200, 30, 44, 0.16) 2px, transparent 2.2px);
+  background-size: 20px 20px;
+  opacity: 0.7;
+}
+.lp-decor-wave {
+  position: absolute;
+  border-radius: 50%;
+}
+.lp-decor-wave-1 {
+  right: -12%;
+  bottom: -30%;
+  width: 55vw;
+  height: 38vw;
+  max-width: 820px;
+  max-height: 560px;
+  background: rgba(200, 30, 44, 0.03);
+}
+.lp-decor-wave-2 {
+  right: 2%;
+  bottom: -38%;
+  width: 36vw;
+  height: 26vw;
+  max-width: 560px;
+  max-height: 380px;
+  background: rgba(200, 30, 44, 0.05);
+}
+
+// ---------------------------------------------------------------------------
+// Hero
+// ---------------------------------------------------------------------------
+.lp-hero {
+  position: relative;
+  z-index: 1;
+  max-width: 920px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.lp-heading {
+  margin: 0;
+  font-size: clamp(48px, 4.5vw, 72px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -1.75px;
+}
+.lp-heading-line,
+.lp-heading-accent {
+  display: block;
+  opacity: 0;
+  animation: lp-fade-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+.lp-heading-line { color: var(--lp-ink); }
+.lp-heading-accent {
+  margin-top: 8px;
+  color: var(--lp-brand-red);
+  animation-delay: 200ms;
+}
+
+.lp-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 20px 0 24px;
+  opacity: 0;
+  transform: scaleX(0.85);
+  animation: lp-divider-in 500ms ease 320ms both;
+}
+.lp-divider-line {
+  width: 52px;
+  height: 1px;
+  background: rgba(200, 30, 44, 0.45);
+}
+.lp-divider-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--lp-brand-red);
+  flex-shrink: 0;
+}
+
+.lp-desc {
+  max-width: 760px;
+  margin: 0 auto 32px;
+  font-size: 19px;
+  line-height: 1.62;
+  font-weight: 400;
+  color: var(--lp-body);
+  opacity: 0;
+  animation: lp-fade 500ms ease 380ms both;
+}
+
+.lp-cta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: lp-fade-rise-sm 500ms ease 440ms both;
+}
+
+.lp-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 220px;
+  height: 60px;
+  padding: 0 26px;
+  background: var(--lp-brand-red);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(200, 30, 44, 0.16);
+  transition: background 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+.lp-cta-primary svg { width: 19px; height: 19px; }
+.lp-cta-primary:hover {
+  text-decoration: none;
+  background: var(--lp-brand-red-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(200, 30, 44, 0.22);
+}
+
+.lp-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 250px;
+  height: 60px;
+  padding: 0 26px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(200, 30, 44, 0.65);
+  color: #b71927;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.lp-cta-secondary:hover {
+  text-decoration: none;
+  background: #fff7f8;
+  border-color: var(--lp-brand-red);
+}
+
+.lp-process-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 30px;
+  color: var(--lp-brand-red);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  opacity: 0;
+  animation: lp-fade 500ms ease 500ms both;
+}
+.lp-process-link svg { width: 16px; height: 16px; }
+.lp-process-link:hover { text-decoration: underline; text-underline-offset: 5px; }
+
+// ---------------------------------------------------------------------------
+// Feature cards
+// ---------------------------------------------------------------------------
+.lp-cards {
+  position: relative;
+  z-index: 1;
+  max-width: 1160px;
+  width: 100%;
+  margin: 40px auto 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 30px;
+}
+
+.lp-card {
+  position: relative;
+  min-height: 280px;
+  padding: 32px 30px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--lp-border);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.055);
+  overflow: hidden;
+  opacity: 0;
+  animation: lp-fade-rise-sm 550ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.lp-card:nth-child(1) { animation-delay: 520ms; }
+.lp-card:nth-child(2) { animation-delay: 580ms; }
+.lp-card:nth-child(3) { animation-delay: 640ms; }
+.lp-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(16, 24, 40, 0.09);
+}
+.lp-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 15px 15px 0 0;
+}
+.lp-card-red::before { background: var(--lp-brand-red); }
+.lp-card-gold::before { background: var(--lp-brand-gold); }
+.lp-card-green::before { background: var(--lp-brand-green); }
+
+.lp-card-badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.lp-card-badge svg { width: 34px; height: 34px; }
+.lp-card-red .lp-card-badge { background: var(--lp-soft-red); }
+.lp-card-red .lp-card-badge svg { color: var(--lp-brand-red); }
+.lp-card-gold .lp-card-badge { background: var(--lp-soft-gold); }
+.lp-card-gold .lp-card-badge svg { color: var(--lp-brand-gold); }
+.lp-card-green .lp-card-badge { background: var(--lp-soft-green); }
+.lp-card-green .lp-card-badge svg { color: var(--lp-brand-green); }
+
+.lp-card-title {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--lp-ink);
+  text-align: left;
+}
+
+.lp-card-rule {
+  display: block;
+  width: 38px;
+  height: 2px;
+  margin: 14px 0 0;
+}
+.lp-card-red .lp-card-rule { background: var(--lp-brand-red); }
+.lp-card-gold .lp-card-rule { background: var(--lp-brand-gold); }
+.lp-card-green .lp-card-rule { background: var(--lp-brand-green); }
+
+.lp-card-desc {
+  margin: 24px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--lp-body);
+  text-align: left;
+}
+
+.lp-card-watermark {
+  position: absolute;
+  bottom: -5px;
+  right: 5px;
+  width: 88px;
+  height: 88px;
+  opacity: 0.1;
+  pointer-events: none;
+}
+.lp-card-red .lp-card-watermark { color: var(--lp-brand-red); }
+.lp-card-gold .lp-card-watermark { color: var(--lp-brand-gold); }
+.lp-card-green .lp-card-watermark { color: var(--lp-brand-green); }
+
+// ---------------------------------------------------------------------------
+// Bottom civic wave
+// ---------------------------------------------------------------------------
+.lp-wave {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  height: clamp(50px, 7vw, 95px);
+  line-height: 0;
+}
+.lp-wave svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.lp-wave-1 { fill: var(--lp-brand-red); }
+.lp-wave-2 { fill: var(--lp-brand-red-dark); }
+
+// ---------------------------------------------------------------------------
+// Entrance keyframes (scoped names to avoid clashing with the shared
+// fade-rise/flip-in/pop-in/float-y keyframes in styles.scss).
+// ---------------------------------------------------------------------------
+@keyframes lp-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes lp-fade-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes lp-fade-rise-sm {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes lp-divider-in {
+  from { opacity: 0; transform: scaleX(0.8); }
+  to { opacity: 1; transform: scaleX(1); }
+}
+
+// ---------------------------------------------------------------------------
+// Responsive
+// ---------------------------------------------------------------------------
+@media (max-width: 1439px) and (min-width: 1024px) {
+  .lp-cards { max-width: 94%; }
+  .lp-decor-building { width: min(26vw, 440px); }
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+  .lp-main { padding: 60px 30px 56px; }
+  .lp-heading { font-size: clamp(44px, 5.6vw, 50px); }
+  .lp-desc { font-size: 17px; }
+  .lp-cards { grid-template-columns: repeat(2, 1fr); max-width: 100%; }
+  .lp-cards .lp-card:last-child { grid-column: 1 / -1; max-width: 480px; margin: 0 auto; }
+  .lp-decor-building { opacity: 0.045; width: 34vw; }
+}
+
+@media (max-width: 767px) {
+  .lp-nav { height: auto; min-height: 76px; padding: 14px 20px; flex-wrap: wrap; gap: 12px; }
+  .lp-brand-seal { width: 42px; height: 42px; }
+  .lp-brand-text { font-size: 19px; }
+  .lp-nav-links { gap: 8px; flex-wrap: wrap; }
+  .lp-nav-link { font-size: 14px; padding: 6px 2px; }
+  .lp-btn-login, .lp-btn-register { padding: 10px 14px; font-size: 14px; }
+
+  .lp-main { padding: 48px 20px 100px; }
+  .lp-decor-building { display: none; }
+  .lp-decor-dots { display: none; }
+
+  .lp-heading { font-size: clamp(34px, 10vw, 44px); line-height: 1.05; letter-spacing: -0.75px; }
+  .lp-divider { margin: 18px 0 20px; }
+  .lp-divider-line { width: 34px; }
+  .lp-desc { font-size: 16px; max-width: 100%; }
+
+  .lp-cta-row { flex-direction: column; }
+  .lp-cta-primary, .lp-cta-secondary { width: 100%; max-width: 380px; height: 58px; min-width: 0; }
+
+  .lp-cards { grid-template-columns: 1fr; gap: 20px; }
+  .lp-cards .lp-card:last-child { grid-column: auto; max-width: none; }
+  .lp-card { padding: 26px; min-height: 0; }
+
+  .lp-wave { height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-heading-line,
+  .lp-heading-accent,
+  .lp-divider,
+  .lp-desc,
+  .lp-cta-row,
+  .lp-process-link,
+  .lp-card {
+    opacity: 1;
+    transform: none;
+  }
+}

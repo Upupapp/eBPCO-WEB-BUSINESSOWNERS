@@ -1,0 +1,492 @@
+// Global stylesheet for the eBPCO User Portal.
+//
+// Design tokens are now aligned with castilla-lgu-portal's system
+// (castilla-lgu-portal/src/app/shared/styles/_tokens.scss) rather than the
+// blue "Approved" doc palette this app started on — resolving the
+// documented blue-vs-red conflict (master command Section 12.2, Open
+// Decision #2) in favor of red, per direct instruction. Brand red is
+// inherited from the Admin Portal's own _tokens.scss (shared institutional
+// identity); the gold accent is castilla's own addition, drawn from the
+// municipal seal, reused here sparingly as this portal's distinguishing
+// warm accent. Values below are copied verbatim from castilla's token
+// file — nothing here is invented. This is a visual-only pass: no
+// component logic, data, or copy changed.
+:root {
+  --primary-50: #fdf6f6;
+  --primary-100: #fdeceb;
+  --primary-500: #c81e2c;
+  --primary-600: #a5182a;
+  --primary-700: #a5182a;
+
+  --gold-50: #fdf8ee;
+  --gold-100: #faefd6;
+  --gold-500: #cc9a2e;
+  --gold-600: #b8860f;
+  --gold-700: #96690f;
+  --gold-border: #ecd9a8;
+
+  --secondary-50: #fafafc;
+  --secondary-100: #f4f4f7;
+  --secondary-500: #6b7080;
+
+  --success-100: #e7fbef;
+  --success-500: #16a34a;
+  --success-text: #166534;
+
+  --warning-100: #fef8ea;
+  --warning-500: #b45309;
+  --warning-text: #b45309;
+
+  --danger-100: #fdeceb;
+  --danger-500: #dc2626;
+  --danger-text: #a5182a;
+
+  --info-100: #e8f1ff;
+  --info-500: #2563eb;
+  --info-text: #1d4ed8;
+
+  --gray-50: #fafafc;
+  --gray-100: #f4f4f7;
+  --gray-200: #e6e6ec;
+  --gray-300: #9a9ea8;
+  --gray-400: #8b8f9b;
+  --gray-500: #6b7080;
+  --gray-600: #565c6b;
+  --gray-700: #454a58;
+  --gray-800: #2b2f3a;
+  --gray-900: #1f2430;
+
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-secondary: #f4f4f7;
+  --border-light: #eeeef2;
+  --border-medium: #e6e6ec;
+
+  --radius-sm: 0.4rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.85rem;
+  --shadow-sm: 0 1px 2px rgba(20, 20, 40, 0.04);
+  --shadow-md: 0 10px 22px rgba(20, 20, 40, 0.08);
+  --ease-base: 0.2s ease;
+  --ease-slow: 0.3s ease;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--gray-700);
+  font-family: 'Gothic A1', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 { color: var(--gray-900); font-weight: 800; margin: 0 0 8px; }
+h1 { font-size: 28px; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; font-weight: 700; }
+h4 { font-size: 16px; font-weight: 700; }
+p { margin: 0 0 8px; }
+a { color: var(--primary-600); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.page-header .subtitle { color: var(--gray-500); font-size: 13px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--ease-base), border-color var(--ease-base);
+}
+.card + .card { margin-top: 16px; }
+// The rule above is for cards stacked vertically in normal block flow
+// (e.g. two sequential <div class="card"> sections on a details page). It
+// also matches cards that are merely DOM-adjacent but laid out side by
+// side in a CSS Grid — that selector can't tell the difference — which
+// silently gave every card but the first in a row extra height/width via
+// its own margin, on top of the grid's own `gap`. Grid children never
+// need it: `gap` already spaces them.
+.grid > .card + .card { margin-top: 0; }
+.card-title { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px; }
+
+// Auth cards (login/register/forgot-password) get a thin gold accent
+// stripe across the top — castilla's seal-derived accent, used here as
+// this portal's one distinguishing warm touch against an otherwise
+// red-and-ink transactional palette.
+.auth-card {
+  position: relative;
+  overflow: hidden;
+}
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--primary-500), var(--gold-500));
+}
+
+.accent-bar { height: 3px; background: linear-gradient(90deg, var(--primary-500), var(--gold-500)); }
+.card-accent-primary { border-top: 3px solid var(--primary-500); }
+.card-accent-gold { border-top: 3px solid var(--gold-500); }
+.card-accent-success { border-top: 3px solid var(--success-500); }
+
+// align-items: stretch is CSS Grid's default, but every grid of cards in
+// this app is meant to render as equal-size boxes per row, so it's made
+// explicit here rather than relying on an easy-to-accidentally-override
+// default. Pair with .card-fill on the card itself (and .card-footer on
+// any trailing actions row) so the card's real height — not just its grid
+// cell — stretches to match its row, with actions pinned to the bottom.
+.grid { display: grid; gap: 16px; align-items: stretch; }
+// auto-fit/minmax is for lists whose item count varies (businesses,
+// documents, permit types) and is meant to wrap responsively.
+.grid-2 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+// For a grid that always renders a FIXED number of items (the dashboard's
+// 4 stat cards, the landing page's 3 feature cards), auto-fit/minmax is
+// the wrong tool: at some container widths it computes more tracks than
+// there are items, and the extra empty track collapsing can visibly throw
+// off column widths. An explicit fixed column count has no such edge case.
+.grid-fixed-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-fixed-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 720px) {
+  .grid-fixed-3 { grid-template-columns: repeat(2, 1fr); }
+  .grid-fixed-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+  .grid-fixed-3, .grid-fixed-4 { grid-template-columns: 1fr; }
+}
+
+.card-link { display: block; height: 100%; color: inherit; text-decoration: none; }
+.card-fill { height: 100%; display: flex; flex-direction: column; }
+.card-footer { margin-top: auto; padding-top: 12px; }
+
+// Buttons
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--ease-base), border-color var(--ease-base), box-shadow var(--ease-base), transform 0.15s ease, opacity 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--primary-500); color: #fff; border-color: var(--primary-500); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-600); border-color: var(--primary-600); box-shadow: 0 8px 18px rgba(165, 24, 42, 0.28); transform: translateY(-1px); }
+.btn-secondary { background: var(--surface); color: var(--gray-700); border-color: var(--border-medium); }
+.btn-secondary:hover:not(:disabled) { background: var(--gray-50); border-color: var(--gray-300); }
+.btn-danger { background: var(--danger-500); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: var(--primary-600); }
+.btn-ghost { background: transparent; color: var(--primary-600); }
+.btn-ghost:hover:not(:disabled) { background: var(--primary-50); }
+.btn-block { width: 100%; }
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+
+// Forms
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
+.field .hint { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+.field .error { font-size: 12px; color: var(--danger-text); margin-top: 4px; font-weight: 600; }
+.input, select.input, textarea.input {
+  width: 100%;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 9px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--gray-900);
+  transition: border-color var(--ease-base), box-shadow var(--ease-base);
+}
+.input:focus, select.input:focus, textarea.input:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+.input.invalid { border-color: var(--danger-500); }
+.checkbox-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--gray-700); }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+
+// Badges / status pills
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+.badge-req { background: var(--danger-100); color: var(--danger-text); }
+.badge-opt { background: var(--gray-100); color: var(--gray-600); }
+.badge-gray { background: var(--gray-100); color: var(--gray-700); }
+.badge-blue { background: var(--info-100); color: var(--info-text); }
+.badge-primary { background: var(--primary-100); color: var(--primary-700); }
+.badge-gold { background: var(--gold-100); color: var(--gold-700); border: 1px solid var(--gold-border); }
+.badge-amber { background: var(--warning-100); color: var(--warning-text); }
+.badge-green { background: var(--success-100); color: var(--success-text); }
+.badge-red { background: var(--danger-100); color: var(--danger-text); }
+
+// Tables
+table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.table th { text-align: left; color: var(--primary-700); background: var(--primary-50); padding: 10px 12px; font-weight: 700; }
+table.table td { padding: 10px 12px; border-bottom: 1px solid var(--border-light); }
+table.table tr:last-child td { border-bottom: none; }
+
+// Steps
+.steps { display: flex; align-items: center; gap: 4px; margin-bottom: 24px; flex-wrap: wrap; }
+.step-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--gray-400); }
+.step-item .dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--gray-100); color: var(--gray-500); font-weight: 700; font-size: 11px; }
+.step-item.active { color: var(--primary-700); font-weight: 700; }
+.step-item.active .dot { background: var(--primary-500); color: #fff; }
+.step-item.done .dot { background: var(--success-500); color: #fff; }
+.step-sep { width: 20px; height: 1px; background: var(--border-medium); }
+
+// ---------------------------------------------------------------------------
+// Generated permit document — formal, restrained, printable A4 layout.
+// Deliberately separate from the rest of this stylesheet's red/gold brand
+// system: a real government document should look like paper, not like a
+// dashboard card. No gradients, no shadows beyond a faint page edge, no
+// rounded corners, no brand color beyond black/gray ink and one muted
+// watermark tone.
+// ---------------------------------------------------------------------------
+.doc-generated-page {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 16mm 18mm;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: Georgia, 'Times New Roman', Cambria, serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  position: relative;
+  box-sizing: border-box;
+  border: 1px solid #d0d0d0;
+}
+
+.doc-generated-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  text-align: center;
+  border-bottom: 2px solid #000;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+.doc-generated-header img { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
+.doc-generated-header .lines { display: flex; flex-direction: column; font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #1a1a1a; line-height: 1.3; }
+.doc-generated-header .lines strong { font-size: 11pt; }
+.doc-generated-header .office-line { font-size: 8.5pt; color: #5a5a5a; }
+
+.doc-generated-title { text-align: center; margin: 6px 0 14px; }
+.doc-generated-title h1 { margin: 0; font-size: 15pt; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #1a1a1a; }
+.doc-generated-title .subtitle { margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; font-weight: 700; letter-spacing: 0.06em; color: #5a5a5a; }
+
+.doc-generated-numberblock {
+  border: 1px solid #000;
+  padding: 8px 12px;
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.doc-generated-numberblock .num-main { display: flex; align-items: baseline; gap: 8px; }
+.doc-generated-numberblock .num-label { font-size: 8.5pt; color: #5a5a5a; text-transform: uppercase; letter-spacing: 0.03em; }
+.doc-generated-numberblock .num-value { font-size: 12pt; font-weight: 700; letter-spacing: 0.02em; }
+.doc-generated-numberblock .num-dates { display: flex; gap: 20px; font-size: 8.5pt; color: #5a5a5a; }
+
+.doc-generated-section { margin: 0 0 14px; }
+.doc-generated-section h2 {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  border-bottom: 1px solid #000;
+  padding-bottom: 3px;
+  margin: 0 0 8px;
+}
+.doc-generated-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px 24px; margin: 0; }
+.doc-generated-fields div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted #b0b0b0; padding: 2px 0; }
+.doc-generated-fields dt { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; color: #5a5a5a; white-space: nowrap; }
+.doc-generated-fields dd { margin: 0; font-weight: 600; text-align: right; }
+.doc-generated-placeholder { font-style: italic; color: #8a8a8a; font-weight: 400; }
+
+.doc-generated-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 6px 0; }
+.doc-generated-table th, .doc-generated-table td { border: 1px solid #333; padding: 5px 8px; text-align: left; }
+.doc-generated-table th { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.03em; background: #f2f2f2; }
+
+.doc-generated-note { font-size: 8.5pt; color: #5a5a5a; margin: 5px 0 0; }
+
+.doc-generated-signature { width: 260px; margin: 24px auto 0; text-align: center; }
+.doc-generated-signature .sig-pending { height: 48px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 3px; font-style: italic; font-size: 8.5pt; color: #8a8a8a; }
+.doc-generated-signature .sig-line { border-top: 1px solid #000; margin-top: 3px; }
+.doc-generated-signature .sig-name { font-weight: 700; font-size: 9.5pt; margin-top: 5px; }
+.doc-generated-signature .sig-position { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #5a5a5a; }
+
+.doc-generated-qr { display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 16px 0 8px; }
+.doc-generated-qr svg { width: 78px; height: 78px; border: 1px solid #333; }
+.doc-generated-qr .qr-caption { font-family: Arial, Helvetica, sans-serif; font-size: 7pt; color: #5a5a5a; text-align: center; margin: 0; max-width: 220px; word-break: break-all; }
+.doc-generated-qr .qr-unavailable { font-style: italic; color: #8a8a8a; max-width: 200px; }
+
+.doc-generated-footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #333; font-family: Arial, Helvetica, sans-serif; font-size: 7.5pt; color: #8a8a8a; text-align: center; }
+.doc-generated-footer p { margin: 2px 0; }
+
+.doc-generated-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(2.2rem, 9vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: rgba(150, 20, 20, 0.14);
+  text-transform: uppercase;
+  text-align: center;
+  transform: rotate(-30deg);
+  line-height: 1.1;
+  padding: 0 10%;
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  .doc-generated-page { border: none; }
+  .no-print { display: none !important; }
+}
+
+// How It Works process steps
+.hiw-step-number {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-500), var(--gold-500));
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.empty-state { text-align: center; padding: 48px 20px; color: var(--gray-500); }
+.muted { color: var(--gray-500); }
+.small { font-size: 12.5px; }
+.divider { height: 1px; background: var(--border-light); margin: 16px 0; border: none; }
+
+.toast-host { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+.toast { background: var(--gray-900); color: #fff; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13.5px; box-shadow: var(--shadow-md); max-width: 320px; }
+.toast.success { background: var(--success-text); }
+.toast.error { background: var(--danger-text); }
+
+// Onboarding carousel
+.onboarding-dots { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 16px 0; }
+.onboarding-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  transition: width 240ms ease, background-color 240ms ease, transform 240ms ease;
+}
+.onboarding-dot.active { width: 42px; background: var(--primary-500); }
+.onboarding-track { display: flex; transition: transform var(--ease-slow); }
+.onboarding-slide { flex: 0 0 100%; text-align: center; padding: 0 24px; }
+
+// Splash loader
+@keyframes ebpco-spin { to { transform: rotate(360deg); } }
+.splash-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: ebpco-spin 0.8s linear infinite;
+}
+
+// ---------------------------------------------------------------------------
+// Marketing/public screen motion — Splash, Onboarding, Landing, How It
+// Works, 404. Deliberately NOT used on the generated permit document or
+// Terms/Privacy, which stay restrained/printable. Every animation here is
+// transform/opacity only (GPU-friendly) and fully neutralized under
+// prefers-reduced-motion below.
+// ---------------------------------------------------------------------------
+
+@keyframes fade-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes flip-in {
+  from { opacity: 0; transform: perspective(600px) rotateY(-70deg) scale(0.9); }
+  to { opacity: 1; transform: perspective(600px) rotateY(0deg) scale(1); }
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.anim-fade-rise { animation: fade-rise 0.6s var(--ease-slow, 0.3s ease) both; }
+.anim-flip-in { animation: flip-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-pop-in { animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.anim-float { animation: float-y 3.4s ease-in-out infinite; }
+
+// A real, hover-driven 3D tilt — perspective + rotateX/rotateY read from
+// two CSS custom properties a mousemove handler sets per-card (see
+// landing.page.ts). Falls back to flat/no-op wherever those handlers
+// aren't wired up, since --tilt-x/--tilt-y simply default to 0.
+.tilt-card {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) translateZ(0);
+  transition: transform 0.15s ease-out, box-shadow var(--ease-base);
+  will-change: transform;
+}
+.tilt-card:hover { box-shadow: var(--shadow-md); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .tilt-card { transform: none !important; }
+}

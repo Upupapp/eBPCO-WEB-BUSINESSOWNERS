@@ -1,0 +1,201 @@
+// App shell (sidebar + topbar) — shared chrome for every authenticated
+// page, so this redesign applies consistently app-wide, not just to the
+// dashboard. Scoped tokens use the exact hex values from the agreed
+// design direction rather than the app's slightly-different global tokens,
+// so this doesn't ripple into other pages that still use --gray-900 etc.
+// Font is intentionally never set here — it inherits the project's
+// existing font-family from html/body in styles.scss.
+:host {
+  display: block;
+}
+
+.ds-shell {
+  display: flex;
+  min-height: 100vh;
+  --ds-ink: #101828;
+  --ds-ink-secondary: #344054;
+  --ds-body: #667085;
+  --ds-red: #d7192d;
+  --ds-red-dark: #b31626;
+  --ds-border: #e8eaee;
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar
+// ---------------------------------------------------------------------------
+.ds-sidenav {
+  width: 290px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-right: 1px solid var(--ds-border);
+  padding: 24px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.ds-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 8px;
+}
+.ds-brand-seal {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.ds-brand-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--ds-ink);
+}
+.ds-brand-rule {
+  height: 1px;
+  background: var(--ds-border);
+  margin: 28px 8px 18px;
+}
+
+.ds-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ds-nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 54px;
+  padding: 0 16px;
+  border-radius: 11px;
+  color: var(--ds-ink-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+.ds-nav-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.ds-nav-badge { margin-left: auto; }
+
+.ds-nav-link:hover { background: #f9fafb; text-decoration: none; }
+.ds-nav-link.active {
+  background: #fff5f6;
+  color: var(--ds-red);
+  font-weight: 600;
+}
+.ds-nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--ds-red);
+}
+.ds-nav-link:focus-visible {
+  outline: 2px solid var(--ds-red-dark);
+  outline-offset: 2px;
+}
+
+.ds-divider {
+  border: none;
+  height: 1px;
+  background: var(--ds-border);
+  margin: auto 8px 14px;
+  width: calc(100% - 16px);
+}
+
+.ds-logout { color: var(--ds-red); }
+.ds-logout:hover { background: #fff5f6; color: var(--ds-red-dark); }
+
+// ---------------------------------------------------------------------------
+// Main column
+// ---------------------------------------------------------------------------
+.ds-main {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  background: linear-gradient(135deg, #fff 0%, #fff 57%, #fffafb 78%, #fff5f6 100%);
+}
+
+// Soft radial accents — shared across every routed page (dashboard,
+// businesses, permits, applications, documents, payments, notifications,
+// profile, help). Gradients that fade to fully transparent, not a
+// clip-path shape, so there's no hard edge for overflow:hidden to crop.
+.ds-main::before {
+  content: '';
+  position: absolute;
+  width: 640px;
+  height: 420px;
+  right: -220px;
+  top: -140px;
+  background: radial-gradient(closest-side, rgba(220, 38, 38, 0.06), rgba(220, 38, 38, 0) 100%);
+  pointer-events: none;
+}
+.ds-main::after {
+  content: '';
+  position: absolute;
+  width: 480px;
+  height: 340px;
+  left: -200px;
+  bottom: -200px;
+  background: radial-gradient(closest-side, rgba(220, 38, 38, 0.045), rgba(220, 38, 38, 0) 100%);
+  pointer-events: none;
+}
+// The routed page component renders as router-outlet's next sibling —
+// lift it above the decorative blobs above (topbar already has its own
+// position: sticky; z-index: 5 below).
+.ds-main > router-outlet + * {
+  position: relative;
+  z-index: 1;
+}
+
+.ds-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  height: 70px;
+  padding: 0 32px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--ds-border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.ds-topbar-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ds-ink-secondary);
+}
+.ds-topbar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f4f5f7;
+  border: 1px solid var(--ds-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #667085;
+  flex-shrink: 0;
+}
+.ds-topbar-avatar svg { width: 18px; height: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-nav-link { transition: none; }
+}

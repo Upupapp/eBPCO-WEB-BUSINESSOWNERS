@@ -1,0 +1,12 @@
+[build]
+  base    = "ebpco-user-portal"
+  command = "npm run build"
+  publish = "dist/ebpco-user-portal/browser"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
