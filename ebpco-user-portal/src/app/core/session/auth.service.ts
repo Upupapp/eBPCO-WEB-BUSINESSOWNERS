@@ -4,6 +4,7 @@ import {
   ApplicantType,
   CivilStatus,
   Sex,
+  NotificationPreferences,
   UserAccount,
   defaultNotificationPreferences,
   unverifiedContact,
@@ -35,18 +36,33 @@ export interface RegisterSecurityInfo {
 }
 
 /**
- * Mock authentication — there is no backend anywhere in the eBPCO system
- * yet (see master command Section 15, Open Decision #3). This mirrors the
- * existing convention in ebpco-mobile's MockAuthRepository: a real,
- * working UI flow against an in-memory store, structured so a genuine
- * HTTP-backed AuthService can replace this one without touching call
- * sites. Deliberately in-memory only, not persisted to localStorage — a
- * page refresh always logs out, by design, rather than silently keeping a
- * "signed in" state alive across reloads.
+ * Mock authentication: a real, working UI flow against an in-memory store,
+ * structured so a genuine HTTP-backed AuthService can replace this one without
+ * touching call sites. It mirrors the convention in the citizen mobile app's
+ * MockAuthRepository.
+ *
+ * Deliberately in-memory only, never persisted to localStorage — a page refresh
+ * always logs out, by design, rather than silently keeping a "signed in" state
+ * alive across reloads.
+ *
+ * WHY IT IS STILL A MOCK, as of 2026-08-31. This comment used to justify itself
+ * with "there is no backend anywhere in the eBPCO system yet (see master command
+ * Section 15, Open Decision #3)". That premise has EXPIRED: Upupapp/eBPCOBackend
+ * exists and carries a branch, and the admin portal already calls it over HTTP.
+ * What remains true is narrower — no backend is wired to THIS portal, and its
+ * auth contract has not been settled for citizens.
+ *
+ * The distinction matters because this comment is the load-bearing justification
+ * for the whole in-memory design, and a stale premise quietly converts a
+ * deliberate decision into an unexamined one. Re-date it or replace it; do not
+ * leave it asserting something that has stopped being true.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly accounts = new Map<string, { account: UserAccount; password: string }>();
+  private readonly accounts = new Map<
+    string,
+    { account: UserAccount; password: string; preferences: NotificationPreferences }
+  >();
   private readonly currentUserId = signal<string | null>(null);
 
   readonly currentUser = computed<UserAccount | null>(() => {
@@ -65,6 +81,7 @@ export class AuthService {
     const id = 'user-demo';
     this.accounts.set(id, {
       password: 'Password1',
+      preferences: defaultNotificationPreferences(),
       account: {
         id,
         firstName: 'Juan',
@@ -139,7 +156,7 @@ export class AuthService {
       mobileVerification: unverifiedContact(),
       registeredSince: todayIso(),
     };
-    this.accounts.set(id, { account, password: security.password });
+    this.accounts.set(id, { account, password: security.password, preferences: defaultNotificationPreferences() });
     return { ok: true, id };
   }
 
@@ -175,7 +192,33 @@ export class AuthService {
     this.accounts.set(id, entry);
   }
 
-  notificationPreferencesFor(): ReturnType<typeof defaultNotificationPreferences> {
-    return defaultNotificationPreferences();
+  /**
+   * F-15: this used to return a FRESH default object on every call, and nothing
+   * called it. The Profile screen bound its eight preference checkboxes to a
+   * local `defaultNotificationPreferences()` instead, so toggling one changed an
+   * object that was discarded on navigation — a settings panel that looked
+   * functional and configured nothing.
+   *
+   * Bound is not persisted. The controls all had bindings, which is why a
+   * dead-control scan (looking for handler-less buttons and unbound selects)
+   * reported this screen clean.
+   *
+   * Preferences now live on the account, like every other profile field, so the
+   * panel works end-to-end within the demo's own world — the same standard the
+   * mocked login already meets. They are still in-memory only.
+   */
+  notificationPreferencesFor(): NotificationPreferences {
+    const id = this.currentUserId();
+    if (!id) return defaultNotificationPreferences();
+    return { ...(this.accounts.get(id)?.preferences ?? defaultNotificationPreferences()) };
+  }
+
+  updateNotificationPreferences(next: NotificationPreferences): void {
+    const id = this.currentUserId();
+    if (!id) return;
+    const entry = this.accounts.get(id);
+    if (!entry) return;
+    entry.preferences = { ...next };
+    this.accounts.set(id, entry);
   }
 }

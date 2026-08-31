@@ -6,7 +6,11 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "check:assets": "node scripts/check-no-third-party-assets.mjs",
+    "verify": "npm run check:assets && npm run check:print && npm run check:labels && npm run build && npm test -- --watch=false",
+    "check:print": "node scripts/check-print-safety.mjs",
+    "check:labels": "node scripts/check-form-labels.mjs"
   },
   "private": true,
   "packageManager": "npm@11.0.0",

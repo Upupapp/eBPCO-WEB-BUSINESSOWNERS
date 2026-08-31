@@ -10,10 +10,11 @@ import {
   applicantStatusOf,
 } from '../domain/status.model';
 import { ApplicationDocument, DocumentStatus, SavedDocumentFileType } from '../domain/document.model';
-import { Assessment, AssessmentLineItem } from '../domain/assessment.model';
+import { Assessment, AssessmentLineItem, ILLUSTRATIVE_FEE_BASIS } from '../domain/assessment.model';
 import { PaymentMethod, PaymentTransaction } from '../domain/payment.model';
 import { GENERIC_APPLICATION_DOCUMENTS, requirementsFor } from '../domain/requirements-catalog';
 import { nextId, todayIso } from '../utils/ids';
+import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
 
 export interface CreateApplicationInput {
   businessId: string;
@@ -119,6 +120,8 @@ export class ApplicationStore {
       [app2.id]: {
         applicationId: app2.id,
         permitNumber: app2.permitNumber!,
+        // Seeded demo data — never an office issuance. See PermitProvenance.
+        provenance: 'demo',
         issuedDateValue: new Date(app2.issuedDate!),
         issuedDate: app2.issuedDate!,
         expiryDateValue: new Date(app2.expiryDate!),
@@ -133,7 +136,7 @@ export class ApplicationStore {
         applicationId: app2.id,
         status: 'Paid',
         lineItems: [
-          { code: 'ZON-001', name: 'Locational / Zoning Fee', family: 'Locational/Zoning Fee', authority: 'LGU', amountCentavos: 85000, legalBasisTitle: 'LGU Fee Schedule' },
+          { code: 'ZON-001', name: 'Locational / Zoning Fee', family: 'Locational/Zoning Fee', authority: 'LGU', amountCentavos: 85000, legalBasisTitle: ILLUSTRATIVE_FEE_BASIS },
         ],
         totalCentavos: 85000,
         amountPaidCentavos: 85000,
@@ -300,8 +303,8 @@ export class ApplicationStore {
     if (!app) return;
     const lineItems: AssessmentLineItem[] =
       app.applicationAction === 'New'
-        ? [{ code: 'FIL-001', name: 'Filing / Processing Fee', family: 'Filing/Processing', authority: 'LGU', amountCentavos: 525000, legalBasisTitle: 'LGU Fee Schedule' }]
-        : [{ code: 'FIL-002', name: `${app.applicationAction} Fee`, family: 'Filing/Processing', authority: 'LGU', amountCentavos: app.applicationAction === 'Renewal' ? 320000 : 150000, legalBasisTitle: 'LGU Fee Schedule' }];
+        ? [{ code: 'FIL-001', name: 'Filing / Processing Fee', family: 'Filing/Processing', authority: 'LGU', amountCentavos: 525000, legalBasisTitle: ILLUSTRATIVE_FEE_BASIS }]
+        : [{ code: 'FIL-002', name: `${app.applicationAction} Fee`, family: 'Filing/Processing', authority: 'LGU', amountCentavos: app.applicationAction === 'Renewal' ? 320000 : 150000, legalBasisTitle: ILLUSTRATIVE_FEE_BASIS }];
     const total = lineItems.reduce((sum, l) => sum + (l.amountCentavos ?? 0), 0);
     const assessment: Assessment = {
       id: nextId('assess'),
@@ -409,7 +412,12 @@ export class ApplicationStore {
     if (next === 'Permit Generated') {
       const req = app.permitType === 'General Business Permit' ? null : requirementsFor(app.permitType);
       const validityMonths = req ? req.validityMonths : 12;
-      const reviewingOffice = req ? req.reviewingOffice : 'Business Permit and Licensing Office';
+      // The generic flow has no catalog entry to read an office from. The
+      // fallback used to be the "Business Permit and Licensing Office" — a real
+      // but WRONG office: the BPLO issues business permits, and this product is
+      // the Electronic Building Permit and Certificate of Occupancy. The office
+      // that issues these is the one on the LGU's own checklist letterhead.
+      const reviewingOffice = req ? req.reviewingOffice : MUNICIPAL_ENGINEER.name;
       const issued = todayIso();
       const expiry = validityMonths
         ? new Date(new Date(issued).setMonth(new Date(issued).getMonth() + validityMonths)).toISOString()
@@ -420,6 +428,9 @@ export class ApplicationStore {
         [applicationId]: {
           applicationId,
           permitNumber,
+          // Minted by advanceForDemo(), which any signed-in portal user can
+          // trigger from the Application Details screen. Not an issuance.
+          provenance: 'demo',
           issuedDateValue: new Date(issued),
           issuedDate: issued,
           expiryDateValue: expiry ? new Date(expiry) : null,

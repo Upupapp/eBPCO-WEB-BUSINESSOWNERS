@@ -26,15 +26,15 @@ type Step = 1 | 2 | 3;
 
         @if (step() === 1) {
           <div class="form-row">
-            <div class="field"><label>First Name*</label><input class="input" [(ngModel)]="firstName" /></div>
-            <div class="field"><label>Middle Name</label><input class="input" [(ngModel)]="middleName" /></div>
+            <div class="field"><label for="register-first-name-1">First Name*</label><input id="register-first-name-1" class="input" [(ngModel)]="firstName" /></div>
+            <div class="field"><label for="register-middle-name-2">Middle Name</label><input id="register-middle-name-2" class="input" [(ngModel)]="middleName" /></div>
           </div>
-          <div class="field"><label>Last Name*</label><input class="input" [(ngModel)]="lastName" /></div>
+          <div class="field"><label for="register-last-name-3">Last Name*</label><input id="register-last-name-3" class="input" [(ngModel)]="lastName" /></div>
           <div class="form-row">
-            <div class="field"><label>Date of Birth*</label><input class="input" type="date" [(ngModel)]="dateOfBirth" /></div>
+            <div class="field"><label for="register-date-of-birth-4">Date of Birth*</label><input id="register-date-of-birth-4" class="input" type="date" [(ngModel)]="dateOfBirth" /></div>
             <div class="field">
-              <label>Sex*</label>
-              <select class="input" [(ngModel)]="sex">
+              <label for="register-sex-5">Sex*</label>
+              <select id="register-sex-5" class="input" [(ngModel)]="sex">
                 <option [ngValue]="null" disabled>Select</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
@@ -43,8 +43,8 @@ type Step = 1 | 2 | 3;
           </div>
           <div class="form-row">
             <div class="field">
-              <label>Civil Status*</label>
-              <select class="input" [(ngModel)]="civilStatus">
+              <label for="register-civil-status-6">Civil Status*</label>
+              <select id="register-civil-status-6" class="input" [(ngModel)]="civilStatus">
                 <option [ngValue]="null" disabled>Select</option>
                 <option value="Single">Single</option>
                 <option value="Married">Married</option>
@@ -53,23 +53,23 @@ type Step = 1 | 2 | 3;
                 <option value="Divorced">Divorced</option>
               </select>
             </div>
-            <div class="field"><label>Nationality*</label><input class="input" [(ngModel)]="nationality" /></div>
+            <div class="field"><label for="register-nationality-7">Nationality*</label><input id="register-nationality-7" class="input" [(ngModel)]="nationality" /></div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <button class="btn btn-primary btn-block" (click)="toStep2()">Continue</button>
         }
 
         @if (step() === 2) {
-          <div class="field"><label>Email Address*</label><input class="input" type="email" [(ngModel)]="email" /></div>
-          <div class="field"><label>Mobile Number*</label><input class="input" placeholder="09XXXXXXXXX" [(ngModel)]="mobileNumber" /></div>
-          <div class="field"><label>House Number / Street*</label><input class="input" [(ngModel)]="address" /></div>
+          <div class="field"><label for="register-email-address-8">Email Address*</label><input id="register-email-address-8" class="input" type="email" [(ngModel)]="email" /></div>
+          <div class="field"><label for="register-mobile-number-9">Mobile Number*</label><input id="register-mobile-number-9" class="input" placeholder="09XXXXXXXXX" [(ngModel)]="mobileNumber" /></div>
+          <div class="field"><label for="register-house-number-street-10">House Number / Street*</label><input id="register-house-number-street-10" class="input" [(ngModel)]="address" /></div>
           <div class="form-row">
-            <div class="field"><label>Barangay*</label><input class="input" [(ngModel)]="barangay" /></div>
-            <div class="field"><label>City / Municipality*</label><input class="input" [(ngModel)]="city" /></div>
+            <div class="field"><label for="register-barangay-11">Barangay*</label><input id="register-barangay-11" class="input" [(ngModel)]="barangay" /></div>
+            <div class="field"><label for="register-city-municipality-12">City / Municipality*</label><input id="register-city-municipality-12" class="input" [(ngModel)]="city" /></div>
           </div>
           <div class="form-row">
-            <div class="field"><label>Province*</label><input class="input" [(ngModel)]="province" /></div>
-            <div class="field"><label>Postal Code*</label><input class="input" maxlength="4" [(ngModel)]="zipCode" /></div>
+            <div class="field"><label for="register-province-13">Province*</label><input id="register-province-13" class="input" [(ngModel)]="province" /></div>
+            <div class="field"><label for="register-postal-code-14">Postal Code*</label><input id="register-postal-code-14" class="input" maxlength="4" [(ngModel)]="zipCode" /></div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
@@ -80,11 +80,11 @@ type Step = 1 | 2 | 3;
 
         @if (step() === 3) {
           <div class="field">
-            <label>Password*</label>
-            <input class="input" type="password" [(ngModel)]="password" />
+            <label for="register-password-15">Password*</label>
+            <input id="register-password-15" class="input" type="password" [(ngModel)]="password" />
             <div class="hint">Minimum 8 characters, at least 1 letter and 1 number.</div>
           </div>
-          <div class="field"><label>Confirm Password*</label><input class="input" type="password" [(ngModel)]="confirmPassword" /></div>
+          <div class="field"><label for="register-confirm-password-16">Confirm Password*</label><input id="register-confirm-password-16" class="input" type="password" [(ngModel)]="confirmPassword" /></div>
           <label class="checkbox-row" style="margin-bottom:8px;">
             <input type="checkbox" [(ngModel)]="acceptedTerms" /> I agree to the <a routerLink="/terms">Terms &amp; Conditions</a>
           </label>

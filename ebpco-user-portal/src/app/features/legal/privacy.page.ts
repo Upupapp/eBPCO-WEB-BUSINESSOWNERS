@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
+import { PRIVACY_POLICY_SECTIONS } from '../../core/domain/legal-copy';
 
 @Component({
   selector: 'app-privacy',
@@ -11,12 +11,17 @@ import { PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
       <div class="page-header" style="margin-top:12px;">
         <h1>Privacy Policy</h1>
       </div>
-      <div class="card">
-        <p>{{ privacy }}</p>
-      </div>
+      @for (section of sections; track section.heading) {
+        <div class="card">
+          <div class="card-title">{{ section.heading }}</div>
+          @for (paragraph of section.paragraphs; track paragraph) {
+            <p class="small" style="margin:0 0 8px;">{{ paragraph }}</p>
+          }
+        </div>
+      }
     </div>
   `,
 })
 export class PrivacyPage {
-  readonly privacy = PRIVACY_POLICY_TEXT;
+  protected readonly sections = PRIVACY_POLICY_SECTIONS;
 }

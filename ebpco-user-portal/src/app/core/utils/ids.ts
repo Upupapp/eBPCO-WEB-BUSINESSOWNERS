@@ -1,6 +1,6 @@
 let counter = 1000;
 
-/** Simple incrementing id generator for this mock/in-memory build — swap for server-issued ids once a real backend exists (see master command Section 15, Open Decision #3). */
+/** Simple incrementing id generator for this mock/in-memory build — swap for server-issued ids once a backend is wired to this portal (see master command Section 15, Open Decision #3). */
 export function nextId(prefix: string): string {
   counter += 1;
   return `${prefix}-${counter}`;

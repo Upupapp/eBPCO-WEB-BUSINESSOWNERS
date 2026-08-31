@@ -199,3 +199,17 @@
 @media (prefers-reduced-motion: reduce) {
   .ds-nav-link { transition: none; }
 }
+
+// F-14 demo banner. Deliberately not dismissible: a citizen who dismisses it
+// on the dashboard would not see it again on the wizard, which is the screen
+// where the misunderstanding actually costs them something.
+.ds-demo-banner {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--warning-text, #a15c00);
+  border-radius: 8px;
+  background: var(--warning-100, #fff4e5);
+  color: var(--warning-text, #a15c00);
+  font-size: 13px;
+  line-height: 1.45;
+}

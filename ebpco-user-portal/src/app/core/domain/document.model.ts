@@ -36,7 +36,7 @@ export interface ApplicationDocument {
 
 export type SavedDocumentFileType = 'pdf' | 'jpg' | 'jpeg' | 'png';
 
-/** Mirrors ebpco-mobile's SavedDocumentCategory — the applicant's reusable "My Documents" library. */
+/** Mirrors ebpco-mobile's SavedDocumentCategory — the citizen's reusable "My Documents" library. */
 export type SavedDocumentCategory =
   | 'validGovernmentId'
   | 'proofOfAddress'

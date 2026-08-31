@@ -1,7 +1,7 @@
 // The single, fixed, complete list of permit types this system supports.
 // Mirrors EBPCO WEB ADMIN/E-BPCO-Software-main's core/domain/permit.model.ts
 // exactly (PermitType union + ALL_PERMIT_TYPES order) — this is the shared
-// contract between the Admin Portal and this User Portal. Do not add,
+// contract between the Admin Portal and this Citizen Portal. Do not add,
 // rename, reorder, or alias any entry without updating both apps.
 export type PermitType =
   | 'Building Permit – New Construction'
@@ -89,9 +89,25 @@ export function isValidPermitType(value: string): value is PermitType {
 
 export type ApplicationAction = 'New' | 'Renewal' | 'Amendment';
 
+/**
+ * Where a permit record came from. This is the ONLY signal that may clear the
+ * "not a real permit" watermark on a printed document, so it must never be
+ * derivable from anything a portal user can drive themselves.
+ *
+ * 'demo'   — minted in-browser by the demo lifecycle advance, or seeded. No
+ *            office reviewed it and no office issued it.
+ * 'issued' — genuinely issued by the LGU and read back from the backend.
+ *            NOTHING sets this today; it is the seam the backend will fill.
+ *
+ * While there is no backend, every record is 'demo' and every printed document
+ * is therefore watermarked. That is the correct behaviour, not a placeholder.
+ */
+export type PermitProvenance = 'demo' | 'issued';
+
 export interface GeneratedPermit {
   applicationId: string;
   permitNumber: string;
+  provenance: PermitProvenance;
   issuedDateValue: Date;
   issuedDate: string;
   expiryDateValue: Date | null;

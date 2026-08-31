@@ -2,7 +2,7 @@
   <aside class="ds-sidenav">
     <div class="ds-brand">
       <img src="logo.png" alt="Municipality of Castilla seal" class="ds-brand-seal" />
-      <span class="ds-brand-title">eBPCO Portal</span>
+      <span class="ds-brand-title">eBPCO Citizen Portal</span>
     </div>
     <div class="ds-brand-rule"></div>
 
@@ -102,6 +102,22 @@
         </svg>
       </span>
     </div>
+    <!--
+      F-14: the demo disclosure belongs HERE, in the shell, not on individual
+      screens. It previously appeared on three screens and only in their
+      "we couldn't find that" branch — so a citizen saw it after their data was
+      already gone, never before they spent an hour on the application wizard.
+      A disclosure that arrives only on failure is a consolation, not a warning.
+      The whole build is a demonstration, so the notice is a property of the
+      build, not of a screen. Guarded by app-shell.component.spec.ts.
+    -->
+    <div class="ds-demo-banner" role="status">
+      <strong>Demonstration build.</strong>
+      Nothing you enter here reaches the Municipality of Castilla. Data is kept in your browser only
+      and is erased when you close or refresh the page. Do not file a real permit application here —
+      contact the Office of the Municipal Engineer on {{ engineerMobile }}.
+    </div>
+
     <router-outlet />
   </div>
 </div>

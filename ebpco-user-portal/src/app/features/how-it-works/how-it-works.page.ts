@@ -52,7 +52,7 @@ const STEPS: ProcessStep[] = [
       <header style="display:flex; align-items:center; justify-content:space-between; padding:18px 32px; background:#fff; border-bottom:1px solid var(--border-light);">
         <a routerLink="/landing" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
           <img src="logo.png" alt="eBPCO" style="width:34px; height:34px; object-fit:contain;" />
-          <strong style="font-size:16px;">eBPCO User Portal</strong>
+          <strong style="font-size:16px;">eBPCO Citizen Portal</strong>
         </a>
         <div style="display:flex; gap:10px;">
           <a routerLink="/login" class="btn btn-secondary">Log In</a>

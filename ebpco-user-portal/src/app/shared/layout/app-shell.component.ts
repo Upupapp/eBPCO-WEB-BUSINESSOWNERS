@@ -4,6 +4,7 @@ import { AuthService } from '../../core/session/auth.service';
 import { NotificationStore } from '../../core/stores/notification.store';
 import { ToastHostComponent } from '../ui/toast-host.component';
 import { fullName } from '../../core/domain/user.model';
+import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 
 @Component({
   selector: 'app-shell',
@@ -15,6 +16,7 @@ export class AppShellComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly notifications = inject(NotificationStore);
+  protected readonly engineerMobile = MUNICIPAL_ENGINEER.mobile;
 
   userName(): string {
     const u = this.auth.currentUser();

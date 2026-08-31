@@ -18,19 +18,19 @@ import { ToastService } from '../../shared/ui/toast.service';
       </div>
 
       <div class="card">
-        <div class="field"><label>Business Name*</label><input class="input" [(ngModel)]="name" /></div>
+        <div class="field"><label for="register-business-business-name-1">Business Name*</label><input id="register-business-business-name-1" class="input" [(ngModel)]="name" /></div>
         <div class="field">
-          <label>Business Category*</label>
-          <select class="input" [(ngModel)]="category">
+          <label for="register-business-business-category-2">Business Category*</label>
+          <select id="register-business-business-category-2" class="input" [(ngModel)]="category">
             @for (c of categories; track c) { <option [value]="c">{{ c }}</option> }
           </select>
         </div>
-        <div class="field"><label>House Number / Street*</label><input class="input" [(ngModel)]="street" /></div>
+        <div class="field"><label for="register-business-house-number-street-3">House Number / Street*</label><input id="register-business-house-number-street-3" class="input" [(ngModel)]="street" /></div>
         <div class="form-row">
-          <div class="field"><label>Barangay*</label><input class="input" [(ngModel)]="barangay" /></div>
-          <div class="field"><label>City / Municipality*</label><input class="input" [(ngModel)]="city" /></div>
+          <div class="field"><label for="register-business-barangay-4">Barangay*</label><input id="register-business-barangay-4" class="input" [(ngModel)]="barangay" /></div>
+          <div class="field"><label for="register-business-city-municipality-5">City / Municipality*</label><input id="register-business-city-municipality-5" class="input" [(ngModel)]="city" /></div>
         </div>
-        <div class="field"><label>Province*</label><input class="input" [(ngModel)]="province" /></div>
+        <div class="field"><label for="register-business-province-6">Province*</label><input id="register-business-province-6" class="input" [(ngModel)]="province" /></div>
 
         @if (error()) { <div class="field error">{{ error() }}</div> }
 
@@ -70,7 +70,8 @@ export class RegisterBusinessPage {
       city: this.city,
       province: this.province,
     });
-    this.toast.success(`${business.name} has been registered.`);
+    // F-14: "registered" reads as registered WITH THE MUNICIPALITY. It is not.
+    this.toast.success(`${business.name} saved to this demo, not registered with the Municipality.`);
     this.router.navigate(['/businesses', business.id]);
   }
 }

@@ -1,0 +1,24 @@
+# Repository-root ignores.
+#
+# The app's own ebpco-user-portal/.gitignore uses ROOTED patterns (/node_modules,
+# /dist), which anchor to that subdirectory only. Anything installed or generated
+# at this level was therefore tracked — a vitest cache under node_modules/ and an
+# agent's runtime lock file both reached the initial commit that way.
+
+# Dependencies and build output, at any depth
+node_modules/
+dist/
+.angular/
+*.tsbuildinfo
+
+# Agent and editor runtime state
+.claude/
+.DS_Store
+*.log
+
+# NOTE: sweep reports and pending registers are deliberately NOT ignored here.
+# This repository is PRIVATE (verified 2026-08-31), so its findings book belongs
+# in it — that is how the next agent receives it. The estate rule that keeps
+# findings local applies to the PUBLIC repo (eBPCO-Web), not this one. If this
+# repo is ever made public, move SWEEP-*.md out BEFORE flipping visibility: it
+# inventories the portal's own weaknesses.

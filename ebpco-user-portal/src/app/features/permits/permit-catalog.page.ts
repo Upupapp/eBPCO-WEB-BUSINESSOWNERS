@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
 import { REQUIREMENTS_CATALOG } from '../../core/domain/requirements-catalog';
 import { BusinessStore } from '../../core/stores/business.store';
+import { permitFormAssetFor } from '../../core/domain/permit-form-assets';
 
 @Component({
   selector: 'app-permit-catalog',
@@ -45,6 +46,30 @@ import { BusinessStore } from '../../core/stores/business.store';
                     </li>
                   }
                 </ul>
+
+                <!--
+                  F-13: this is what makes the bundled LGU forms reachable.
+                  permit-form-assets.ts mapped all 19 permit types to the
+                  Municipality's own blank forms in public/assets/permit-forms/,
+                  and NOTHING imported it — 13 of the 14 bundled PDFs could not
+                  be opened from any screen. The files existed; the feature did
+                  not. Guarded by permit-catalog.page.spec.ts.
+                -->
+                <a
+                  class="small"
+                  style="display:inline-block; margin:0 0 16px;"
+                  [href]="formAsset(type).fileName"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Download the official blank form — {{ formAsset(type).label }}
+                </a>
+                @if (formAsset(type).isFallback) {
+                  <p class="small muted" style="margin:-10px 0 16px;">
+                    Castilla has no dedicated form for this permit; the generic Unified Application
+                    Form is used.
+                  </p>
+                }
               }
 
               <div class="card-footer" style="display:flex; flex-direction:column; gap:8px;">
@@ -61,6 +86,7 @@ import { BusinessStore } from '../../core/stores/business.store';
   `,
 })
 export class PermitCatalogPage {
+  protected readonly formAsset = permitFormAssetFor;
   protected readonly businesses = inject(BusinessStore);
   private readonly router = inject(Router);
 

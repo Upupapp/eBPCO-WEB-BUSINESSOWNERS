@@ -5,7 +5,13 @@ import { BusinessStore } from '../../core/stores/business.store';
 import { requirementsFor } from '../../core/domain/requirements-catalog';
 import { formatDate } from '../../core/utils/ids';
 
-type PublicStatus = 'Valid' | 'Expired';
+/**
+ * 'Unverified' is the default for anything this page cannot positively confirm.
+ * A verification surface must fail CLOSED: the cost of showing "Valid" for a
+ * permit that is not is far higher than the cost of showing "Unverified" for
+ * one that is. Do not add a branch that returns 'Valid' by fallthrough.
+ */
+type PublicStatus = 'Valid' | 'Expired' | 'Unverified';
 
 /** Public, no-login verification page — the destination the QR block on every generated permit points to. The token is simply the permit's own real, system-generated number. */
 @Component({
@@ -20,7 +26,7 @@ type PublicStatus = 'Valid' | 'Expired';
         </p>
 
         @if (permit(); as p) {
-          <div class="badge" [class]="status() === 'Valid' ? 'badge-green' : 'badge-amber'" style="margin-bottom:16px; font-size:14px; padding:6px 16px;">
+          <div class="badge" [class]="badgeClass()" style="margin-bottom:16px; font-size:14px; padding:6px 16px;">
             {{ status() }}
           </div>
           <dl style="text-align:left; display:flex; flex-direction:column; gap:8px; margin:0;">
@@ -49,9 +55,44 @@ type PublicStatus = 'Valid' | 'Expired';
               <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ p.approvingOffice }}</dd>
             </div>
           </dl>
+          @if (status() === 'Unverified') {
+            <p class="small" style="margin-top:16px; text-align:left; font-weight:600;">
+              This record is demonstration data, not an issued permit. It does not confirm that any
+              permit exists.
+            </p>
+          }
         } @else {
-          <p class="muted" style="font-weight:600;">No permit found for this number.</p>
+          <p class="muted" style="font-weight:600;">No record for this permit number.</p>
+          <p class="small muted" style="margin-top:8px; text-align:left;">
+            <strong>This does not mean the permit is invalid.</strong> A genuine permit issued by the
+            Municipality will not be found here either — see the notice below.
+          </p>
         }
+
+        <!--
+          F-3: this is the only screen a member of the public reaches without an
+          account, and it is the destination of the QR printed on every permit.
+          It must therefore carry the demo disclosure the four signed-in screens
+          already carry, on BOTH the found and not-found paths. Without it, a
+          bank or barangay official checking a real permit number reads "not
+          found" as "this permit is forged".
+        -->
+        <div
+          class="card"
+          style="margin-top:20px; text-align:left; background:var(--warning-100, #fff4e5); border:1px solid var(--warning-text, #a15c00);"
+        >
+          <div class="card-title" style="margin-bottom:6px;">This portal cannot yet verify permits</div>
+          <p class="small" style="margin:0 0 8px;">
+            eBPCO is a demonstration build. It holds no real permit records, so
+            <strong>no permit issued by the Municipality of Castilla can be confirmed here</strong> —
+            whether or not this page found a match.
+          </p>
+          <p class="small" style="margin:0;">
+            To verify a permit, contact the Office of the Municipal Engineer, Municipality of Castilla,
+            Sorsogon — <strong>09054818572</strong> or
+            <a href="mailto:meocastilla&#64;gmail.com">meocastilla&#64;gmail.com</a>.
+          </p>
+        </div>
       </div>
     </div>
   `,
@@ -88,8 +129,24 @@ export class VerifyPermitPage {
 
   protected readonly status = computed<PublicStatus>(() => {
     const p = this.permit();
-    if (!p) return 'Valid';
+    // Fail closed. No record, or a record no office actually issued, is never
+    // 'Valid' — see PermitProvenance. Today nothing is 'issued', so this page
+    // cannot return 'Valid' at all, which is the honest answer while the
+    // portal holds no real permit records.
+    if (!p) return 'Unverified';
+    if (p.provenance !== 'issued') return 'Unverified';
     if (p.expiryDateValue && p.expiryDateValue.getTime() < Date.now()) return 'Expired';
     return 'Valid';
+  });
+
+  protected readonly badgeClass = computed(() => {
+    switch (this.status()) {
+      case 'Valid':
+        return 'badge-green';
+      case 'Expired':
+        return 'badge-amber';
+      default:
+        return 'badge-gray';
+    }
   });
 }

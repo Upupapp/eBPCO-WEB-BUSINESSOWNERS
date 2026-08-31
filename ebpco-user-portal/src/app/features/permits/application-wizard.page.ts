@@ -55,8 +55,8 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
       @if (step() === 1) {
         <div class="card">
           <div class="field">
-            <label>Business*</label>
-            <select class="input" [(ngModel)]="businessId">
+            <label for="application-wizard-business-1">Business*</label>
+            <select id="application-wizard-business-1" class="input" [(ngModel)]="businessId">
               <option [ngValue]="null" disabled>Select a business</option>
               @for (b of businesses.myBusinesses(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
             </select>
@@ -65,8 +65,8 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
             }
           </div>
           <div class="field">
-            <label>Application Type*</label>
-            <select class="input" [(ngModel)]="applicationAction">
+            <label for="application-wizard-application-type-2">Application Type*</label>
+            <select id="application-wizard-application-type-2" class="input" [(ngModel)]="applicationAction">
               <option value="New">New Permit</option>
               <option value="Renewal">Renewal</option>
               <option value="Amendment">Amendment</option>
@@ -80,11 +80,11 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
       @if (step() === 2) {
         <div class="card">
           <div class="card-title">Project / Application Details</div>
-          <div class="field"><label>Project / Business Address*</label><input class="input" [(ngModel)]="projectAddress" placeholder="Street, Barangay, City" /></div>
-          <div class="field"><label>Scope of Work / Purpose*</label><textarea class="input" rows="3" [(ngModel)]="scopeOfWork" placeholder="Briefly describe the work or purpose of this application"></textarea></div>
+          <div class="field"><label for="application-wizard-project-business-address-3">Project / Business Address*</label><input id="application-wizard-project-business-address-3" class="input" [(ngModel)]="projectAddress" placeholder="Street, Barangay, City" /></div>
+          <div class="field"><label for="application-wizard-scope-of-work-4">Scope of Work / Purpose*</label><textarea id="application-wizard-scope-of-work-4" class="input" rows="3" [(ngModel)]="scopeOfWork" placeholder="Briefly describe the work or purpose of this application"></textarea></div>
           <div class="form-row">
-            <div class="field"><label>Professional in Charge (if any)</label><input class="input" [(ngModel)]="professionalName" placeholder="Engineer / Architect name" /></div>
-            <div class="field"><label>PRC License No.</label><input class="input" [(ngModel)]="prcNumber" /></div>
+            <div class="field"><label for="application-wizard-professional-in-charge-5">Professional in Charge (if any)</label><input id="application-wizard-professional-in-charge-5" class="input" [(ngModel)]="professionalName" placeholder="Engineer / Architect name" /></div>
+            <div class="field"><label for="application-wizard-prc-license-no-6">PRC License No.</label><input id="application-wizard-prc-license-no-6" class="input" [(ngModel)]="prcNumber" /></div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
@@ -256,7 +256,10 @@ export class ApplicationWizardPage {
       if (a) this.applicationStore.attachDocument(record.id, d.id, d.label, a.fileName, a.fileType);
     }
     this.applicationStore.submit(record.id);
-    this.toast.success('Application submitted successfully.');
+    // F-14: not "submitted successfully". Nothing was sent to the Municipality,
+    // and this is the screen where believing otherwise costs the most — a citizen
+    // could let construction proceed thinking a permit application is in progress.
+    this.toast.success('Saved to this demo. NOT sent to the Municipality.');
     this.router.navigate(['/applications', record.id]);
   }
 }

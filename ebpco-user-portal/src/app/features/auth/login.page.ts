@@ -16,12 +16,12 @@ import { AuthService } from '../../core/session/auth.service';
         </div>
 
         <div class="field">
-          <label>Email or Mobile Number</label>
-          <input class="input" [(ngModel)]="identifier" placeholder="you@example.com" />
+          <label for="login-email-or-mobile-1">Email or Mobile Number</label>
+          <input id="login-email-or-mobile-1" class="input" [(ngModel)]="identifier" placeholder="you@example.com" />
         </div>
         <div class="field">
-          <label>Password</label>
-          <input class="input" type="password" [(ngModel)]="password" placeholder="••••••••" />
+          <label for="login-password-2">Password</label>
+          <input id="login-password-2" class="input" type="password" [(ngModel)]="password" placeholder="••••••••" />
         </div>
 
         @if (error()) {

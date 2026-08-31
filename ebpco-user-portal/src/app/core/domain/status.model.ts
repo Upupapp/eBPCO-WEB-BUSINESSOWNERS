@@ -1,6 +1,6 @@
 // Canonical application status model — ported from the Admin Portal's
 // core/domain/status.model.ts so the two apps describe the same record.
-// This User Portal only ever DISPLAYS the coarser applicant-facing label
+// This Citizen Portal only ever DISPLAYS the coarser citizen-facing label
 // (see LIFECYCLE_TO_MOBILE_LABEL / applicantStatusOf below); the full
 // 19-value lifecycle exists here so a future shared backend has one
 // definition to implement, not two.
@@ -54,7 +54,7 @@ export function isTerminalStatus(status: ApplicationLifecycleStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-/** The applicant-facing vocabulary — identical to ebpco-mobile's ApplicationStatus. Every screen in this portal renders this, never the raw 19-value lifecycle. */
+/** The citizen-facing vocabulary — identical to ebpco-mobile's ApplicationStatus. Every screen in this portal renders this, never the raw 19-value lifecycle. */
 export type ApplicantStatus =
   | 'Draft'
   | 'Submitted'

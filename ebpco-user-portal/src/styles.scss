@@ -1,4 +1,4 @@
-// Global stylesheet for the eBPCO User Portal.
+// Global stylesheet for the eBPCO Citizen Portal.
 //
 // Design tokens are now aligned with castilla-lgu-portal's system
 // (castilla-lgu-portal/src/app/shared/styles/_tokens.scss) rather than the
@@ -22,7 +22,11 @@
   --gold-100: #faefd6;
   --gold-500: #cc9a2e;
   --gold-600: #b8860f;
-  --gold-700: #96690f;
+  // a11y: darkened from #96690f, which gave 4.25:1 against --gold-100 (#faefd6)
+  // on .badge-gold — under the 4.5:1 WCAG AA floor for 12px bold text. #8c6210
+  // gives 4.75:1. Keep any future gold text at or above this darkness, or
+  // re-check the ratio: the badge sits on the pale gold, not on white.
+  --gold-700: #8c6210;
   --gold-border: #ecd9a8;
 
   --secondary-50: #fafafc;
@@ -380,10 +384,75 @@ table.table tr:last-child td { border-bottom: none; }
   padding: 0 10%;
 }
 
+// a11y (WCAG 1.4.1): an inline link inside a block of text must not be
+// distinguishable by colour alone. Standalone links that are visually obvious
+// from their placement — nav items, buttons, cards — are exempt via .btn and
+// the layout classes, so this targets prose only.
+// Any inline link sitting inside a run of text — including the auth screens'
+// "Don't have an account? Register", which lives in a plain <div>, not a <p>.
+// Keyed on the LINK, with real navigation chrome excluded, rather than on the
+// container: keying on <p> missed exactly the two highest-traffic cases.
+p a:not(.btn),
+dd a:not(.btn),
+li a:not(.btn),
+div.small a:not(.btn),
+div.muted a:not(.btn),
+label a:not(.btn) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @media print {
   @page { size: A4; margin: 0; }
   .doc-generated-page { border: none; }
   .no-print { display: none !important; }
+
+  // F-18: the permit document lives inside the app shell, and the shell used to
+  // print with it. A citizen who clicked "Print / Download" — the primary action
+  // on that screen — got the navigation sidebar down the left and the ENTIRE
+  // RIGHT HALF of the permit off the page: the municipality name, the permit
+  // title, the owner's business and address, and the whole AMOUNT column.
+  //
+  // Only clicking found this. Every static check passed, because nothing here is
+  // wrong until the layout meets a page boundary.
+  .ds-sidenav,
+  .ds-topbar { display: none !important; }
+
+  .ds-shell { display: block !important; }
+
+  .ds-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible !important;
+
+    &::before,
+    &::after { display: none !important; }
+  }
+
+  // The demo notice MUST print. A watermarked permit that leaves the building
+  // without it is a disclosure that was only ever screen-bound — the artifact
+  // travels further than the screen, and is what someone else will be shown.
+  .ds-demo-banner {
+    margin: 0 0 8px !important;
+    border: 1px solid #a15c00 !important;
+    background: #fff4e5 !important;
+    color: #7a4600 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  // Without this the watermark is a 14%-opacity tint that the browser is free to
+  // drop as decorative ink under the default `print-color-adjust: economy` —
+  // which would hand back exactly the unwatermarked, letterheaded document F-2
+  // exists to prevent.
+  .doc-generated-watermark {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    display: flex !important;
+    visibility: visible !important;
+  }
 }
 
 // How It Works process steps

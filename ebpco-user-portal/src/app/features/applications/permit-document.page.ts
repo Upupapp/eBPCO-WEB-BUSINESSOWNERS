@@ -80,6 +80,19 @@ interface QrCell {
             </div>
 
             <section class="doc-generated-section">
+              <!--
+                "Owner / Applicant" STAYS, and is not swept into the CITIZEN
+                vocabulary ruling. This heading mirrors BOX 1 of the LGU's own
+                Unified Application Form for Building Permit, which reads
+                "OWNER/APPLICANT" and treats Applicant, Owner and Licensed
+                Architect / Civil Engineer as three distinct signing roles
+                (BOX 3, BOX 4, BOX 5). "Citizen" names WHO uses this portal;
+                "Applicant" names WHICH ROLE they signed a statutory form in,
+                and one citizen may be the applicant without being the lot
+                owner — see the "Owner's Written Consent (if applicant is not
+                the lot owner)" requirement. Renaming this would misstate a
+                legal document. Guarded by permit-document.page.spec.ts.
+              -->
               <h2>Owner / Applicant</h2>
               <dl class="doc-generated-fields">
                 <div>
@@ -196,7 +209,15 @@ interface QrCell {
             </div>
 
             <footer class="doc-generated-footer">
-              <p>This is a system-generated document issued by the Municipality of Castilla, Sorsogon.</p>
+              @if (gateCleared()) {
+                <p>This is a system-generated document issued by the Municipality of Castilla, Sorsogon.</p>
+              } @else {
+                <p>
+                  This is a system-generated <strong>preview</strong> produced by the eBPCO portal. It is
+                  not an issued permit and has no legal effect. Only the Municipality of Castilla,
+                  Sorsogon issues permits.
+                </p>
+              }
               <p>Document Ref. {{ a.id }} &middot; Generated {{ generatedOn }} &middot; Page 1 of 1</p>
             </footer>
           </article>
@@ -269,14 +290,25 @@ export class PermitDocumentPage {
     const a = this.app();
     if (!a) return { cleared: false, watermarkText: 'DRAFT' as WatermarkText };
 
-    // A real, store-issued permit record is the authoritative "this is
-    // genuinely issued" signal — the office only ever creates one after
-    // its own review/payment gate already passed, so its mere existence
-    // outranks re-deriving those same preconditions here. (Re-checking
-    // them independently is also fragile against seed rows whose document
-    // checklist wasn't fully backfilled for a later lifecycle stage —
-    // trusting the permit record avoids that false negative.)
-    if (this.permit()) return { cleared: true, watermarkText: null as WatermarkText };
+    // An ISSUED permit record is the authoritative "this is genuinely issued"
+    // signal — the office only ever creates one after its own review/payment
+    // gate already passed, so its mere existence outranks re-deriving those
+    // same preconditions here. (Re-checking them independently is also fragile
+    // against seed rows whose document checklist wasn't fully backfilled for a
+    // later lifecycle stage — trusting the permit record avoids that false
+    // negative.)
+    //
+    // The provenance check is load-bearing and must not be dropped. The mere
+    // EXISTENCE of a permit record is not evidence of issuance while the demo
+    // lifecycle advance can mint one: 'Demo: Simulate Office Update' on the
+    // Application Details screen walks any application to 'Permit Generated',
+    // so without this check any signed-in user could print an unwatermarked
+    // document carrying the Republic of the Philippines letterhead, the
+    // municipal seal and a verification QR. Nothing sets 'issued' until a
+    // backend does, so today every document is watermarked — by design.
+    const p = this.permit();
+    if (p?.provenance === 'issued') return { cleared: true, watermarkText: null as WatermarkText };
+    if (p) return { cleared: false, watermarkText: 'NOT VALID AS AN OFFICIAL PERMIT' as WatermarkText };
 
     if (!this.store.documentsResolvedFor(a.id)) {
       return { cleared: false, watermarkText: 'DRAFT' as WatermarkText };
@@ -289,6 +321,7 @@ export class PermitDocumentPage {
   });
 
   protected readonly watermarkText = computed(() => this.gate().watermarkText);
+  protected readonly gateCleared = computed(() => this.gate().cleared);
 
   protected readonly verificationUrl = computed(() => {
     const p = this.permit();
