@@ -16,8 +16,24 @@
  */
 import { readFileSync } from 'node:fs';
 
-const css = readFileSync('src/styles.scss', 'utf8');
-const doc = readFileSync('../docs/01-Brand-Guidelines/04-Typography.md', 'utf8');
+// Paths are overridable so this script can be dropped into the admin portal and
+// the information website unchanged - they carry the same guideline and have no
+// such check. Defaults are this repo's layout.
+//
+//   node check-heading-scale.mjs [stylesheet] [guideline]
+//
+// NOT directly reusable by the Flutter mobile app: it has no stylesheet. The
+// same IDEA transfers - assert the shipped TextTheme against the guideline - but
+// it needs a Dart implementation. Do not pretend this file covers that surface.
+const [cssPath = 'src/styles.scss',
+       docPath = '../docs/01-Brand-Guidelines/04-Typography.md'] = process.argv.slice(2);
+
+const read = (p, what) => {
+  try { return readFileSync(p, 'utf8'); }
+  catch { console.error(`✘ cannot read the ${what}: ${p}`); process.exit(2); }
+};
+const css = read(cssPath, 'stylesheet');
+const doc = read(docPath, 'guideline');
 const failures = [];
 
 // Blanket rule supplies 800; a level may override it.
@@ -32,15 +48,15 @@ for (const level of [1, 2, 3, 4, 5, 6]) {
   // lines below. The gate caught its own bug, which is the point of running it
   // against a known-good state before trusting it.
   const rule = new RegExp(`^h${level} \\{([^}]*)\\}`, 'm').exec(css);
-  if (!rule) { failures.push(`styles.scss: h${level} has no rule of its own - it would inherit the blanket weight at the browser's default size`); continue; }
+  if (!rule) { failures.push(`${cssPath}: h${level} has no rule of its own - it would inherit the blanket weight at the browser's default size`); continue; }
   const size = /font-size:\s*(\d+)px/.exec(rule[1]);
-  if (!size) { failures.push(`styles.scss: h${level} sets no font-size`); continue; }
+  if (!size) { failures.push(`${cssPath}: h${level} sets no font-size`); continue; }
   const w = /font-weight:\s*(\d+)/.exec(rule[1]);
   const weight = w ? Number(w[1]) : base;
 
   // The document's own block for this level.
   const block = new RegExp(`## Heading ${level}\\n[\\s\\S]*?Desktop\\n\\n(\\d+)px[\\s\\S]*?Weight\\n\\n(\\d+)`).exec(doc);
-  if (!block) { failures.push(`04-Typography.md: no parsable "Heading ${level}" block`); continue; }
+  if (!block) { failures.push(`${docPath}: no parsable "Heading ${level}" block`); continue; }
   if (Number(block[1]) !== Number(size[1])) {
     failures.push(`h${level}: code is ${size[1]}px, the guideline says ${block[1]}px`);
   }
@@ -50,9 +66,9 @@ for (const level of [1, 2, 3, 4, 5, 6]) {
 }
 
 if (failures.length) {
-  console.error('✘ heading-scale check FAILED — styles.scss and 04-Typography.md disagree\n');
+  console.error(`✘ heading-scale check FAILED — ${cssPath} and ${docPath} disagree\n`);
   for (const f of failures) console.error(`  - ${f}`);
   console.error('\n  The shipping scale is authoritative (owner, 31 Aug 2026): fix the document.');
   process.exit(1);
 }
-console.log('✔ heading scale in styles.scss matches the brand guideline');
+console.log(`✔ heading scale in ${cssPath} matches ${docPath}`);
