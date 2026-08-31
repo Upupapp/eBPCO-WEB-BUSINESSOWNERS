@@ -444,6 +444,45 @@
   .ob-cta { margin-bottom: 24px; }
 }
 
+// Short viewports - in practice a phone held in LANDSCAPE (e.g. 844x390).
+//
+// The primary action was falling BELOW THE FOLD: the CTA sat at y=498 in a
+// 390px viewport, so the only way forward on an onboarding screen was invisible
+// until the citizen thought to scroll. The max-height: 700px rule above only
+// trims margins, which cannot recover the ~130px needed.
+//
+// The hero is scaled with `transform`, NOT by setting a smaller width/height.
+// Its rings, aura and icon chips are absolutely positioned children with FIXED
+// px sizes (200px aura, 180/220px rings) centred on the parent - shrinking the
+// parent box would leave every one of them overflowing at full size. `transform`
+// scales the subtree; the reduced `height` then reclaims the layout space the
+// transform does not.
+@media (max-height: 480px) {
+  // padding-top has to clear the hero's ORBIT, not its box: the outer dashed
+  // ring and the icon chips are positioned outside the 340x260 bounds, so the
+  // topmost painted pixel sits ~35px above the box even after scaling.
+  .ob-content { padding-top: 22px; }
+
+  .ob-hero {
+    transform: scale(0.4);
+    transform-origin: center top;
+    height: 104px;
+    margin-bottom: 2px;
+  }
+
+  .ob-heading { font-size: clamp(20px, 2.9vw, 26px); }
+  .ob-desc { font-size: 14px; }
+  .ob-dots { margin-top: 10px; }
+
+  .ob-cta {
+    height: 46px;
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+
+  .ob-skip { top: 12px; right: 16px; font-size: 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ob-orbit-ring-outer { animation: none; }
 }
