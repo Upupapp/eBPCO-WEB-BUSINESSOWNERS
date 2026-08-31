@@ -89,11 +89,22 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+// Heading scale. This is the authority the brand guideline now documents
+// (04-Typography.md v1.2.0) - doc corrected to code, not the other way round,
+// because this scale is live and coherent and the documented one never shipped.
+//
+// h5 and h6 previously had NO font-size rule and fell through to the blanket
+// weight above, so the first `<h5>` anyone wrote would have rendered at the
+// browser default (~13px) in Extra Bold. Nothing used them yet, so this closed
+// a trap rather than a visible defect - but the guideline promises 14px/13px at
+// 700, and a scale with two undefined steps is not a scale.
 h1, h2, h3, h4, h5, h6 { color: var(--gray-900); font-weight: 800; margin: 0 0 8px; }
 h1 { font-size: 28px; }
 h2 { font-size: 22px; }
 h3 { font-size: 18px; font-weight: 700; }
 h4 { font-size: 16px; font-weight: 700; }
+h5 { font-size: 14px; font-weight: 700; }
+h6 { font-size: 13px; font-weight: 700; }
 p { margin: 0 0 8px; }
 a { color: var(--primary-600); text-decoration: none; }
 a:hover { text-decoration: underline; }

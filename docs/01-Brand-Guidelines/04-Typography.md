@@ -1,9 +1,10 @@
 # 04 Typography
 
-Version: 1.1.0  
+Version: 1.2.0  
 Status: Approved  
 Document Owner: UI/UX Team  
-Last updated: 31 August 2026 — the official font family is now NAMED (see Font Family).
+Last updated: 31 August 2026 — the official font family is now NAMED (see Font Family),
+and the Typography Scale now records the scale that actually ships (see Font Weights).
 
 ---
 
@@ -79,28 +80,34 @@ Sans-serif
 
 | Weight | Usage |
 |---------|------|
-| Light (300) | Rarely used |
+| Light (300) | Not used. Not bundled. |
 | Regular (400) | Body text |
-| Medium (500) | Labels |
-| SemiBold (600) | Section titles |
-| Bold (700) | Main headings |
+| Medium (500) | Labels, secondary link text |
+| SemiBold (600) | Buttons, table headers, form labels |
+| Bold (700) | Headings 3-6, badges |
+| Extra Bold (800) | Headings 1-2, and display / hero type |
 
-Extra Bold should be avoided except for marketing materials.
+Extra Bold (800) is reserved for Headings 1-2 and display type. Do not use it
+for body copy, labels, buttons or table text.
 
-> **Open discrepancy, recorded 31 August 2026 — for the document owner to
-> settle.** The citizen web portal sets **every** heading (`h1`–`h6`) to weight
-> **800**, not the 700 this table specifies, in four rules across `styles.scss`
-> and `landing.page.scss`. So either the table is describing an intent the
-> implementation never followed, or 800 is the real heading weight and the table
-> is stale.
+> **Settled 31 August 2026 (owner).** This table and the Typography Scale below
+> previously specified 700 for main headings and 600 for Headings 2-6, and told
+> implementers to avoid Extra Bold. **No surface ever implemented that scale.**
+> The shipping scale was systematically smaller *and* heavier at every level —
+> a coherent, denser, bolder scale that someone designed and nobody wrote down.
 >
-> This was not resolved unilaterally: changing it either way alters the
-> appearance of every heading on a live government portal, or overrides an
-> approved specification. The UI/UX Team should decide which is correct and the
-> other should be brought into line.
+> The ruling is that **the shipping scale is authoritative**, and this document
+> has been corrected to describe it. That is why the numbers above and below
+> changed rather than the code: the code is live on a production portal, is
+> internally consistent, and was evidently a deliberate design; the documented
+> scale existed only here.
 >
-> Weight 300 (Light) is documented as rarely used and is currently used **zero**
-> times and bundled nowhere, which is consistent.
+> Recorded so the next reader knows this was decided, not drifted into. If the
+> UI/UX Team wants the lighter scale, that is a fresh decision and it must move
+> all four surfaces together.
+>
+> Weight 300 (Light) is used zero times and is not bundled — the table now says
+> so rather than calling it "rarely used".
 
 ---
 
@@ -142,19 +149,19 @@ Main page titles
 
 Desktop
 
-32px
+28px
 
 Tablet
 
-30px
+28px
 
 Mobile
 
-28px
+24px
 
 Weight
 
-700
+800
 
 ---
 
@@ -166,19 +173,19 @@ Section titles
 
 Desktop
 
-28px
+22px
 
 Tablet
 
-26px
+22px
 
 Mobile
 
-24px
+20px
 
 Weight
 
-600
+800
 
 ---
 
@@ -194,19 +201,19 @@ Dashboard widgets
 
 Desktop
 
-24px
+18px
 
 Tablet
 
-22px
+18px
 
 Mobile
 
-20px
+17px
 
 Weight
 
-600
+700
 
 ---
 
@@ -222,19 +229,19 @@ Panels
 
 Desktop
 
-20px
+16px
 
 Tablet
 
-20px
+16px
 
 Mobile
 
-18px
+16px
 
 Weight
 
-600
+700
 
 ---
 
@@ -242,19 +249,19 @@ Weight
 
 Desktop
 
-18px
+14px
 
 Tablet
 
-18px
+14px
 
 Mobile
 
-16px
+14px
 
 Weight
 
-600
+700
 
 ---
 
@@ -262,19 +269,19 @@ Weight
 
 Desktop
 
-16px
+13px
 
 Tablet
 
-16px
+13px
 
 Mobile
 
-16px
+13px
 
 Weight
 
-600
+700
 
 ---
 
