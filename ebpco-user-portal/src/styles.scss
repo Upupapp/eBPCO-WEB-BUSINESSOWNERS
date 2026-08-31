@@ -226,34 +226,6 @@ a:hover { text-decoration: underline; }
 .btn-block { width: 100%; }
 .btn-sm { padding: 6px 12px; font-size: 13px; }
 
-// Touch targets.
-//
-// `.btn` renders 36px tall and `.btn-sm` about 30px. That clears WCAG 2.2
-// SC 2.5.8 Target Size (Minimum), which is 24x24 and the AA bar, so it is not a
-// conformance failure - which is exactly why axe does not flag it. It is under
-// SC 2.5.5 (44x44, AAA) and under both platform touch guidelines: Apple HIG
-// 44pt, Material 48dp.
-//
-// Raised for COARSE POINTERS ONLY. That is how the platform guidance is itself
-// scoped, and it is the honest reading of the problem: a 36px target is
-// comfortable with a mouse and cramped with a thumb. Desktop is left untouched,
-// so the app's density is unchanged for the people it already suits.
-//
-// This covers all 58 `.btn` uses at once. Prefer fixing it here rather than
-// per-screen: a per-screen height is how the onboarding CTA drifted to 88px.
-@media (pointer: coarse) {
-  .btn,
-  .btn-sm {
-    min-height: 44px;
-  }
-
-  .input,
-  select.input,
-  textarea.input {
-    min-height: 44px;
-  }
-}
-
 // Forms
 .field { margin-bottom: 16px; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
@@ -278,6 +250,72 @@ a:hover { text-decoration: underline; }
 .input.invalid { border-color: var(--danger-500); }
 .checkbox-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--gray-700); }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+
+// Touch targets.
+//
+// `.btn` renders 36px tall and `.btn-sm` about 30px. That clears WCAG 2.2
+// SC 2.5.8 Target Size (Minimum), which is 24x24 and the AA bar, so it is not a
+// conformance failure - which is exactly why axe does not flag it. It is under
+// SC 2.5.5 (44x44, AAA) and under both platform touch guidelines: Apple HIG
+// 44pt, Material 48dp.
+//
+// Raised for COARSE POINTERS ONLY. That is how the platform guidance is itself
+// scoped, and it is the honest reading of the problem: a 36px target is
+// comfortable with a mouse and cramped with a thumb. Desktop is left untouched,
+// so the app's density is unchanged for the people it already suits.
+//
+// PLACEMENT IS LOAD-BEARING. This block must sit AFTER the .btn and .input
+// definitions. A media query adds NO specificity, so `.input` here and `.input`
+// there tie, and source order decides. When this block was earlier in the file
+// the base rule won: `min-height` still applied (the base rule does not set it)
+// but `font-size: 16px` was silently overridden back to 14px, and `select.input`
+// stayed at its 18px default. Measured on WebKit, not assumed - a select
+// rendered 23px tall while the inputs beside it were 44px. Do not move this up.
+//
+// This covers all 58 `.btn` uses at once. Prefer fixing it here rather than
+// per-screen: a per-screen height is how the onboarding CTA drifted to 88px.
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm {
+    min-height: 44px;
+  }
+
+  // 16px is not a style choice here, it is the threshold that stops iOS Safari
+  // ZOOMING THE PAGE when a field is focused. Below 16px it zooms in and does
+  // not zoom back out, so on the registration form - 16 fields - a citizen taps
+  // a field, the page jumps, and they pinch out again for every one.
+  //
+  // Confirmed on WebKit (Safari's own engine) at iPhone 13 metrics, not
+  // emulated: the login input computed to font-size: 14px.
+  //
+  // Scoped to coarse pointers with the touch targets above, so desktop keeps
+  // its 14px density.
+  .input,
+  select.input,
+  textarea.input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  // A native <select> ignores author padding and min-height: WebKit renders it
+  // as a `menulist` control with its own intrinsic metrics, so it stayed 25px
+  // tall while the text inputs beside it were 44px. Measured on WebKit at
+  // iPhone 13 metrics - computed min-height came back as 18px and padding as 0
+  // despite the rule above.
+  //
+  // Turning the appearance off makes the box styleable, which means supplying
+  // the disclosure arrow ourselves - hence the inline SVG. Scoped to coarse
+  // pointers, so desktop keeps the native control.
+  select.input {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 44px;
+    padding: 0 40px 0 12px;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23454a58' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+}
 
 // Badges / status pills
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
