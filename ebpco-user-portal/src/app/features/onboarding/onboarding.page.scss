@@ -282,30 +282,51 @@
 // ---------------------------------------------------------------------------
 // CTA
 // ---------------------------------------------------------------------------
+// Primary CTA.
+//
+// This was `margin: 0 52px 48px; height: 88px` — a phone layout rendered at
+// desktop width, which on a 1920px viewport produced a red bar roughly
+// 1816x88px. At that size it stops reading as a button and reads as a banner:
+// the affordance is lost, it out-weighs the heading it is subordinate to, and
+// it puts a long mouse journey between the text and the control.
+//
+// A button's width should follow its LABEL, not the viewport. The house style
+// already had the right answer on the landing page's hero CTA
+// (`min-width: 220px; height: 60px; border-radius: 12px; font-size: 17px`), so
+// this now matches it rather than inventing a second convention.
+//
+// Height is 56px: comfortably above the 44x44 CSS px minimum (WCAG 2.5.5) and
+// the 48dp/44pt platform floors, without the 88px overshoot.
+//
+// Full-bleed is kept at <=767px, where edge-to-edge really is the convention
+// for a thumb — see the media query below, which was already correct.
 .ob-cta {
   position: relative;
   z-index: 1;
-  display: flex;
+  display: inline-flex;
+  align-self: center;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  margin: 0 52px 48px;
-  height: 88px;
+  gap: 12px;
+  margin: 0 auto 48px;
+  min-width: 260px;
+  height: 56px;
+  padding: 0 36px;
   border: none;
-  border-radius: 28px;
+  border-radius: 14px;
   background: linear-gradient(90deg, #d21829 0%, #c81e2c 55%, #b91927 100%);
   color: #ffffff;
   font: inherit;
-  font-size: 21px;
+  font-size: 17px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(200, 30, 44, 0.2);
+  box-shadow: 0 10px 24px rgba(200, 30, 44, 0.16);
   transition: transform 200ms ease, box-shadow 200ms ease;
   animation: ob-fade-rise-10 700ms ease 260ms both;
 }
 .ob-cta-arrow {
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
 }
 .ob-cta:hover {
   transform: translateY(-1px);
@@ -365,7 +386,7 @@
   .ob-icon-chip { width: 52px; height: 52px; }
   .ob-icon-chip svg { width: 20px; height: 20px; }
   .ob-heading { font-size: clamp(36px, 4.4vw, 44px); }
-  .ob-cta { height: 74px; margin: 0 30px 40px; border-radius: 24px; }
+  .ob-cta { height: 54px; margin: 0 auto 40px; border-radius: 14px; }
 }
 
 @media (max-width: 767px) {
@@ -403,12 +424,16 @@
   }
   .ob-dots { margin-top: 26px; }
 
+  // Full-bleed is deliberate here and only here: on a phone this is a thumb
+  // target at the bottom of the screen, which is the established convention.
   .ob-cta {
     margin: 16px;
     width: calc(100% - 32px);
-    height: 60px;
-    border-radius: 18px;
-    font-size: 18px;
+    min-width: 0;
+    padding: 0 20px;
+    height: 52px;
+    border-radius: 14px;
+    font-size: 17px;
   }
 }
 
