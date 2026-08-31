@@ -51,6 +51,25 @@ for (const url of faces) {
   }
 }
 
+// A bundled font carries its licence with it. Gothic A1 is SIL OFL 1.1, which
+// REQUIRES the licence and copyright notice to be distributed with the font
+// files. Self-hosting turned a Google-served font into one we redistribute, so
+// the obligation moved to this repo along with the woff2 files. This is a
+// licensing condition, not housekeeping.
+if (faces.length > 0) {
+  try {
+    const ofl = readFileSync('public/assets/fonts/OFL.txt', 'utf8');
+    if (!ofl.includes('SIL OPEN FONT LICENSE')) {
+      failures.push('public/assets/fonts/OFL.txt does not contain the SIL Open Font License text');
+    }
+    if (!/Copyright/i.test(ofl)) {
+      failures.push('public/assets/fonts/OFL.txt carries no copyright notice');
+    }
+  } catch {
+    failures.push('fonts are bundled but public/assets/fonts/OFL.txt is missing - the SIL OFL requires the licence to ship with the font');
+  }
+}
+
 if (failures.length > 0) {
   console.error('✘ third-party asset check FAILED\n');
   for (const f of failures) console.error(`  - ${f}`);

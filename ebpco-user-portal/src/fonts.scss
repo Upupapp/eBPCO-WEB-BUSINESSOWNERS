@@ -18,6 +18,13 @@
  * font-display: swap keeps text visible while the file loads, matching the
  * behaviour of the &display=swap parameter the old Google link carried.
  *
+ * LICENCE. Gothic A1 is (C) HanYang I&C Co., Ltd. and is released under the SIL
+ * Open Font License 1.1. The OFL REQUIRES the licence and copyright notice to be
+ * distributed with the font, so `public/assets/fonts/OFL.txt` ships beside the
+ * woff2 files and is served from this origin. Bundling the font without it was a
+ * licensing gap, not a tidiness one - do not delete it, and keep it beside any
+ * face that is added later. Verified by `npm run check:assets`.
+ *
  * Generated from the Google Fonts CSS2 API on 2026-08-31 (Gothic A1 v18);
  * the unicode-range values are Google's own, copied verbatim so the browser
  * still only downloads a slice it actually needs.
