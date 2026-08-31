@@ -1,5 +1,26 @@
-<div class="ds-shell">
-  <aside class="ds-sidenav">
+<div class="ds-shell" [class.nav-open]="navOpen()">
+  <!--
+    Below 1024px the sidebar becomes an off-canvas drawer. It used to be a hard
+    290px flex item at EVERY width, so on a 390px phone the content column was
+    100px and on a 320px phone it was 30px - every signed-in screen was
+    unusable, on a portal whose own onboarding promises "Apply for permits from
+    your phone". See app-shell.component.scss.
+  -->
+  <button
+    type="button"
+    class="ds-nav-toggle"
+    [attr.aria-expanded]="navOpen()"
+    aria-controls="ds-sidenav"
+    (click)="toggleNav()"
+  >
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      @if (navOpen()) { <path d="M6 6l12 12M18 6L6 18" /> } @else { <path d="M4 7h16M4 12h16M4 17h16" /> }
+    </svg>
+    <span class="ds-visually-hidden">{{ navOpen() ? 'Close navigation' : 'Open navigation' }}</span>
+  </button>
+
+  <div class="ds-nav-backdrop" (click)="closeNav()" aria-hidden="true"></div>
+  <aside class="ds-sidenav" id="ds-sidenav">
     <div class="ds-brand">
       <img src="logo.png" alt="Municipality of Castilla seal" class="ds-brand-seal" />
       <span class="ds-brand-title">eBPCO Citizen Portal</span>
