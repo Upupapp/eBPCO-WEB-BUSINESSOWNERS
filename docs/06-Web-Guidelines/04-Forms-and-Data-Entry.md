@@ -275,7 +275,7 @@ Long-running workflows should support automatic draft saving.
 
 Applicable workflows include:
 
-- New Business Permit Application
+- New Building Permit Application
 - Permit Renewal
 - Business Registration
 - Business Profile Updates
@@ -311,7 +311,7 @@ Successful submissions shall display:
 
 Example
 
-Business Permit Application Submitted Successfully
+Building Permit Application Submitted Successfully
 
 Reference Number
 

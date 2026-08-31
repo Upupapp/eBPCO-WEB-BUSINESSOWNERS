@@ -311,7 +311,7 @@ When no records exist, the table should display an informative empty state.
 
 Example
 
-No Business Permit Applications Found.
+No Building Permit Applications Found.
 
 Try adjusting your search or filters.
 

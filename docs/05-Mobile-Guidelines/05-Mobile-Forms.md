@@ -268,7 +268,7 @@ Long forms should support draft saving.
 
 Applicable workflows include:
 
-- Business Permit Application
+- Building Permit Application
 - Permit Renewal
 - Business Registration
 
@@ -300,7 +300,7 @@ Successful submissions should display:
 
 Example
 
-Business Permit Application Submitted Successfully
+Building Permit Application Submitted Successfully
 
 Reference Number
 

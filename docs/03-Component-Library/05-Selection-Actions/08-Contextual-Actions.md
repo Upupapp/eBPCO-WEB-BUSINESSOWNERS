@@ -63,7 +63,7 @@ A Contextual Action consists of:
 Example
 
 +----------------------------------------------+
-| Business Permit #2026-001              ⋮     |
+| Building Permit #2026-001              ⋮     |
 +----------------------------------------------+
 
 Selecting the action trigger displays a contextual menu.

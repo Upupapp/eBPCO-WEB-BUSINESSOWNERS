@@ -48,7 +48,7 @@ Every screen should support a clear user objective.
 
 Examples
 
-- Apply for a Business Permit
+- Apply for a Building Permit
 - Renew a Permit
 - Upload Documents
 - Pay Fees

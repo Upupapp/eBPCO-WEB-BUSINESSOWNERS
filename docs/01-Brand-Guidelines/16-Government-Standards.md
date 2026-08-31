@@ -82,7 +82,7 @@ Use consistent terminology throughout the platform.
 
 Examples:
 
-- Business Permit
+- Building Permit
 - Clearance
 - Application
 - Applicant

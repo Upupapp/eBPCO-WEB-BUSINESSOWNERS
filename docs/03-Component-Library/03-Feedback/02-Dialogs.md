@@ -44,7 +44,7 @@ Use Dialogs when users must:
 
 Examples in eBPCO:
 
-- Submit Business Permit Application
+- Submit Building Permit Application
 - Delete Uploaded Document
 - Cancel Application
 - Approve Payment
@@ -73,7 +73,7 @@ Example
 | ⚠ Confirm Submission                 |
 |--------------------------------------|
 | Are you sure you want to submit your |
-| Business Permit Application?         |
+| Building Permit Application?         |
 |                                      |
 | [Cancel]          [Submit]           |
 +--------------------------------------+

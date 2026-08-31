@@ -278,7 +278,7 @@ Links should clearly describe their destination.
 
 Good
 
-Download Business Permit
+Download Building Permit
 
 Bad
 

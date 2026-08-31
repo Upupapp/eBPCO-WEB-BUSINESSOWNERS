@@ -208,7 +208,7 @@ Example
 
 No Applications Found
 
-Start a new Business Permit Application to begin.
+Start a new Building Permit Application to begin.
 
 Empty states should encourage the next logical action.
 

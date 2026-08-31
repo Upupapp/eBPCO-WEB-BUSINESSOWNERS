@@ -66,7 +66,7 @@ Example:
 
 ---------------------------------------------------
 
-📄 Business Permit
+📄 Building Permit
 
 ABC Trading
 

@@ -299,7 +299,7 @@ Example
 
 "No applications found.
 
-Start a new Business Permit Application to begin."
+Start a new Building Permit Application to begin."
 
 ---
 

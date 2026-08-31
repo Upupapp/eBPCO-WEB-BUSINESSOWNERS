@@ -95,7 +95,7 @@ Examples include:
 
 - Dashboard
 - Users
-- Business Permits
+- Building Permits
 - Workflow
 - Reports
 - Notifications

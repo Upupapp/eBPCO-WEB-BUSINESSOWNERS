@@ -122,7 +122,7 @@ Each application card contains:
 Example
 
 ```
-Business Permit
+Building Permit
 
 Tracking No.
 BP-2026-000125
@@ -164,7 +164,7 @@ The same status colors must be reused throughout the application.
 
 # Announcements
 
-Displays important notices from the Business Permit Office.
+Displays important notices from the Office of the Municipal Engineer.
 
 Examples
 

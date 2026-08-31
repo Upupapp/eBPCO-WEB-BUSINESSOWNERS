@@ -152,7 +152,7 @@ Examples
 
 - Login
 - Registration
-- Business Permit Application
+- Building Permit Application
 - Payment
 - Application Tracking
 

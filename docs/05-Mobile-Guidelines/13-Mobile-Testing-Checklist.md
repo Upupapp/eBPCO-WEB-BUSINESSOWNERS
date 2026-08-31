@@ -88,7 +88,7 @@ Verify:
 
 ☐ Password Reset
 
-☐ Business Permit Application
+☐ Building Permit Application
 
 ☐ Permit Renewal
 

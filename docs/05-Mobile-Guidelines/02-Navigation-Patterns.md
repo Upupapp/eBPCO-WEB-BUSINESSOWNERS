@@ -239,7 +239,7 @@ Example
 
 No Applications Found
 
-Start a new Business Permit Application to begin.
+Start a new Building Permit Application to begin.
 
 Users should always understand what to do next.
 

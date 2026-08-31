@@ -242,7 +242,7 @@ Successful submissions should include:
 
 Example
 
-Business Permit Application Submitted Successfully
+Building Permit Application Submitted Successfully
 
 Reference Number
 
@@ -291,7 +291,7 @@ Mobile
 
 The following workflows shall follow these standards:
 
-- Business Permit Application
+- Building Permit Application
 - Permit Renewal
 - Inspection Reports
 - User Registration

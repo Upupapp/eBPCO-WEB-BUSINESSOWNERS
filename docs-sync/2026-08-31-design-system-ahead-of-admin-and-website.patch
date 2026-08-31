@@ -1,19 +1,35 @@
-# Patch: bring docs/ up to the citizen portal's version for 4 files.
+# Patch: bring docs/ up to the citizen portal's version.
 #
-# Generated 31 August 2026 from Upupapp/eBPCO-WEB-BUSINESSOWNERS at f1e1dc9.
+# Generated 31 August 2026 from Upupapp/eBPCO-WEB-BUSINESSOWNERS.
 # Baseline: the admin and website copies, which are byte-identical to each other.
-# The other 154 files already agree and are not touched here.
 #
-# Apply from the repository root (the directory CONTAINING docs/):
-#     git apply --check docs-sync/<this file>   # dry run first
+# Apply from YOUR repository root (the directory CONTAINING docs/):
+#     git apply --check docs-sync/<this file>   # dry run, expect no output
 #     git apply         docs-sync/<this file>
 #
-# Contents:
-#   01-Brand-Guidelines/04-Typography.md   v1.0.0 -> v1.2.0  (Gothic A1 named; shipping heading scale)
-#   02-Design-System/10-Motion.md          v1.0.0 -> v1.1.0  (Maximalist Motion Exception)
-#   01-Brand-Guidelines/19-Do-and-Dont.md  v1.0.0 -> v1.1.0  (the same exception, cross-referenced)
-#   08-Reusable-Stitch/04-Screen-Inventory.md               (fuller PUB-001..005 inventory)
+# TWO groups of change:
 #
+# 1. Four documents where the citizen portal is ahead:
+#      01-Brand-Guidelines/04-Typography.md    v1.0.0 -> v1.2.0  Gothic A1 named; shipping heading scale
+#      02-Design-System/10-Motion.md           v1.0.0 -> v1.1.0  Maximalist Motion Exception
+#      01-Brand-Guidelines/19-Do-and-Dont.md   v1.0.0 -> v1.1.0  the same exception, cross-referenced
+#      08-Reusable-Stitch/04-Screen-Inventory.md                 fuller PUB-001..005 inventory
+#
+# 2. The wrong permit in example copy, 46 occurrences across 33 files:
+#      'Business Permit Office' -> 'Office of the Municipal Engineer'   (3)
+#      'Business Permit'        -> 'Building Permit'                    (43)
+#
+#    This product issues 19 permit types and NOT ONE is a business permit;
+#    the issuing office is the Office of the Municipal Engineer, per the
+#    LGU's own checklist letterhead. The examples were seeding the wrong
+#    permit into implementations - it reached the citizen portal's
+#    production code twice (a bank account named 'eBPCO Business Permits',
+#    and generated permits printing 'Business Permit and Licensing Office'
+#    as the approving office). Both are fixed there.
+#
+#    'Business Name', 'Business Registration', 'Business Owner',
+diff --git a/docs/01-Brand-Guidelines/04-Typography.md b/docs/01-Brand-Guidelines/04-Typography.md
+index 86dc043..689edba 100644
 --- a/docs/01-Brand-Guidelines/04-Typography.md
 +++ b/docs/01-Brand-Guidelines/04-Typography.md
 @@ -1,8 +1,10 @@
@@ -29,14 +45,15 @@
  
  ---
  
-@@ -31,17 +33,44 @@
+@@ -31,17 +33,44 @@ The typography system is designed to achieve the following goals:
  
  # Font Family
  
 -The official font family shall be the font used by the approved eBPCO interface.
-+**The official eBPCO font family is Gothic A1.**
- 
+-
 -If future changes are required, they must be documented and approved before implementation.
++**The official eBPCO font family is Gothic A1.**
++
 +Owner decision, 31 August 2026. Until that date this section read *"the official
 +font family shall be the font used by the approved eBPCO interface"*, which is
 +circular — it defines the font as whatever the interface happens to use, so it
@@ -44,7 +61,7 @@
 +the three web surfaces adopted Gothic A1 while the Flutter mobile app adopted
 +Poppins, leaving the citizen web portal and the citizen mobile app — one product,
 +required to be in parity — on different typefaces.
- 
++
 +Gothic A1 was chosen because three of the four surfaces already ship it and it is
 +live in production, and because its Latin set is a clean geometric sans suited to
 +the English and Filipino text these interfaces render.
@@ -65,7 +82,7 @@
 +
 +If future changes are required, they must be documented and approved before
 +implementation.
-+
+ 
  Fallback order:
  
  ```
@@ -79,7 +96,7 @@
  Sans-serif
  ```
  
-@@ -51,13 +80,34 @@
+@@ -51,13 +80,34 @@ Sans-serif
  
  | Weight | Usage |
  |---------|------|
@@ -89,12 +106,13 @@
 -| Medium (500) | Labels |
 -| SemiBold (600) | Section titles |
 -| Bold (700) | Main headings |
+-
+-Extra Bold should be avoided except for marketing materials.
 +| Medium (500) | Labels, secondary link text |
 +| SemiBold (600) | Buttons, table headers, form labels |
 +| Bold (700) | Headings 3-6, badges |
 +| Extra Bold (800) | Headings 1-2, and display / hero type |
- 
--Extra Bold should be avoided except for marketing materials.
++
 +Extra Bold (800) is reserved for Headings 1-2 and display type. Do not use it
 +for body copy, labels, buttons or table text.
 +
@@ -119,7 +137,7 @@
  
  ---
  
-@@ -99,19 +149,19 @@
+@@ -99,19 +149,19 @@ Main page titles
  
  Desktop
  
@@ -143,7 +161,7 @@
  
  ---
  
-@@ -123,19 +173,19 @@
+@@ -123,19 +173,19 @@ Section titles
  
  Desktop
  
@@ -167,7 +185,7 @@
  
  ---
  
-@@ -151,19 +201,19 @@
+@@ -151,19 +201,19 @@ Dashboard widgets
  
  Desktop
  
@@ -191,7 +209,7 @@
  
  ---
  
-@@ -179,19 +229,19 @@
+@@ -179,19 +229,19 @@ Panels
  
  Desktop
  
@@ -215,7 +233,7 @@
  
  ---
  
-@@ -199,19 +249,19 @@
+@@ -199,19 +249,19 @@ Weight
  
  Desktop
  
@@ -239,7 +257,7 @@
  
  ---
  
-@@ -219,19 +269,19 @@
+@@ -219,19 +269,19 @@ Weight
  
  Desktop
  
@@ -263,55 +281,34 @@
  
  ---
  
---- a/docs/02-Design-System/10-Motion.md
-+++ b/docs/02-Design-System/10-Motion.md
-@@ -1,6 +1,6 @@
- # 10 Motion
+diff --git a/docs/01-Brand-Guidelines/08-Icons.md b/docs/01-Brand-Guidelines/08-Icons.md
+index 2a9d89f..b0c6e52 100644
+--- a/docs/01-Brand-Guidelines/08-Icons.md
++++ b/docs/01-Brand-Guidelines/08-Icons.md
+@@ -95,7 +95,7 @@ Examples include:
  
--Version: 1.0.0
-+Version: 1.1.0
- Status: Approved
- Document Owner: UI/UX Team
+ - Dashboard
+ - Users
+-- Business Permits
++- Building Permits
+ - Workflow
+ - Reports
+ - Notifications
+diff --git a/docs/01-Brand-Guidelines/16-Government-Standards.md b/docs/01-Brand-Guidelines/16-Government-Standards.md
+index f5d40ad..52760bf 100644
+--- a/docs/01-Brand-Guidelines/16-Government-Standards.md
++++ b/docs/01-Brand-Guidelines/16-Government-Standards.md
+@@ -82,7 +82,7 @@ Use consistent terminology throughout the platform.
  
-@@ -46,7 +46,21 @@
- - Non-blocking
+ Examples:
  
- Animations should communicate intent rather than decoration.
-+
-+---
-+
-+# Maximalist Motion Exception (Angular Web Admin Portal)
-+
-+As of version 1.1.0 (2026-08-27), the Angular Web Administration Portal deliberately runs a denser, more expressive motion treatment across all of its screens — not only the brand/auth moments this document otherwise reserves richer motion for. This was requested and approved by the Web Admin UI Lead (michaela@lguids.com.ph) under this document's own Governance rule that new animation patterns require UI/UX Team review before implementation; this section is that review record.
-+
-+Scope: this exception applies **only** to the Angular Web Administration Portal. The Flutter Mobile Application continues to follow the restrained motion system described in the rest of this document, unchanged.
-+
-+What the exception does **not** relax:
- 
-+- The "Hardcoded Animations" rule below still applies in full — every duration, easing curve, and keyframe used anywhere in the Admin Portal routes through the centralized tokens in `shared/styles/_motion.scss`, extended for this pass with: `$dur-stagger-step`, `$dur-count-up`, `$dur-chart-draw`, `$dur-page` (durations), `$ease-emphasis`, `$ease-draw` (easings), and shared keyframes `stagger-in`, `skeleton-shimmer`, `pill-swap`, `count-pop`.
-+- The Accessibility section's reduced-motion requirements remain in full force, with no Admin Portal carve-out — every new animation is still caught by the app-wide `prefers-reduced-motion` kill-switch, and the two JS-timed additions (KPI count-up, chart draw-in) each check the media query directly and render their final state instantly when motion is reduced.
-+- Motion must still be purposeful, not decorative — see the corresponding note added to `01-Brand-Guidelines/19-Do-and-Dont.md`.
-+
- ---
- 
- # Motion Categories
-@@ -124,6 +138,8 @@
- 
- Complex transitions are discouraged.
- 
-+The Angular Web Admin Portal implements page transitions via a plain CSS `animation` on each routed page's own host element (no `@angular/animations`, no View Transitions API) — a small `page-in` mount keyframe layered on top of each page's existing entrance animation. This satisfies the "Fade + Slide" pattern above without introducing a second animation system into a codebase that is otherwise 100% hand-rolled CSS.
-+
- ---
- 
- # Component Transitions
-@@ -333,4 +349,4 @@
- 
- Version
- 
--1.0.0
-\ No newline at end of file
-+1.1.0
-\ No newline at end of file
+-- Business Permit
++- Building Permit
+ - Clearance
+ - Application
+ - Applicant
+diff --git a/docs/01-Brand-Guidelines/19-Do-and-Dont.md b/docs/01-Brand-Guidelines/19-Do-and-Dont.md
+index 6a61916..c30bb65 100644
 --- a/docs/01-Brand-Guidelines/19-Do-and-Dont.md
 +++ b/docs/01-Brand-Guidelines/19-Do-and-Dont.md
 @@ -1,6 +1,6 @@
@@ -322,16 +319,16 @@
  Status: Approved
  Document Owner: UI/UX Team
  
-@@ -222,6 +222,8 @@
- - Delay workflows.
+@@ -223,6 +223,8 @@ When making design decisions, always choose:
  - Overanimate components.
  - Use flashing effects.
-+
-+**Exception — Angular Web Admin Portal:** per the approved Maximalist Motion Exception (see `02-Design-System/10-Motion.md`), this platform intentionally uses denser, more visible motion than the baseline rule above — staggered reveals, count-up numbers, chart draw-ins, a kinetic headline treatment on brand screens. This exception is scoped to the Angular Web Admin Portal only; the "keep animations subtle" / "avoid decorative animations" rules above remain the default for every other eBPCO surface, and even within the Admin Portal's exception, every animation must still be traceable to a specific usability purpose — confirming an action, guiding attention, or communicating a state change. Purely ornamental motion is still out of scope, exception or not.
  
++**Exception — Angular Web Admin Portal:** per the approved Maximalist Motion Exception (see `02-Design-System/10-Motion.md`), this platform intentionally uses denser, more visible motion than the baseline rule above — staggered reveals, count-up numbers, chart draw-ins, a kinetic headline treatment on brand screens. This exception is scoped to the Angular Web Admin Portal only; the "keep animations subtle" / "avoid decorative animations" rules above remain the default for every other eBPCO surface, and even within the Admin Portal's exception, every animation must still be traceable to a specific usability purpose — confirming an action, guiding attention, or communicating a state change. Purely ornamental motion is still out of scope, exception or not.
++
  ---
  
-@@ -307,4 +309,4 @@
+ # Component Creation
+@@ -307,4 +309,4 @@ Approved
  
  Version
  
@@ -339,9 +336,474 @@
 \ No newline at end of file
 +1.1.0
 \ No newline at end of file
+diff --git a/docs/02-Design-System/10-Motion.md b/docs/02-Design-System/10-Motion.md
+index 091c25c..d54eb31 100644
+--- a/docs/02-Design-System/10-Motion.md
++++ b/docs/02-Design-System/10-Motion.md
+@@ -1,6 +1,6 @@
+ # 10 Motion
+ 
+-Version: 1.0.0
++Version: 1.1.0
+ Status: Approved
+ Document Owner: UI/UX Team
+ 
+@@ -49,6 +49,20 @@ Animations should communicate intent rather than decoration.
+ 
+ ---
+ 
++# Maximalist Motion Exception (Angular Web Admin Portal)
++
++As of version 1.1.0 (2026-08-27), the Angular Web Administration Portal deliberately runs a denser, more expressive motion treatment across all of its screens — not only the brand/auth moments this document otherwise reserves richer motion for. This was requested and approved by the Web Admin UI Lead (michaela@lguids.com.ph) under this document's own Governance rule that new animation patterns require UI/UX Team review before implementation; this section is that review record.
++
++Scope: this exception applies **only** to the Angular Web Administration Portal. The Flutter Mobile Application continues to follow the restrained motion system described in the rest of this document, unchanged.
++
++What the exception does **not** relax:
++
++- The "Hardcoded Animations" rule below still applies in full — every duration, easing curve, and keyframe used anywhere in the Admin Portal routes through the centralized tokens in `shared/styles/_motion.scss`, extended for this pass with: `$dur-stagger-step`, `$dur-count-up`, `$dur-chart-draw`, `$dur-page` (durations), `$ease-emphasis`, `$ease-draw` (easings), and shared keyframes `stagger-in`, `skeleton-shimmer`, `pill-swap`, `count-pop`.
++- The Accessibility section's reduced-motion requirements remain in full force, with no Admin Portal carve-out — every new animation is still caught by the app-wide `prefers-reduced-motion` kill-switch, and the two JS-timed additions (KPI count-up, chart draw-in) each check the media query directly and render their final state instantly when motion is reduced.
++- Motion must still be purposeful, not decorative — see the corresponding note added to `01-Brand-Guidelines/19-Do-and-Dont.md`.
++
++---
++
+ # Motion Categories
+ 
+ The Design System defines the following motion categories:
+@@ -124,6 +138,8 @@ Recommended transitions:
+ 
+ Complex transitions are discouraged.
+ 
++The Angular Web Admin Portal implements page transitions via a plain CSS `animation` on each routed page's own host element (no `@angular/animations`, no View Transitions API) — a small `page-in` mount keyframe layered on top of each page's existing entrance animation. This satisfies the "Fade + Slide" pattern above without introducing a second animation system into a codebase that is otherwise 100% hand-rolled CSS.
++
+ ---
+ 
+ # Component Transitions
+@@ -333,4 +349,4 @@ Approved
+ 
+ Version
+ 
+-1.0.0
+\ No newline at end of file
++1.1.0
+\ No newline at end of file
+diff --git a/docs/02-Design-System/11-Layout-Patterns.md b/docs/02-Design-System/11-Layout-Patterns.md
+index 47ef350..7a9536c 100644
+--- a/docs/02-Design-System/11-Layout-Patterns.md
++++ b/docs/02-Design-System/11-Layout-Patterns.md
+@@ -263,7 +263,7 @@ Progress Indicator
+ 
+ Typical Usage
+ 
+-- Business Permit Application
++- Building Permit Application
+ - Renewal Process
+ - Business Registration
+ 
+diff --git a/docs/03-Component-Library/02-Data-Display/01-Cards.md b/docs/03-Component-Library/02-Data-Display/01-Cards.md
+index 1451d37..3800ef5 100644
+--- a/docs/03-Component-Library/02-Data-Display/01-Cards.md
++++ b/docs/03-Component-Library/02-Data-Display/01-Cards.md
+@@ -66,7 +66,7 @@ A standard Card may include:
+ Example:
+ 
+ +----------------------------------------------------+
+-| Business Permit                                    |
++| Building Permit                                    |
+ | ABC Trading                                        |
+ | Retail Business                                    |
+ |                                                    |
+diff --git a/docs/03-Component-Library/02-Data-Display/05-Lists.md b/docs/03-Component-Library/02-Data-Display/05-Lists.md
+index d294151..2ce8aae 100644
+--- a/docs/03-Component-Library/02-Data-Display/05-Lists.md
++++ b/docs/03-Component-Library/02-Data-Display/05-Lists.md
+@@ -66,7 +66,7 @@ Example:
+ 
+ ---------------------------------------------------
+ 
+-📄 Business Permit
++📄 Building Permit
+ 
+ ABC Trading
+ 
+diff --git a/docs/03-Component-Library/03-Feedback/02-Dialogs.md b/docs/03-Component-Library/03-Feedback/02-Dialogs.md
+index bbb0364..a1d0ec6 100644
+--- a/docs/03-Component-Library/03-Feedback/02-Dialogs.md
++++ b/docs/03-Component-Library/03-Feedback/02-Dialogs.md
+@@ -44,7 +44,7 @@ Use Dialogs when users must:
+ 
+ Examples in eBPCO:
+ 
+-- Submit Business Permit Application
++- Submit Building Permit Application
+ - Delete Uploaded Document
+ - Cancel Application
+ - Approve Payment
+@@ -73,7 +73,7 @@ Example
+ | ⚠ Confirm Submission                 |
+ |--------------------------------------|
+ | Are you sure you want to submit your |
+-| Business Permit Application?         |
++| Building Permit Application?         |
+ |                                      |
+ | [Cancel]          [Submit]           |
+ +--------------------------------------+
+diff --git a/docs/03-Component-Library/05-Selection-Actions/07-Floating-Action-Buttons.md b/docs/03-Component-Library/05-Selection-Actions/07-Floating-Action-Buttons.md
+index 9e025c1..bf7c71f 100644
+--- a/docs/03-Component-Library/05-Selection-Actions/07-Floating-Action-Buttons.md
++++ b/docs/03-Component-Library/05-Selection-Actions/07-Floating-Action-Buttons.md
+@@ -37,7 +37,7 @@ Use Floating Action Buttons only when a screen has one dominant action.
+ 
+ Recommended examples:
+ 
+-- New Business Permit Application
++- New Building Permit Application
+ - Create Announcement
+ - Add Employee
+ - Upload Document
+@@ -358,7 +358,7 @@ EbpcFloatingActionButton
+ 
+ # eBPCO Examples
+ 
+-## New Business Permit
++## New Building Permit
+ 
+ (+)
+ 
+diff --git a/docs/03-Component-Library/05-Selection-Actions/08-Contextual-Actions.md b/docs/03-Component-Library/05-Selection-Actions/08-Contextual-Actions.md
+index f3aef05..f388c00 100644
+--- a/docs/03-Component-Library/05-Selection-Actions/08-Contextual-Actions.md
++++ b/docs/03-Component-Library/05-Selection-Actions/08-Contextual-Actions.md
+@@ -63,7 +63,7 @@ A Contextual Action consists of:
+ Example
+ 
+ +----------------------------------------------+
+-| Business Permit #2026-001              ⋮     |
++| Building Permit #2026-001              ⋮     |
+ +----------------------------------------------+
+ 
+ Selecting the action trigger displays a contextual menu.
+diff --git a/docs/04-UX-Standards/02-Information-Architecture.md b/docs/04-UX-Standards/02-Information-Architecture.md
+index 9d71447..2418dbf 100644
+--- a/docs/04-UX-Standards/02-Information-Architecture.md
++++ b/docs/04-UX-Standards/02-Information-Architecture.md
+@@ -299,7 +299,7 @@ Example
+ 
+ "No applications found.
+ 
+-Start a new Business Permit Application to begin."
++Start a new Building Permit Application to begin."
+ 
+ ---
+ 
+diff --git a/docs/04-UX-Standards/03-User-Flows.md b/docs/04-UX-Standards/03-User-Flows.md
+index 77bd7dc..0b1f27f 100644
+--- a/docs/04-UX-Standards/03-User-Flows.md
++++ b/docs/04-UX-Standards/03-User-Flows.md
+@@ -40,8 +40,8 @@ Every user flow must exist to accomplish a clearly defined goal.
+ 
+ Examples
+ 
+-- Apply for Business Permit
+-- Renew Business Permit
++- Apply for Building Permit
++- Renew Building Permit
+ - Upload Documents
+ - Track Application
+ - Pay Permit Fees
+@@ -181,7 +181,7 @@ Long workflows should support saving progress.
+ 
+ Recommended examples:
+ 
+-- Business Permit Applications
++- Building Permit Applications
+ - Renewal Applications
+ - Inspection Forms
+ 
+@@ -296,7 +296,7 @@ Mobile
+ 
+ The platform should standardize the following workflows:
+ 
+-## Business Permit Application
++## Building Permit Application
+ 
+ Dashboard
+ 
+@@ -330,7 +330,7 @@ Confirmation
+ 
+ ---
+ 
+-## Business Permit Renewal
++## Building Permit Renewal
+ 
+ Dashboard
+ 
+diff --git a/docs/04-UX-Standards/05-Form-Experience.md b/docs/04-UX-Standards/05-Form-Experience.md
+index b108c9d..8515308 100644
+--- a/docs/04-UX-Standards/05-Form-Experience.md
++++ b/docs/04-UX-Standards/05-Form-Experience.md
+@@ -242,7 +242,7 @@ Successful submissions should include:
+ 
+ Example
+ 
+-Business Permit Application Submitted Successfully
++Building Permit Application Submitted Successfully
+ 
+ Reference Number
+ 
+@@ -291,7 +291,7 @@ Mobile
+ 
+ The following workflows shall follow these standards:
+ 
+-- Business Permit Application
++- Building Permit Application
+ - Permit Renewal
+ - Inspection Reports
+ - User Registration
+diff --git a/docs/04-UX-Standards/06-Error Handling & Recovery.md b/docs/04-UX-Standards/06-Error Handling & Recovery.md
+index 34d1863..daecf92 100644
+--- a/docs/04-UX-Standards/06-Error Handling & Recovery.md	
++++ b/docs/04-UX-Standards/06-Error Handling & Recovery.md	
+@@ -205,7 +205,7 @@ should require user confirmation.
+ 
+ Example
+ 
+-Delete Business Permit?
++Delete Building Permit?
+ 
+ This action cannot be undone.
+ 
+diff --git a/docs/04-UX-Standards/07-Feedback & System Status.md b/docs/04-UX-Standards/07-Feedback & System Status.md
+index 2a6ae7f..0ed1327 100644
+--- a/docs/04-UX-Standards/07-Feedback & System Status.md	
++++ b/docs/04-UX-Standards/07-Feedback & System Status.md	
+@@ -208,7 +208,7 @@ Example
+ 
+ No Applications Found
+ 
+-Start a new Business Permit Application to begin.
++Start a new Building Permit Application to begin.
+ 
+ Empty states should encourage the next logical action.
+ 
+diff --git a/docs/05-Mobile-Guidelines/01-Mobile-Design-Principles.md b/docs/05-Mobile-Guidelines/01-Mobile-Design-Principles.md
+index 28786c2..bc2bd3c 100644
+--- a/docs/05-Mobile-Guidelines/01-Mobile-Design-Principles.md
++++ b/docs/05-Mobile-Guidelines/01-Mobile-Design-Principles.md
+@@ -48,7 +48,7 @@ Every screen should support a clear user objective.
+ 
+ Examples
+ 
+-- Apply for a Business Permit
++- Apply for a Building Permit
+ - Renew a Permit
+ - Upload Documents
+ - Pay Fees
+diff --git a/docs/05-Mobile-Guidelines/02-Navigation-Patterns.md b/docs/05-Mobile-Guidelines/02-Navigation-Patterns.md
+index 5083918..c9bff7b 100644
+--- a/docs/05-Mobile-Guidelines/02-Navigation-Patterns.md
++++ b/docs/05-Mobile-Guidelines/02-Navigation-Patterns.md
+@@ -239,7 +239,7 @@ Example
+ 
+ No Applications Found
+ 
+-Start a new Business Permit Application to begin.
++Start a new Building Permit Application to begin.
+ 
+ Users should always understand what to do next.
+ 
+diff --git a/docs/05-Mobile-Guidelines/03-Mobile-Layouts.md b/docs/05-Mobile-Guidelines/03-Mobile-Layouts.md
+index edf5fbc..04066ed 100644
+--- a/docs/05-Mobile-Guidelines/03-Mobile-Layouts.md
++++ b/docs/05-Mobile-Guidelines/03-Mobile-Layouts.md
+@@ -84,7 +84,7 @@ Large amounts of information should be divided into manageable sections.
+ 
+ Example
+ 
+-Business Permit Application
++Building Permit Application
+ 
+ ↓
+ 
+diff --git a/docs/05-Mobile-Guidelines/05-Mobile-Forms.md b/docs/05-Mobile-Guidelines/05-Mobile-Forms.md
+index 2d94594..5f794e7 100644
+--- a/docs/05-Mobile-Guidelines/05-Mobile-Forms.md
++++ b/docs/05-Mobile-Guidelines/05-Mobile-Forms.md
+@@ -268,7 +268,7 @@ Long forms should support draft saving.
+ 
+ Applicable workflows include:
+ 
+-- Business Permit Application
++- Building Permit Application
+ - Permit Renewal
+ - Business Registration
+ 
+@@ -300,7 +300,7 @@ Successful submissions should display:
+ 
+ Example
+ 
+-Business Permit Application Submitted Successfully
++Building Permit Application Submitted Successfully
+ 
+ Reference Number
+ 
+diff --git a/docs/05-Mobile-Guidelines/06-Mobile-Accessibility.md b/docs/05-Mobile-Guidelines/06-Mobile-Accessibility.md
+index 8ddbac8..3c0a284 100644
+--- a/docs/05-Mobile-Guidelines/06-Mobile-Accessibility.md
++++ b/docs/05-Mobile-Guidelines/06-Mobile-Accessibility.md
+@@ -190,7 +190,7 @@ Examples
+ 
+ Good
+ 
+-Submit Business Permit Application
++Submit Building Permit Application
+ 
+ Bad
+ 
+diff --git a/docs/05-Mobile-Guidelines/08-Offline-Experience.md b/docs/05-Mobile-Guidelines/08-Offline-Experience.md
+index 7561d50..de13e56 100644
+--- a/docs/05-Mobile-Guidelines/08-Offline-Experience.md
++++ b/docs/05-Mobile-Guidelines/08-Offline-Experience.md
+@@ -108,7 +108,7 @@ Long-running workflows shall support offline draft saving.
+ 
+ Applicable workflows include:
+ 
+-- Business Permit Application
++- Building Permit Application
+ - Permit Renewal
+ - Business Registration
+ - Profile Updates
+diff --git a/docs/05-Mobile-Guidelines/11-Notifications.md b/docs/05-Mobile-Guidelines/11-Notifications.md
+index c16a128..f16ac19 100644
+--- a/docs/05-Mobile-Guidelines/11-Notifications.md
++++ b/docs/05-Mobile-Guidelines/11-Notifications.md
+@@ -125,7 +125,7 @@ Payment notifications should always include the payment reference number when ap
+ 
+ Examples
+ 
+-- Business Permit Renewal Reminder
++- Building Permit Renewal Reminder
+ - Pending Document Submission
+ - Incomplete Draft Application
+ - Scheduled Appointment Reminder
+@@ -161,11 +161,11 @@ Example
+ 
+ Title
+ 
+-Business Permit Approved
++Building Permit Approved
+ 
+ Message
+ 
+-Your Business Permit application has been approved. Tap to view your permit details.
++Your Building Permit application has been approved. Tap to view your permit details.
+ 
+ ---
+ 
+diff --git a/docs/05-Mobile-Guidelines/12-Responsive-Behavior.md b/docs/05-Mobile-Guidelines/12-Responsive-Behavior.md
+index 3a93131..a7b67dc 100644
+--- a/docs/05-Mobile-Guidelines/12-Responsive-Behavior.md
++++ b/docs/05-Mobile-Guidelines/12-Responsive-Behavior.md
+@@ -152,7 +152,7 @@ Examples
+ 
+ - Login
+ - Registration
+-- Business Permit Application
++- Building Permit Application
+ - Payment
+ - Application Tracking
+ 
+diff --git a/docs/05-Mobile-Guidelines/13-Mobile-Testing-Checklist.md b/docs/05-Mobile-Guidelines/13-Mobile-Testing-Checklist.md
+index 9b34d8d..a6db7b0 100644
+--- a/docs/05-Mobile-Guidelines/13-Mobile-Testing-Checklist.md
++++ b/docs/05-Mobile-Guidelines/13-Mobile-Testing-Checklist.md
+@@ -88,7 +88,7 @@ Verify:
+ 
+ ☐ Password Reset
+ 
+-☐ Business Permit Application
++☐ Building Permit Application
+ 
+ ☐ Permit Renewal
+ 
+diff --git a/docs/06-Web-Guidelines/03-Navigation-Patterns.md b/docs/06-Web-Guidelines/03-Navigation-Patterns.md
+index 8ea6720..42d0a53 100644
+--- a/docs/06-Web-Guidelines/03-Navigation-Patterns.md
++++ b/docs/06-Web-Guidelines/03-Navigation-Patterns.md
+@@ -176,7 +176,7 @@ Dashboard
+ 
+ >
+ 
+-Business Permits
++Building Permits
+ 
+ >
+ 
+diff --git a/docs/06-Web-Guidelines/04-Forms-and-Data-Entry.md b/docs/06-Web-Guidelines/04-Forms-and-Data-Entry.md
+index 465e409..10ebe9d 100644
+--- a/docs/06-Web-Guidelines/04-Forms-and-Data-Entry.md
++++ b/docs/06-Web-Guidelines/04-Forms-and-Data-Entry.md
+@@ -275,7 +275,7 @@ Long-running workflows should support automatic draft saving.
+ 
+ Applicable workflows include:
+ 
+-- New Business Permit Application
++- New Building Permit Application
+ - Permit Renewal
+ - Business Registration
+ - Business Profile Updates
+@@ -311,7 +311,7 @@ Successful submissions shall display:
+ 
+ Example
+ 
+-Business Permit Application Submitted Successfully
++Building Permit Application Submitted Successfully
+ 
+ Reference Number
+ 
+diff --git a/docs/06-Web-Guidelines/05-Data-Tables.md b/docs/06-Web-Guidelines/05-Data-Tables.md
+index 1ef5da2..71f340c 100644
+--- a/docs/06-Web-Guidelines/05-Data-Tables.md
++++ b/docs/06-Web-Guidelines/05-Data-Tables.md
+@@ -311,7 +311,7 @@ When no records exist, the table should display an informative empty state.
+ 
+ Example
+ 
+-No Business Permit Applications Found.
++No Building Permit Applications Found.
+ 
+ Try adjusting your search or filters.
+ 
+diff --git a/docs/06-Web-Guidelines/06-Dashboard-Guidelines.md b/docs/06-Web-Guidelines/06-Dashboard-Guidelines.md
+index 66bf215..757c6d5 100644
+--- a/docs/06-Web-Guidelines/06-Dashboard-Guidelines.md
++++ b/docs/06-Web-Guidelines/06-Dashboard-Guidelines.md
+@@ -309,7 +309,7 @@ Where appropriate, include a primary action.
+ 
+ Example
+ 
+-Apply for a Business Permit
++Apply for a Building Permit
+ 
+ ---
+ 
+diff --git a/docs/06-Web-Guidelines/08-Web-Accessibility.md b/docs/06-Web-Guidelines/08-Web-Accessibility.md
+index 0cb42c3..9bd90f5 100644
+--- a/docs/06-Web-Guidelines/08-Web-Accessibility.md
++++ b/docs/06-Web-Guidelines/08-Web-Accessibility.md
+@@ -278,7 +278,7 @@ Links should clearly describe their destination.
+ 
+ Good
+ 
+-Download Business Permit
++Download Building Permit
+ 
+ Bad
+ 
+diff --git a/docs/08-Reusable-Stitch/04-Screen-Inventory.md b/docs/08-Reusable-Stitch/04-Screen-Inventory.md
+index 2e47e15..22aaa62 100644
 --- a/docs/08-Reusable-Stitch/04-Screen-Inventory.md
 +++ b/docs/08-Reusable-Stitch/04-Screen-Inventory.md
-@@ -49,12 +49,17 @@
+@@ -49,12 +49,17 @@ Each screen belongs to one reusable stitch.
  
  | Screen ID | Screen Name | Stitch | Platforms |
  |------------|-------------|---------|-----------|
@@ -362,6 +824,95 @@
 +| PUB-009 | Privacy Policy | Authentication Stitch | Web |
 +| PUB-010 | 404 / Not Found | Authentication Stitch | Web |
 +| PUB-011 | How It Works | Authentication Stitch | Web |
+ 
+ ---
+ 
+diff --git a/docs/08-Reusable-Stitch/07-Dashboard-Stitch.md b/docs/08-Reusable-Stitch/07-Dashboard-Stitch.md
+index e8dfd58..f1a2e28 100644
+--- a/docs/08-Reusable-Stitch/07-Dashboard-Stitch.md
++++ b/docs/08-Reusable-Stitch/07-Dashboard-Stitch.md
+@@ -122,7 +122,7 @@ Each application card contains:
+ Example
+ 
+ ```
+-Business Permit
++Building Permit
+ 
+ Tracking No.
+ BP-2026-000125
+@@ -164,7 +164,7 @@ The same status colors must be reused throughout the application.
+ 
+ # Announcements
+ 
+-Displays important notices from the Business Permit Office.
++Displays important notices from the Office of the Municipal Engineer.
+ 
+ Examples
+ 
+diff --git a/docs/08-Reusable-Stitch/08-Permit-Application-Stitch.md b/docs/08-Reusable-Stitch/08-Permit-Application-Stitch.md
+index 9d2768b..6850f0a 100644
+--- a/docs/08-Reusable-Stitch/08-Permit-Application-Stitch.md
++++ b/docs/08-Reusable-Stitch/08-Permit-Application-Stitch.md
+@@ -25,8 +25,8 @@ The Permit Application module shall:
+ 
+ Current Version
+ 
+-- New Business Permit
+-- Business Permit Renewal
++- New Building Permit
++- Building Permit Renewal
+ - Business Amendment
+ 
+ Future Versions
+diff --git a/docs/08-Reusable-Stitch/10-Payment-Stitch.md b/docs/08-Reusable-Stitch/10-Payment-Stitch.md
+index 9ca4c55..d17d312 100644
+--- a/docs/08-Reusable-Stitch/10-Payment-Stitch.md
++++ b/docs/08-Reusable-Stitch/10-Payment-Stitch.md
+@@ -83,7 +83,7 @@ Users may choose between:
+ 
+ ### Onsite Payment
+ 
+-Users visit the Business Permit Office to settle payment.
++Users visit the Office of the Municipal Engineer to settle payment.
+ 
+ Display:
+ 
+diff --git a/docs/08-Reusable-Stitch/12-Notification-Stitch.md b/docs/08-Reusable-Stitch/12-Notification-Stitch.md
+index 338462a..9d87126 100644
+--- a/docs/08-Reusable-Stitch/12-Notification-Stitch.md
++++ b/docs/08-Reusable-Stitch/12-Notification-Stitch.md
+@@ -118,7 +118,7 @@ Example
+ ```
+ Application Approved
+ 
+-Your Business Permit application
++Your Building Permit application
+ has been approved.
+ 
+ Today • 10:30 AM
+diff --git a/docs/08-Reusable-Stitch/15-Admin-Review-and-Approval-Stitch.md b/docs/08-Reusable-Stitch/15-Admin-Review-and-Approval-Stitch.md
+index 3fe82ca..8f7daa3 100644
+--- a/docs/08-Reusable-Stitch/15-Admin-Review-and-Approval-Stitch.md
++++ b/docs/08-Reusable-Stitch/15-Admin-Review-and-Approval-Stitch.md
+@@ -131,7 +131,7 @@ Every review action requires remarks.
+ Example
+ 
+ ```
+-Please upload a clearer copy of your Business Permit.
++Please upload a clearer copy of your Building Permit.
+ ```
+ 
+ Remarks should include:
+diff --git a/docs/08-Reusable-Stitch/16-Permit-Release-and-Completion-Stitch.md b/docs/08-Reusable-Stitch/16-Permit-Release-and-Completion-Stitch.md
+index d7ae8f7..44d6d6e 100644
+--- a/docs/08-Reusable-Stitch/16-Permit-Release-and-Completion-Stitch.md
++++ b/docs/08-Reusable-Stitch/16-Permit-Release-and-Completion-Stitch.md
+@@ -80,7 +80,7 @@ Display:
+ 
+ ## Current Version
+ 
+-- Physical Claim at the Business Permit Office
++- Physical Claim at the Office of the Municipal Engineer
  
  ---
  

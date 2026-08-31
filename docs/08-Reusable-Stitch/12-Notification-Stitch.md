@@ -118,7 +118,7 @@ Example
 ```
 Application Approved
 
-Your Business Permit application
+Your Building Permit application
 has been approved.
 
 Today • 10:30 AM

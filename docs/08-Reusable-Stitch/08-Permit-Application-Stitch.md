@@ -25,8 +25,8 @@ The Permit Application module shall:
 
 Current Version
 
-- New Business Permit
-- Business Permit Renewal
+- New Building Permit
+- Building Permit Renewal
 - Business Amendment
 
 Future Versions

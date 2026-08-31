@@ -37,7 +37,7 @@ Use Floating Action Buttons only when a screen has one dominant action.
 
 Recommended examples:
 
-- New Business Permit Application
+- New Building Permit Application
 - Create Announcement
 - Add Employee
 - Upload Document
@@ -358,7 +358,7 @@ EbpcFloatingActionButton
 
 # eBPCO Examples
 
-## New Business Permit
+## New Building Permit
 
 (+)
 

@@ -125,7 +125,7 @@ Payment notifications should always include the payment reference number when ap
 
 Examples
 
-- Business Permit Renewal Reminder
+- Building Permit Renewal Reminder
 - Pending Document Submission
 - Incomplete Draft Application
 - Scheduled Appointment Reminder
@@ -161,11 +161,11 @@ Example
 
 Title
 
-Business Permit Approved
+Building Permit Approved
 
 Message
 
-Your Business Permit application has been approved. Tap to view your permit details.
+Your Building Permit application has been approved. Tap to view your permit details.
 
 ---
 

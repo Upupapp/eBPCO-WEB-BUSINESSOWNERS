@@ -83,7 +83,7 @@ Users may choose between:
 
 ### Onsite Payment
 
-Users visit the Business Permit Office to settle payment.
+Users visit the Office of the Municipal Engineer to settle payment.
 
 Display:
 

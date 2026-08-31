@@ -205,7 +205,7 @@ should require user confirmation.
 
 Example
 
-Delete Business Permit?
+Delete Building Permit?
 
 This action cannot be undone.
 

@@ -263,7 +263,7 @@ Progress Indicator
 
 Typical Usage
 
-- Business Permit Application
+- Building Permit Application
 - Renewal Process
 - Business Registration
 

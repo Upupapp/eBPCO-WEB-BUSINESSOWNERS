@@ -176,7 +176,7 @@ Dashboard
 
 >
 
-Business Permits
+Building Permits
 
 >
 

@@ -40,8 +40,8 @@ Every user flow must exist to accomplish a clearly defined goal.
 
 Examples
 
-- Apply for Business Permit
-- Renew Business Permit
+- Apply for Building Permit
+- Renew Building Permit
 - Upload Documents
 - Track Application
 - Pay Permit Fees
@@ -181,7 +181,7 @@ Long workflows should support saving progress.
 
 Recommended examples:
 
-- Business Permit Applications
+- Building Permit Applications
 - Renewal Applications
 - Inspection Forms
 
@@ -296,7 +296,7 @@ Mobile
 
 The platform should standardize the following workflows:
 
-## Business Permit Application
+## Building Permit Application
 
 Dashboard
 
@@ -330,7 +330,7 @@ Confirmation
 
 ---
 
-## Business Permit Renewal
+## Building Permit Renewal
 
 Dashboard
 

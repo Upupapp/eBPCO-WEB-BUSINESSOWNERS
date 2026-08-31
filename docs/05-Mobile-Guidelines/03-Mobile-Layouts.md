@@ -84,7 +84,7 @@ Large amounts of information should be divided into manageable sections.
 
 Example
 
-Business Permit Application
+Building Permit Application
 
 ↓
 

@@ -108,7 +108,7 @@ Long-running workflows shall support offline draft saving.
 
 Applicable workflows include:
 
-- Business Permit Application
+- Building Permit Application
 - Permit Renewal
 - Business Registration
 - Profile Updates

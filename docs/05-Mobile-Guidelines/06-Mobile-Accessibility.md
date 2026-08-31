@@ -190,7 +190,7 @@ Examples
 
 Good
 
-Submit Business Permit Application
+Submit Building Permit Application
 
 Bad
 

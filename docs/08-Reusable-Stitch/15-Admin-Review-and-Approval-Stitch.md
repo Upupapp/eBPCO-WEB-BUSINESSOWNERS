@@ -131,7 +131,7 @@ Every review action requires remarks.
 Example
 
 ```
-Please upload a clearer copy of your Business Permit.
+Please upload a clearer copy of your Building Permit.
 ```
 
 Remarks should include:
