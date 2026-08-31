@@ -53,8 +53,16 @@ export class LoginPage {
   readonly error = signal<string | null>(null);
 
   submit(): void {
-    if (!this.identifier || !this.password) {
+    if (!this.identifier && !this.password) {
       this.error.set('Please enter your email/mobile number and password.');
+      return;
+    }
+    if (!this.identifier) {
+      this.error.set('Please enter your email or mobile number.');
+      return;
+    }
+    if (!this.password) {
+      this.error.set('Please enter your password.');
       return;
     }
     const result = this.auth.login(this.identifier, this.password);
