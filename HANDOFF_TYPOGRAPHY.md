@@ -10,6 +10,35 @@ unless somebody owns it.
 
 ---
 
+## 0. HOW TO GET THIS DOCUMENT AND ITS ATTACHMENTS
+
+Everything referenced below lives in **`Upupapp/eBPCO-WEB-BUSINESSOWNERS`** on
+`main`. That repository is **private** — you need access.
+
+**Shallow-clone it.** Tested 31 August, works:
+
+```sh
+git clone --depth 1 https://github.com/Upupapp/eBPCO-WEB-BUSINESSOWNERS.git /tmp/ebpco-citizen
+```
+
+Then take what you need from `/tmp/ebpco-citizen`:
+
+| What | Path in that clone | Section |
+|---|---|---|
+| This document | `HANDOFF_TYPOGRAPHY.md` | — |
+| Patch for the four docs | `docs-sync/2026-08-31-design-system-ahead-of-admin-and-website.patch` | 5 |
+| Portable heading gate | `ebpco-user-portal/scripts/check-heading-scale.mjs` | 4 |
+| Self-hosted font reference | `ebpco-user-portal/src/fonts.scss` + `ebpco-user-portal/public/assets/fonts/` | 2 |
+| Full findings record | `SWEEP-2026-08-31.md` | — |
+
+**`git archive --remote` does NOT work here** — GitHub refuses it with
+`HTTP 422 ... expected ACK/NAK, got a flush packet`. Measured, not assumed; do
+not waste time on it.
+
+**All paths in this document are relative to that repository's root.** Where a
+step says `docs-sync/…` or `ebpco-user-portal/…`, that is where it lives *there*.
+Where a step says "apply from your repository root", that means **yours**.
+
 ## 1. THE STRUCTURAL PROBLEM — read this first          [urgent]
 
 **`docs/` exists as a separate copy in each repository, and the copies have
@@ -95,8 +124,9 @@ time, so `ng build` fails ("Inlining of fonts failed") whenever
 `fonts.googleapis.com` is unreachable from the build image. The website lane hit
 that twice on 31 August. **Admin: you still carry those three `<link>` lines.**
 
-Reference implementation, copy it: `ebpco-user-portal/src/fonts.scss` plus
-`public/assets/fonts/`. Latin and Latin-Extended subsets only, Google's own
+Reference implementation, copy it (paths in the citizen portal repo — see
+section 0): `ebpco-user-portal/src/fonts.scss` plus
+`ebpco-user-portal/public/assets/fonts/`. Latin and Latin-Extended subsets only, Google's own
 `unicode-range` values preserved verbatim, `OFL.txt` beside the faces. Ten files,
 153 kB.
 
@@ -138,7 +168,8 @@ overrides very easily leaves the last two levels undefined.
 
 ## 4. THE GATE — take it, it is portable
 
-`ebpco-user-portal/scripts/check-heading-scale.mjs` reads a stylesheet, reads the
+`ebpco-user-portal/scripts/check-heading-scale.mjs` (citizen portal repo — see
+section 0) reads a stylesheet, reads the
 guideline, and fails if they disagree. Paths are arguments:
 
 ```sh
@@ -190,11 +221,13 @@ known-good input has just found something.
 | `01-Brand-Guidelines/19-Do-and-Dont.md` | v1.0.0 → **v1.1.0** — the same exception, cross-referenced |
 | `08-Reusable-Stitch/04-Screen-Inventory.md` | fuller PUB-001..005 inventory |
 
-Apply from the directory **containing** `docs/`:
+Fetch it (section 0), then apply from **your** repository root — the directory
+that contains `docs/`:
 
 ```sh
-git apply --check docs-sync/2026-08-31-design-system-ahead-of-admin-and-website.patch   # dry run
-git apply         docs-sync/2026-08-31-design-system-ahead-of-admin-and-website.patch
+P=2026-08-31-design-system-ahead-of-admin-and-website.patch
+git apply --check docs-sync/$P    # dry run first; expect no output
+git apply         docs-sync/$P
 ```
 
 Generated against your copies as the baseline (admin and website are
