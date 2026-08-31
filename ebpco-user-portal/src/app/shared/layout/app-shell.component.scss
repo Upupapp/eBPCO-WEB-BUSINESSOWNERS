@@ -224,7 +224,15 @@
 // on the dashboard would not see it again on the wizard, which is the screen
 // where the misunderstanding actually costs them something.
 .ds-demo-banner {
-  margin: 0 0 16px;
+  // Sat flush edge-to-edge across the full ds-main width with no cap, so on
+  // a wide monitor its one sentence stretched into a single, hard-to-read
+  // line far longer than the .page content (max-width: 1080px) sitting
+  // right below it. A 32px minimum gutter plus the same 1080px cap keeps
+  // the line length readable and lines the banner up with that content.
+  box-sizing: border-box;
+  width: calc(100% - 64px);
+  max-width: 1080px;
+  margin: 20px auto 16px;
   padding: 10px 14px;
   border: 1px solid var(--warning-text, #a15c00);
   border-radius: 8px;

@@ -49,6 +49,7 @@ export const routes: Routes = [
       { path: 'documents', loadComponent: () => import('./features/documents/my-documents.page').then((m) => m.MyDocumentsPage) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments-list.page').then((m) => m.PaymentsListPage) },
       { path: 'payments/:applicationId', loadComponent: () => import('./features/payments/payment-flow.page').then((m) => m.PaymentFlowPage) },
+      { path: 'payments/:applicationId/receipt', loadComponent: () => import('./features/payments/payment-receipt.page').then((m) => m.PaymentReceiptPage) },
       { path: 'notifications', loadComponent: () => import('./features/notifications/notifications.page').then((m) => m.NotificationsPage) },
       { path: 'profile', loadComponent: () => import('./features/profile/profile.page').then((m) => m.ProfilePage) },
       { path: 'help', loadComponent: () => import('./features/profile/help-support.page').then((m) => m.HelpSupportPage) },

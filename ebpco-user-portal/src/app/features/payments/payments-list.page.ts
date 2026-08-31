@@ -36,7 +36,7 @@ import { Assessment, pesos } from '../../core/domain/assessment.model';
                     @if (row.assessment.balanceCentavos > 0) {
                       <a [routerLink]="['/payments', row.applicationId]" class="btn btn-primary btn-sm">Pay Now</a>
                     } @else {
-                      <a [routerLink]="['/applications', row.applicationId]" class="btn btn-secondary btn-sm">View Receipt</a>
+                      <a [routerLink]="['/payments', row.applicationId, 'receipt']" class="btn btn-secondary btn-sm">View Receipt</a>
                     }
                   </td>
                 </tr>

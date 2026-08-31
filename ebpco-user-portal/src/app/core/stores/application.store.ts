@@ -146,6 +146,32 @@ export class ApplicationStore {
         issuedAt: '2026-07-24T08:00:00.000Z',
       },
     });
+    // app2's assessment and timeline already say "Paid" / "Payment Verified",
+    // but the applicant-facing receipt (payment-receipt.page.ts) reads the
+    // actual PaymentTransaction record, not those denormalized fields —
+    // without seeding one here, "View Receipt" on this demo application had
+    // nothing to show, same gap the comment above already fixed once for
+    // the permit/assessment cards.
+    this.paymentsByApp.set({
+      [app2.id]: [
+        {
+          id: 'pay-seed-2',
+          assessmentId: 'assess-seed-2',
+          applicationId: app2.id,
+          amountCentavos: 85000,
+          method: 'Onsite',
+          agency: 'OBO/LGU',
+          transactionReference: 'ONSITE-20260727-0231',
+          proofFileName: null,
+          status: 'Verified',
+          submittedAt: '2026-07-27T09:00:00.000Z',
+          verifiedAt: '2026-07-28T08:00:00.000Z',
+          rejectionReason: null,
+          orNumber: 'OR-2026-00231',
+          orDate: '2026-07-28T00:00:00.000Z',
+        },
+      ],
+    });
   }
 
   readonly myApplications = computed(() => {
