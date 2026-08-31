@@ -122,6 +122,8 @@ export class ApplicationStore {
         permitNumber: app2.permitNumber!,
         // Seeded demo data — never an office issuance. See PermitProvenance.
         provenance: 'demo',
+        // No office has pronounced on this. See PermitStanding.
+        standing: null,
         issuedDateValue: new Date(app2.issuedDate!),
         issuedDate: app2.issuedDate!,
         expiryDateValue: new Date(app2.expiryDate!),
@@ -457,6 +459,7 @@ export class ApplicationStore {
           // Minted by advanceForDemo(), which any signed-in portal user can
           // trigger from the Application Details screen. Not an issuance.
           provenance: 'demo',
+          standing: null,
           issuedDateValue: new Date(issued),
           issuedDate: issued,
           expiryDateValue: expiry ? new Date(expiry) : null,

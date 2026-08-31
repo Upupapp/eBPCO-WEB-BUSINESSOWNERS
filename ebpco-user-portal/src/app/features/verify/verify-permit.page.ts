@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { BusinessStore } from '../../core/stores/business.store';
 import { requirementsFor } from '../../core/domain/requirements-catalog';
+import { PermitStanding, isPermitStanding } from '../../core/domain/permit.model';
 import { formatDate } from '../../core/utils/ids';
 
 /**
@@ -11,7 +12,7 @@ import { formatDate } from '../../core/utils/ids';
  * permit that is not is far higher than the cost of showing "Unverified" for
  * one that is. Do not add a branch that returns 'Valid' by fallthrough.
  */
-type PublicStatus = 'Valid' | 'Expired' | 'Unverified';
+type PublicStatus = PermitStanding | 'Expired' | 'Unverified';
 
 /** Public, no-login verification page — the destination the QR block on every generated permit points to. The token is simply the permit's own real, system-generated number. */
 @Component({
@@ -129,14 +130,26 @@ export class VerifyPermitPage {
 
   protected readonly status = computed<PublicStatus>(() => {
     const p = this.permit();
-    // Fail closed. No record, or a record no office actually issued, is never
-    // 'Valid' — see PermitProvenance. Today nothing is 'issued', so this page
-    // cannot return 'Valid' at all, which is the honest answer while the
-    // portal holds no real permit records.
+
+    // Fail closed, in three steps, and note that NONE of them derives 'Valid'.
+    //
+    // This page used to end `return 'Valid'` — if a permit was issued and had
+    // not expired, it said Valid. That derivation has no term for revocation,
+    // so a permit the Municipality had REVOKED would have been reported to the
+    // public as Valid the moment a backend set provenance: 'issued'. Nobody
+    // would have had to make a mistake; it was the default.
+    //
+    // A verification surface cannot COMPUTE validity. It can only relay what
+    // the issuing office says, and say so plainly when the office has not said
+    // anything. See PermitStanding.
     if (!p) return 'Unverified';
     if (p.provenance !== 'issued') return 'Unverified';
+    if (!isPermitStanding(p.standing)) return 'Unverified';
+
+    // Expiry is applied ON TOP of the office's answer, never instead of it: a
+    // permit can be both current in the register and out of date.
     if (p.expiryDateValue && p.expiryDateValue.getTime() < Date.now()) return 'Expired';
-    return 'Valid';
+    return p.standing;
   });
 
   protected readonly badgeClass = computed(() => {
@@ -145,6 +158,12 @@ export class VerifyPermitPage {
         return 'badge-green';
       case 'Expired':
         return 'badge-amber';
+      case 'Revoked':
+      case 'Suspended':
+      case 'Cancelled':
+        // Withdrawn standings read as a REFUSAL, not a caution. Someone is
+        // being shown this permit by its holder.
+        return 'badge-red';
       default:
         return 'badge-gray';
     }

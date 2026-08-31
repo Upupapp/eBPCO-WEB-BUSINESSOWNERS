@@ -104,10 +104,43 @@ export type ApplicationAction = 'New' | 'Renewal' | 'Amendment';
  */
 export type PermitProvenance = 'demo' | 'issued';
 
+/**
+ * The issuing office's own word on whether a permit is currently good.
+ *
+ * This exists because the public verification page must NOT compute validity.
+ * It used to: given an issued permit that had not expired, it returned 'Valid'.
+ * That derivation has no term for revocation, so the moment a backend sets
+ * `provenance: 'issued'`, a permit the Municipality had REVOKED would have been
+ * reported to the public as Valid. Nobody would have had to make a mistake for
+ * that to happen — it was the default.
+ *
+ * A verification surface can only relay what the office says. So this is the
+ * office's answer, and `null` means the office has not given one.
+ *
+ * The values are what this PAGE can render, not a claim about Castilla's
+ * lifecycle — that belongs to the backend and has not been settled (see
+ * SWEEP-2026-08-31.md, L-2). `isPermitStanding()` fails closed on anything
+ * else, so a state we have not been told about renders as Unverified rather
+ * than as Valid. Extend the union when the LGU's revocation model is defined;
+ * do NOT widen the guard to accept unknown strings.
+ */
+export type PermitStanding = 'Valid' | 'Revoked' | 'Suspended' | 'Cancelled';
+
+const PERMIT_STANDINGS: readonly string[] = ['Valid', 'Revoked', 'Suspended', 'Cancelled'];
+
+export function isPermitStanding(value: unknown): value is PermitStanding {
+  return typeof value === 'string' && PERMIT_STANDINGS.includes(value);
+}
+
 export interface GeneratedPermit {
   applicationId: string;
   permitNumber: string;
   provenance: PermitProvenance;
+  /**
+   * NOTHING sets this today, exactly like `provenance`. It is the seam the
+   * backend fills, and until it does the verification page reports Unverified.
+   */
+  standing: PermitStanding | null;
   issuedDateValue: Date;
   issuedDate: string;
   expiryDateValue: Date | null;
