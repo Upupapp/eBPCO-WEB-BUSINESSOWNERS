@@ -43,6 +43,10 @@ export class AppShellComponent {
     return u ? fullName(u) : '';
   }
 
+  userPhoto(): string | null {
+    return this.auth.currentUser()?.photoPath ?? null;
+  }
+
   logout(): void {
     this.auth.logout();
     this.router.navigate(['/login']);

@@ -112,11 +112,11 @@ export class AuthService {
   login(emailOrMobile: string, password: string): { ok: true } | { ok: false; error: string } {
     const match = [...this.accounts.values()].find(
       (entry) =>
-        (entry.account.email.toLowerCase() === emailOrMobile.toLowerCase() ||
-          entry.account.mobileNumber === emailOrMobile) &&
-        entry.password === password,
+        entry.account.email.toLowerCase() === emailOrMobile.toLowerCase() ||
+        entry.account.mobileNumber === emailOrMobile,
     );
-    if (!match) return { ok: false, error: 'Incorrect email/mobile number or password.' };
+    if (!match) return { ok: false, error: 'No account found with that email or mobile number.' };
+    if (match.password !== password) return { ok: false, error: 'Incorrect password. Please try again.' };
     this.currentUserId.set(match.account.id);
     return { ok: true };
   }
@@ -164,7 +164,7 @@ export class AuthService {
     this.currentUserId.set(null);
   }
 
-  updateProfile(patch: Partial<Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'address' | 'barangay' | 'city' | 'province' | 'zipCode'>>): void {
+  updateProfile(patch: Partial<Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'address' | 'barangay' | 'city' | 'province' | 'zipCode' | 'photoPath'>>): void {
     const id = this.currentUserId();
     if (!id) return;
     const entry = this.accounts.get(id);
