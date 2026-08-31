@@ -215,6 +215,34 @@ a:hover { text-decoration: underline; }
 .btn-block { width: 100%; }
 .btn-sm { padding: 6px 12px; font-size: 13px; }
 
+// Touch targets.
+//
+// `.btn` renders 36px tall and `.btn-sm` about 30px. That clears WCAG 2.2
+// SC 2.5.8 Target Size (Minimum), which is 24x24 and the AA bar, so it is not a
+// conformance failure - which is exactly why axe does not flag it. It is under
+// SC 2.5.5 (44x44, AAA) and under both platform touch guidelines: Apple HIG
+// 44pt, Material 48dp.
+//
+// Raised for COARSE POINTERS ONLY. That is how the platform guidance is itself
+// scoped, and it is the honest reading of the problem: a 36px target is
+// comfortable with a mouse and cramped with a thumb. Desktop is left untouched,
+// so the app's density is unchanged for the people it already suits.
+//
+// This covers all 58 `.btn` uses at once. Prefer fixing it here rather than
+// per-screen: a per-screen height is how the onboarding CTA drifted to 88px.
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm {
+    min-height: 44px;
+  }
+
+  .input,
+  select.input,
+  textarea.input {
+    min-height: 44px;
+  }
+}
+
 // Forms
 .field { margin-bottom: 16px; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
