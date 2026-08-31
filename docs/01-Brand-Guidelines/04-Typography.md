@@ -1,8 +1,9 @@
 # 04 Typography
 
-Version: 1.0.0  
+Version: 1.1.0  
 Status: Approved  
-Document Owner: UI/UX Team
+Document Owner: UI/UX Team  
+Last updated: 31 August 2026 — the official font family is now NAMED (see Font Family).
 
 ---
 
@@ -31,17 +32,44 @@ The typography system is designed to achieve the following goals:
 
 # Font Family
 
-The official font family shall be the font used by the approved eBPCO interface.
+**The official eBPCO font family is Gothic A1.**
 
-If future changes are required, they must be documented and approved before implementation.
+Owner decision, 31 August 2026. Until that date this section read *"the official
+font family shall be the font used by the approved eBPCO interface"*, which is
+circular — it defines the font as whatever the interface happens to use, so it
+could never be violated and never settled anything. The surfaces duly diverged:
+the three web surfaces adopted Gothic A1 while the Flutter mobile app adopted
+Poppins, leaving the citizen web portal and the citizen mobile app — one product,
+required to be in parity — on different typefaces.
+
+Gothic A1 was chosen because three of the four surfaces already ship it and it is
+live in production, and because its Latin set is a clean geometric sans suited to
+the English and Filipino text these interfaces render.
+
+**Consequence: the Flutter mobile application must move from Poppins to Gothic
+A1.** Until it does, the two citizen surfaces are not in parity.
+
+Licence: Gothic A1 is © HanYang I&C Co., Ltd., released under the SIL Open Font
+License 1.1. **The OFL requires the licence and copyright notice to be
+distributed with the font**, so any surface that self-hosts it must ship
+`OFL.txt` alongside the font files. Self-hosting is preferred over a Google
+Fonts `<link>`: the link discloses every visitor's IP address to a third party
+before the page paints, and Angular additionally resolves it at *build* time, so
+the build fails whenever that host is unreachable. See
+`ebpco-user-portal/src/fonts.scss` for a working reference implementation
+(Latin and Latin-Extended subsets only, Google's own `unicode-range` values
+preserved, `OFL.txt` shipped beside the faces).
+
+If future changes are required, they must be documented and approved before
+implementation.
 
 Fallback order:
 
 ```
-Primary Font
-System UI
-Arial
+Gothic A1
+System UI (-apple-system, BlinkMacSystemFont, Segoe UI, Roboto)
 Helvetica
+Arial
 Sans-serif
 ```
 
@@ -58,6 +86,21 @@ Sans-serif
 | Bold (700) | Main headings |
 
 Extra Bold should be avoided except for marketing materials.
+
+> **Open discrepancy, recorded 31 August 2026 — for the document owner to
+> settle.** The citizen web portal sets **every** heading (`h1`–`h6`) to weight
+> **800**, not the 700 this table specifies, in four rules across `styles.scss`
+> and `landing.page.scss`. So either the table is describing an intent the
+> implementation never followed, or 800 is the real heading weight and the table
+> is stale.
+>
+> This was not resolved unilaterally: changing it either way alters the
+> appearance of every heading on a live government portal, or overrides an
+> approved specification. The UI/UX Team should decide which is correct and the
+> other should be brought into line.
+>
+> Weight 300 (Light) is documented as rarely used and is currently used **zero**
+> times and bundled nowhere, which is consistent.
 
 ---
 
