@@ -64,9 +64,27 @@ npm run verify     # the gate: asset check, production build, unit tests
 
 | Step | What it catches |
 |---|---|
-| `npm run check:assets` | any third-party asset host reintroduced into `index.html` or the global stylesheets, and any bundled font file that has gone missing |
+| `npm run check:assets` | any third-party asset host reintroduced into `index.html` or the global stylesheets, a bundled font file gone missing, or the font's SIL OFL licence not shipping beside it |
+| `npm run check:print` | the app shell printing across the permit document, and a watermark the browser is free to drop to save ink |
+| `npm run check:labels` | a form control a screen reader cannot name |
+| `npm run check:headings` | the heading scale in `styles.scss` drifting from the brand guideline |
 | `npm run build` | compilation, and the per-component CSS budgets |
-| `npm test` | 25 unit tests, most of them guarding specific findings |
+| `npm run check:a11y` | **axe-core against the real rendered DOM**, 16 screens, WCAG 2.0/2.1 A and AA |
+| `npm test` | 41 unit tests, most of them guarding specific findings |
+
+**`check:a11y` needs a browser.** First run on a new machine:
+
+```sh
+npx playwright install chromium
+```
+
+It **fails closed** if Chromium is missing rather than skipping — a gate that
+silently skips reads exactly like a gate that passed. Netlify never runs it
+(the deploy runs `npm run build`), and `netlify.toml` sets
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` so the deploy does not pay for browsers it
+will not use.
+
+The whole of `verify` takes about 40 seconds.
 
 Many tests exist to hold a *finding* closed rather than to describe a feature —
 they name the finding in their `describe` block. If one fails, read what it is

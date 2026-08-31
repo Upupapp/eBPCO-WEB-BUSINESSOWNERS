@@ -5,6 +5,11 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # The a11y gate (npm run check:a11y) needs Playwright, which downloads ~300MB
+  # of browsers on postinstall. Netlify runs `npm run build`, NOT `npm run
+  # verify`, so it never needs them - this keeps that download off every deploy.
+  # Remove this only if the deploy is ever changed to run the gate.
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
 
 [[redirects]]
   from   = "/*"
