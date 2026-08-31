@@ -12,30 +12,54 @@ unless somebody owns it.
 
 ## 1. THE STRUCTURAL PROBLEM — read this first          [urgent]
 
-**`docs/01-Brand-Guidelines/04-Typography.md` exists as at least three separate
-copies, and they are already at two different versions.** Measured on this
-machine, read-only, 31 August:
+**`docs/` exists as a separate copy in each repository, and the copies have
+drifted in BOTH directions.** Measured read-only on 31 August, then partly
+reconciled from this side.
 
-| Copy | Version | Font family | Heading 1 |
-|---|---|---|---|
-| `eBPCO-Web` (admin) | **1.0.0** | *circular* | 32px / 700 |
-| `eBPCO-Website` | **1.0.0** | *circular* | 32px / 700 |
-| `eBPCO-WEB-BUSINESSOWNERS` | **1.2.0** | Gothic A1 | 28px / 800 |
+**Correction to an earlier draft of this handoff.** It said your copies were
+stale and this repo's was current. That was wrong, and the error is instructive:
+this repo's copy carried the **superseded product name** — *"Electronic Business
+Permit and Clearance Office"* — **223 times across 156 files**, while yours had
+already been corrected to *"Electronic Building Permit and Certificate of
+Occupancy"*. Neither copy was simply ahead. **"Pick one and overwrite" would have
+destroyed real work in whichever direction it ran.**
 
-The owner's rulings below live in **one** of them. An agent reading your copy
-will see the old text, follow it correctly, and re-diverge — which is exactly
-how the surfaces ended up on different typefaces in the first place.
+Now reconciled from this side (commit `f1e1dc9`): **154 of 158 files are
+byte-identical** to your copies. Four remain, and on those this repo is ahead —
+see section 5 for a patch that applies cleanly.
 
-**A design system duplicated per repository cannot hold a decision.** Fixing the
-two rulings without fixing this only resets the clock. Somebody should decide
-whether `docs/` becomes a single source (its own repo, a submodule, a published
-package) or whether one repo is declared canonical and the rest carry a pointer
-instead of a copy. That decision is not any single lane's to take.
+The clearest illustration of the defect: **the "Maximalist Motion Exception",
+written explicitly for the Angular Web Admin Portal, exists only in the CITIZEN
+portal's copy.** The admin repo does not have its own exception.
 
-Whatever is chosen, **do not hand-merge four copies**. Pick the canonical one
-and make the others reference it.
+**Owner decision, 31 August 2026: `docs/` moves to its own repository —
+`Upupapp/eBPCO-Design-System` — consumed by all four surfaces.**
 
----
+Each surface references it (submodule, or a pull step in the build) instead of
+holding a copy. One place to rule, one version number, and a stale copy becomes
+*impossible* rather than merely discouraged. This is not a lane's decision to
+implement alone; it needs the four repos to move roughly together.
+
+Suggested order, so nothing is lost:
+
+1. Create the new repo from **this repo's `docs/` at `f1e1dc9`** — it is the
+   only copy that now carries both the correct product name *and* the four
+   ahead-files. Verify before trusting that: `diff -r` it against your copy and
+   expect exactly the four files in section 5.
+2. Each surface removes its `docs/` and references the new repo.
+3. Leave a `docs/README.md` pointer where the directory was, so the next agent
+   who looks for it finds the new home rather than assuming it was deleted.
+
+**Do not hand-merge four copies.** That is how bidirectional drift becomes
+silent data loss.
+
+**One thing deliberately NOT fixed.** Both this repo and yours contain **46**
+occurrences of "Business Permit" that are *not* the product name — "Business
+Permit Application", "Business Permit Renewal". Identical count on both sides,
+which is evidence they were left alone deliberately in your rename too. A
+business permit is a different permit from a building permit, so blanket
+replacing that phrase is a trap. Whether those 46 are correct is an estate-wide
+question and no single lane should settle it.
 
 ## 2. RULING: the official typeface is Gothic A1
 
@@ -155,6 +179,34 @@ known-good input has just found something.
 
 ---
 
+## 5. THE FOUR FILES WHERE THIS REPO IS AHEAD — patch attached
+
+`docs-sync/2026-08-31-design-system-ahead-of-admin-and-website.patch`
+
+| File | Change |
+|---|---|
+| `01-Brand-Guidelines/04-Typography.md` | v1.0.0 → **v1.2.0** — Gothic A1 named, shipping heading scale |
+| `02-Design-System/10-Motion.md` | v1.0.0 → **v1.1.0** — Maximalist Motion Exception |
+| `01-Brand-Guidelines/19-Do-and-Dont.md` | v1.0.0 → **v1.1.0** — the same exception, cross-referenced |
+| `08-Reusable-Stitch/04-Screen-Inventory.md` | fuller PUB-001..005 inventory |
+
+Apply from the directory **containing** `docs/`:
+
+```sh
+git apply --check docs-sync/2026-08-31-design-system-ahead-of-admin-and-website.patch   # dry run
+git apply         docs-sync/2026-08-31-design-system-ahead-of-admin-and-website.patch
+```
+
+Generated against your copies as the baseline (admin and website are
+byte-identical to each other) and **tested**: applied to a pristine copy of the
+admin `docs/`, it applies cleanly and reproduces all four files exactly. The two
+`trailing whitespace` warnings are Markdown hard line breaks and are intended.
+
+If the design-system repo lands first, skip this — take `docs/` from this repo at
+`f1e1dc9` instead and the four files come with it.
+
+---
+
 ## Provenance
 
 Everything above was measured, not assumed. The typography defects were found
@@ -162,3 +214,4 @@ while sweeping this portal, and the Google-Fonts and build-budget findings were
 raised independently by the information-website lane in its own handoff — the two
 readings matched exactly, which is why they are stated as fact rather than
 opinion. The full record is `SWEEP-2026-08-31.md` in this repository.
+

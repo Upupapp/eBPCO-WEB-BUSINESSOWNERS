@@ -1,0 +1,367 @@
+# Patch: bring docs/ up to the citizen portal's version for 4 files.
+#
+# Generated 31 August 2026 from Upupapp/eBPCO-WEB-BUSINESSOWNERS at f1e1dc9.
+# Baseline: the admin and website copies, which are byte-identical to each other.
+# The other 154 files already agree and are not touched here.
+#
+# Apply from the repository root (the directory CONTAINING docs/):
+#     git apply --check docs-sync/<this file>   # dry run first
+#     git apply         docs-sync/<this file>
+#
+# Contents:
+#   01-Brand-Guidelines/04-Typography.md   v1.0.0 -> v1.2.0  (Gothic A1 named; shipping heading scale)
+#   02-Design-System/10-Motion.md          v1.0.0 -> v1.1.0  (Maximalist Motion Exception)
+#   01-Brand-Guidelines/19-Do-and-Dont.md  v1.0.0 -> v1.1.0  (the same exception, cross-referenced)
+#   08-Reusable-Stitch/04-Screen-Inventory.md               (fuller PUB-001..005 inventory)
+#
+--- a/docs/01-Brand-Guidelines/04-Typography.md
++++ b/docs/01-Brand-Guidelines/04-Typography.md
+@@ -1,8 +1,10 @@
+ # 04 Typography
+ 
+-Version: 1.0.0  
++Version: 1.2.0  
+ Status: Approved  
+-Document Owner: UI/UX Team
++Document Owner: UI/UX Team  
++Last updated: 31 August 2026 — the official font family is now NAMED (see Font Family),
++and the Typography Scale now records the scale that actually ships (see Font Weights).
+ 
+ ---
+ 
+@@ -31,17 +33,44 @@
+ 
+ # Font Family
+ 
+-The official font family shall be the font used by the approved eBPCO interface.
++**The official eBPCO font family is Gothic A1.**
+ 
+-If future changes are required, they must be documented and approved before implementation.
++Owner decision, 31 August 2026. Until that date this section read *"the official
++font family shall be the font used by the approved eBPCO interface"*, which is
++circular — it defines the font as whatever the interface happens to use, so it
++could never be violated and never settled anything. The surfaces duly diverged:
++the three web surfaces adopted Gothic A1 while the Flutter mobile app adopted
++Poppins, leaving the citizen web portal and the citizen mobile app — one product,
++required to be in parity — on different typefaces.
+ 
++Gothic A1 was chosen because three of the four surfaces already ship it and it is
++live in production, and because its Latin set is a clean geometric sans suited to
++the English and Filipino text these interfaces render.
++
++**Consequence: the Flutter mobile application must move from Poppins to Gothic
++A1.** Until it does, the two citizen surfaces are not in parity.
++
++Licence: Gothic A1 is © HanYang I&C Co., Ltd., released under the SIL Open Font
++License 1.1. **The OFL requires the licence and copyright notice to be
++distributed with the font**, so any surface that self-hosts it must ship
++`OFL.txt` alongside the font files. Self-hosting is preferred over a Google
++Fonts `<link>`: the link discloses every visitor's IP address to a third party
++before the page paints, and Angular additionally resolves it at *build* time, so
++the build fails whenever that host is unreachable. See
++`ebpco-user-portal/src/fonts.scss` for a working reference implementation
++(Latin and Latin-Extended subsets only, Google's own `unicode-range` values
++preserved, `OFL.txt` shipped beside the faces).
++
++If future changes are required, they must be documented and approved before
++implementation.
++
+ Fallback order:
+ 
+ ```
+-Primary Font
+-System UI
+-Arial
++Gothic A1
++System UI (-apple-system, BlinkMacSystemFont, Segoe UI, Roboto)
+ Helvetica
++Arial
+ Sans-serif
+ ```
+ 
+@@ -51,13 +80,34 @@
+ 
+ | Weight | Usage |
+ |---------|------|
+-| Light (300) | Rarely used |
++| Light (300) | Not used. Not bundled. |
+ | Regular (400) | Body text |
+-| Medium (500) | Labels |
+-| SemiBold (600) | Section titles |
+-| Bold (700) | Main headings |
++| Medium (500) | Labels, secondary link text |
++| SemiBold (600) | Buttons, table headers, form labels |
++| Bold (700) | Headings 3-6, badges |
++| Extra Bold (800) | Headings 1-2, and display / hero type |
+ 
+-Extra Bold should be avoided except for marketing materials.
++Extra Bold (800) is reserved for Headings 1-2 and display type. Do not use it
++for body copy, labels, buttons or table text.
++
++> **Settled 31 August 2026 (owner).** This table and the Typography Scale below
++> previously specified 700 for main headings and 600 for Headings 2-6, and told
++> implementers to avoid Extra Bold. **No surface ever implemented that scale.**
++> The shipping scale was systematically smaller *and* heavier at every level —
++> a coherent, denser, bolder scale that someone designed and nobody wrote down.
++>
++> The ruling is that **the shipping scale is authoritative**, and this document
++> has been corrected to describe it. That is why the numbers above and below
++> changed rather than the code: the code is live on a production portal, is
++> internally consistent, and was evidently a deliberate design; the documented
++> scale existed only here.
++>
++> Recorded so the next reader knows this was decided, not drifted into. If the
++> UI/UX Team wants the lighter scale, that is a fresh decision and it must move
++> all four surfaces together.
++>
++> Weight 300 (Light) is used zero times and is not bundled — the table now says
++> so rather than calling it "rarely used".
+ 
+ ---
+ 
+@@ -99,19 +149,19 @@
+ 
+ Desktop
+ 
+-32px
++28px
+ 
+ Tablet
+ 
+-30px
++28px
+ 
+ Mobile
+ 
+-28px
++24px
+ 
+ Weight
+ 
+-700
++800
+ 
+ ---
+ 
+@@ -123,19 +173,19 @@
+ 
+ Desktop
+ 
+-28px
++22px
+ 
+ Tablet
+ 
+-26px
++22px
+ 
+ Mobile
+ 
+-24px
++20px
+ 
+ Weight
+ 
+-600
++800
+ 
+ ---
+ 
+@@ -151,19 +201,19 @@
+ 
+ Desktop
+ 
+-24px
++18px
+ 
+ Tablet
+ 
+-22px
++18px
+ 
+ Mobile
+ 
+-20px
++17px
+ 
+ Weight
+ 
+-600
++700
+ 
+ ---
+ 
+@@ -179,19 +229,19 @@
+ 
+ Desktop
+ 
+-20px
++16px
+ 
+ Tablet
+ 
+-20px
++16px
+ 
+ Mobile
+ 
+-18px
++16px
+ 
+ Weight
+ 
+-600
++700
+ 
+ ---
+ 
+@@ -199,19 +249,19 @@
+ 
+ Desktop
+ 
+-18px
++14px
+ 
+ Tablet
+ 
+-18px
++14px
+ 
+ Mobile
+ 
+-16px
++14px
+ 
+ Weight
+ 
+-600
++700
+ 
+ ---
+ 
+@@ -219,19 +269,19 @@
+ 
+ Desktop
+ 
+-16px
++13px
+ 
+ Tablet
+ 
+-16px
++13px
+ 
+ Mobile
+ 
+-16px
++13px
+ 
+ Weight
+ 
+-600
++700
+ 
+ ---
+ 
+--- a/docs/02-Design-System/10-Motion.md
++++ b/docs/02-Design-System/10-Motion.md
+@@ -1,6 +1,6 @@
+ # 10 Motion
+ 
+-Version: 1.0.0
++Version: 1.1.0
+ Status: Approved
+ Document Owner: UI/UX Team
+ 
+@@ -46,7 +46,21 @@
+ - Non-blocking
+ 
+ Animations should communicate intent rather than decoration.
++
++---
++
++# Maximalist Motion Exception (Angular Web Admin Portal)
++
++As of version 1.1.0 (2026-08-27), the Angular Web Administration Portal deliberately runs a denser, more expressive motion treatment across all of its screens — not only the brand/auth moments this document otherwise reserves richer motion for. This was requested and approved by the Web Admin UI Lead (michaela@lguids.com.ph) under this document's own Governance rule that new animation patterns require UI/UX Team review before implementation; this section is that review record.
++
++Scope: this exception applies **only** to the Angular Web Administration Portal. The Flutter Mobile Application continues to follow the restrained motion system described in the rest of this document, unchanged.
++
++What the exception does **not** relax:
+ 
++- The "Hardcoded Animations" rule below still applies in full — every duration, easing curve, and keyframe used anywhere in the Admin Portal routes through the centralized tokens in `shared/styles/_motion.scss`, extended for this pass with: `$dur-stagger-step`, `$dur-count-up`, `$dur-chart-draw`, `$dur-page` (durations), `$ease-emphasis`, `$ease-draw` (easings), and shared keyframes `stagger-in`, `skeleton-shimmer`, `pill-swap`, `count-pop`.
++- The Accessibility section's reduced-motion requirements remain in full force, with no Admin Portal carve-out — every new animation is still caught by the app-wide `prefers-reduced-motion` kill-switch, and the two JS-timed additions (KPI count-up, chart draw-in) each check the media query directly and render their final state instantly when motion is reduced.
++- Motion must still be purposeful, not decorative — see the corresponding note added to `01-Brand-Guidelines/19-Do-and-Dont.md`.
++
+ ---
+ 
+ # Motion Categories
+@@ -124,6 +138,8 @@
+ 
+ Complex transitions are discouraged.
+ 
++The Angular Web Admin Portal implements page transitions via a plain CSS `animation` on each routed page's own host element (no `@angular/animations`, no View Transitions API) — a small `page-in` mount keyframe layered on top of each page's existing entrance animation. This satisfies the "Fade + Slide" pattern above without introducing a second animation system into a codebase that is otherwise 100% hand-rolled CSS.
++
+ ---
+ 
+ # Component Transitions
+@@ -333,4 +349,4 @@
+ 
+ Version
+ 
+-1.0.0
+\ No newline at end of file
++1.1.0
+\ No newline at end of file
+--- a/docs/01-Brand-Guidelines/19-Do-and-Dont.md
++++ b/docs/01-Brand-Guidelines/19-Do-and-Dont.md
+@@ -1,6 +1,6 @@
+ # 19 Do and Don't
+ 
+-Version: 1.0.0
++Version: 1.1.0
+ Status: Approved
+ Document Owner: UI/UX Team
+ 
+@@ -222,6 +222,8 @@
+ - Delay workflows.
+ - Overanimate components.
+ - Use flashing effects.
++
++**Exception — Angular Web Admin Portal:** per the approved Maximalist Motion Exception (see `02-Design-System/10-Motion.md`), this platform intentionally uses denser, more visible motion than the baseline rule above — staggered reveals, count-up numbers, chart draw-ins, a kinetic headline treatment on brand screens. This exception is scoped to the Angular Web Admin Portal only; the "keep animations subtle" / "avoid decorative animations" rules above remain the default for every other eBPCO surface, and even within the Admin Portal's exception, every animation must still be traceable to a specific usability purpose — confirming an action, guiding attention, or communicating a state change. Purely ornamental motion is still out of scope, exception or not.
+ 
+ ---
+ 
+@@ -307,4 +309,4 @@
+ 
+ Version
+ 
+-1.0.0
+\ No newline at end of file
++1.1.0
+\ No newline at end of file
+--- a/docs/08-Reusable-Stitch/04-Screen-Inventory.md
++++ b/docs/08-Reusable-Stitch/04-Screen-Inventory.md
+@@ -49,12 +49,17 @@
+ 
+ | Screen ID | Screen Name | Stitch | Platforms |
+ |------------|-------------|---------|-----------|
+-| PUB-001 | Splash Screen | Authentication Stitch | Mobile |
+-| PUB-002 | Landing Page | Authentication Stitch | Web |
+-| PUB-003 | Login | Authentication Stitch | Web / Mobile |
+-| PUB-004 | Register Account | Authentication Stitch | Web / Mobile |
+-| PUB-005 | Forgot Password | Authentication Stitch | Web / Mobile |
+-| PUB-006 | Reset Password | Authentication Stitch | Web / Mobile |
++| PUB-001 | Splash Screen | Authentication Stitch | Web / Mobile |
++| PUB-002 | Onboarding Carousel | Authentication Stitch | Web / Mobile |
++| PUB-003 | Landing Page | Authentication Stitch | Web |
++| PUB-004 | Login | Authentication Stitch | Web / Mobile |
++| PUB-005 | Register Account | Authentication Stitch | Web / Mobile |
++| PUB-006 | Forgot Password | Authentication Stitch | Web / Mobile |
++| PUB-007 | Reset Password | Authentication Stitch | Web / Mobile |
++| PUB-008 | Terms & Conditions | Authentication Stitch | Web |
++| PUB-009 | Privacy Policy | Authentication Stitch | Web |
++| PUB-010 | 404 / Not Found | Authentication Stitch | Web |
++| PUB-011 | How It Works | Authentication Stitch | Web |
+ 
+ ---
+ 
