@@ -95,7 +95,18 @@ export class ProfilePage {
     this.toast.success('Profile updated.');
   }
 
+  /**
+   * F-20: this used to skip straight to the match check, so two blank fields
+   * ("" === "") sailed through and silently set the account's password to an
+   * empty string as long as the current password was correct. Register enforces
+   * the same 8-char/letter/number rule on account creation; Change Password must
+   * enforce it too, not just on the way in.
+   */
   changePassword(): void {
+    if (this.newPassword.length < 8 || !/[a-zA-Z]/.test(this.newPassword) || !/\d/.test(this.newPassword)) {
+      this.passwordError.set('Password must be at least 8 characters with at least 1 letter and 1 number.');
+      return;
+    }
     if (this.newPassword !== this.confirmPassword) {
       this.passwordError.set('New passwords do not match.');
       return;

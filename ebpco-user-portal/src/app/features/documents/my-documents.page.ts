@@ -78,6 +78,8 @@ export class MyDocumentsPage {
   }
 
   remove(id: string): void {
+    const doc = this.store.myDocuments().find((d) => d.id === id);
     this.store.remove(id);
+    this.toast.success(doc ? `${doc.fileName} removed.` : 'Document removed.');
   }
 }

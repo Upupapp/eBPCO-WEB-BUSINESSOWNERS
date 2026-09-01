@@ -60,3 +60,61 @@ describe('ProfilePage (F-15: preferences must actually persist)', () => {
     expect(auth.notificationPreferencesFor().pushNotifications).not.toBe(a.pushNotifications);
   });
 });
+
+/**
+ * Guards F-20: Change Password only checked that the two new-password fields
+ * matched each other, not that either one was a real password. Two blank
+ * fields matched, so a correct current password plus nothing else silently
+ * cleared the account's password.
+ */
+describe('ProfilePage (F-20: Change Password must enforce the same password rule as Register)', () => {
+  function setup() {
+    TestBed.configureTestingModule({ imports: [ProfilePage], providers: [provideRouter([])] });
+    const auth = TestBed.inject(AuthService);
+    auth.login('juan.delacruz@example.com', 'Password1');
+    const fixture = TestBed.createComponent(ProfilePage);
+    fixture.detectChanges();
+    return { fixture, auth };
+  }
+  afterEach(() => TestBed.resetTestingModule());
+
+  type PasswordPage = {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+    passwordError: () => string | null;
+    changePassword(): void;
+  };
+
+  it('rejects a blank new password instead of clearing the account password', () => {
+    const { fixture, auth } = setup();
+    const page = fixture.componentInstance as unknown as PasswordPage;
+    page.currentPassword = 'Password1';
+    page.newPassword = '';
+    page.confirmPassword = '';
+    page.changePassword();
+    expect(page.passwordError()).toBe('Password must be at least 8 characters with at least 1 letter and 1 number.');
+    expect(auth.login('juan.delacruz@example.com', 'Password1').ok).toBe(true);
+  });
+
+  it('rejects a new password that is too short or missing a letter/number', () => {
+    const { fixture } = setup();
+    const page = fixture.componentInstance as unknown as PasswordPage;
+    page.currentPassword = 'Password1';
+    page.newPassword = 'short1';
+    page.confirmPassword = 'short1';
+    page.changePassword();
+    expect(page.passwordError()).toBe('Password must be at least 8 characters with at least 1 letter and 1 number.');
+  });
+
+  it('still accepts a valid new password', () => {
+    const { fixture, auth } = setup();
+    const page = fixture.componentInstance as unknown as PasswordPage;
+    page.currentPassword = 'Password1';
+    page.newPassword = 'NewPassword2';
+    page.confirmPassword = 'NewPassword2';
+    page.changePassword();
+    expect(page.passwordError()).toBeNull();
+    expect(auth.login('juan.delacruz@example.com', 'NewPassword2').ok).toBe(true);
+  });
+});
