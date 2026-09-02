@@ -24,6 +24,12 @@ import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
           <div>
             <h1>{{ a.permitType }}</h1>
             <div class="subtitle">{{ a.applicationNumber }} · {{ a.businessName }} · {{ a.applicationAction }}</div>
+            @if (a.relatedPermitNumber) {
+              <div class="small muted">
+                {{ a.applicationAction === 'Renewal' ? 'Renewing' : 'Amending' }} permit
+                <strong>{{ a.relatedPermitNumber }}</strong>
+              </div>
+            }
           </div>
           <app-status-pill [label]="applicantStatusOf(a.lifecycleStatus)" />
         </div>

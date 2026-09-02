@@ -1,8 +1,13 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationAction, PermitType, isValidPermitType } from '../../core/domain/permit.model';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
+import {
+  actionNeedsExistingPermit,
+  actionReferenceIsComplete,
+  existingPermitPrompt,
+} from '../../core/domain/application.model';
 import { SavedDocumentFileType } from '../../core/domain/document.model';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
@@ -83,6 +88,31 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               <option value="Amendment">Amendment</option>
             </select>
           </div>
+          @if (needsExistingPermit()) {
+            <div class="field">
+              <label for="application-wizard-related-permit">{{ existingPermitPrompt(applicationAction) }}*</label>
+              @if (renewablePermits().length > 0) {
+                <select id="application-wizard-related-permit" class="input" [(ngModel)]="relatedPermitNumber">
+                  <option [ngValue]="null" disabled>Select a permit</option>
+                  @for (p of renewablePermits(); track p.permitNumber) {
+                    <option [value]="p.permitNumber">
+                      {{ p.permitNumber }} — {{ p.permitType }}{{ p.businessName ? ' · ' + p.businessName : '' }}
+                    </option>
+                  }
+                </select>
+                <div class="hint">
+                  The office needs to know which permit this application acts on. Only permits already
+                  issued to you are listed.
+                </div>
+              } @else {
+                <div class="hint">
+                  You have no issued permits yet, so there is nothing to
+                  {{ applicationAction === 'Renewal' ? 'renew' : 'amend' }}. Choose
+                  <strong>New Permit</strong> above to apply for one.
+                </div>
+              }
+            </div>
+          }
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <button class="btn btn-primary" (click)="toStep(2)">Continue</button>
         </div>
@@ -145,6 +175,9 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               <tr><td class="muted">Business</td><td>{{ selectedBusinessName() }}</td></tr>
               <tr><td class="muted">Permit Type</td><td>{{ isGeneric ? 'New Business Permit (Generic)' : permitType }}</td></tr>
               <tr><td class="muted">Application Type</td><td>{{ applicationAction }}</td></tr>
+              @if (needsExistingPermit() && relatedPermitNumber) {
+                <tr><td class="muted">{{ existingPermitPrompt(applicationAction) }}</td><td><strong>{{ relatedPermitNumber }}</strong></td></tr>
+              }
               <tr><td class="muted">Documents Attached</td><td>{{ attachedCount() }} of {{ documents.length }}</td></tr>
             </tbody>
           </table>
@@ -182,6 +215,14 @@ export class ApplicationWizardPage {
 
   businessId: string | null = null;
   applicationAction: ApplicationAction = 'New';
+  relatedPermitNumber: string | null = null;
+
+  protected readonly existingPermitPrompt = existingPermitPrompt;
+  protected readonly actionReferenceIsComplete = actionReferenceIsComplete;
+  protected readonly renewablePermits = computed(() => this.applicationStore.renewablePermits());
+  protected needsExistingPermit(): boolean {
+    return actionNeedsExistingPermit(this.applicationAction);
+  }
   projectAddress = '';
   scopeOfWork = '';
   professionalName = '';
@@ -235,6 +276,17 @@ export class ApplicationWizardPage {
       this.error.set('Please select a business.');
       return;
     }
+    // A Renewal or Amendment that names no permit is not a lesser application,
+    // it is an unanswerable one: the office is told an existing permit is
+    // involved and never told which. Blocked here AND refused by the store.
+    if (next === 2 && !actionReferenceIsComplete(this.applicationAction, this.relatedPermitNumber)) {
+      this.error.set(
+        this.renewablePermits().length === 0
+          ? `You have no issued permits to ${this.applicationAction === 'Renewal' ? 'renew' : 'amend'}. Choose "New Permit" to apply for one.`
+          : `Please select the permit being ${this.applicationAction === 'Renewal' ? 'renewed' : 'amended'}.`,
+      );
+      return;
+    }
     if (next === 3 && (!this.projectAddress || !this.scopeOfWork)) {
       this.error.set('Please complete the project address and scope of work.');
       return;
@@ -261,6 +313,7 @@ export class ApplicationWizardPage {
       businessName: business.name,
       permitType: this.isGeneric ? 'Business Permit' : this.permitType!,
       applicationAction: this.applicationAction,
+      relatedPermitNumber: this.relatedPermitNumber,
     });
     for (const d of this.documents) {
       const a = this.attached[d.id];

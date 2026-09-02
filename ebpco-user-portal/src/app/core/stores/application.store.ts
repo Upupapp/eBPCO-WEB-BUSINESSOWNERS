@@ -1,7 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { AuthService } from '../session/auth.service';
 import { NotificationStore } from './notification.store';
-import { ApplicationRecord, StatusTimelineEntry } from '../domain/application.model';
+import { ApplicationRecord, StatusTimelineEntry, actionReferenceIsComplete } from '../domain/application.model';
 import { ApplicationAction, GeneratedPermit, PermitType, PublishedPermitType } from '../domain/permit.model';
 import {
   ApplicationLifecycleStatus,
@@ -21,6 +21,8 @@ export interface CreateApplicationInput {
   businessName: string;
   permitType: PublishedPermitType;
   applicationAction: ApplicationAction;
+  /** The permit being renewed or amended. Null for a 'New' application; required otherwise. */
+  relatedPermitNumber: string | null;
 }
 
 let appSeq = 3000;
@@ -61,6 +63,7 @@ export class ApplicationStore {
       applicantId: 'user-demo',
       permitType: 'Building Permit – New Construction',
       applicationAction: 'New',
+      relatedPermitNumber: null,
       dateSubmitted: '2026-08-10T08:00:00.000Z',
       lifecycleStatus: 'Under Evaluation',
       evaluationStage: 'OBO',
@@ -80,6 +83,7 @@ export class ApplicationStore {
       applicantId: 'user-demo',
       permitType: 'Zoning / Locational Clearance',
       applicationAction: 'New',
+      relatedPermitNumber: null,
       dateSubmitted: '2026-07-15T08:00:00.000Z',
       lifecycleStatus: 'Ready for Release',
       evaluationStage: 'Final Approval',
@@ -209,6 +213,36 @@ export class ApplicationStore {
     return this.permitsByApp()[applicationId];
   }
 
+  /**
+   * The signed-in citizen's own issued permits, newest first — what a Renewal
+   * or Amendment may act on.
+   *
+   * Sourced from applications that actually reached an issued permit, so the
+   * list cannot offer something that does not exist. It is deliberately NOT
+   * filtered by expiry: a lapsed permit is often exactly what a citizen has
+   * come to renew, and this build has no authority on standing anyway (the
+   * Municipality holds no expiry_date — see the backend handoff). The choice
+   * of what is still renewable belongs to the office, not to this form; the
+   * form's job is to let the citizen say which permit they mean.
+   */
+  readonly renewablePermits = computed(() => {
+    const uid = this.auth.currentUser()?.id;
+    if (!uid) return [];
+    const permits = this.permitsByApp();
+    return this.applications()
+      .filter((a) => a.applicantId === uid && a.permitNumber !== null)
+      .map((a) => ({
+        applicationId: a.id,
+        permitNumber: a.permitNumber!,
+        permitType: a.permitType,
+        businessName: a.businessName,
+        issuedDate: a.issuedDate,
+        expiryDate: a.expiryDate,
+        provenance: permits[a.id]?.provenance ?? null,
+      }))
+      .sort((x, y) => (y.issuedDate ?? '').localeCompare(x.issuedDate ?? ''));
+  });
+
   /** Looks up a permit by its own real, system-generated permit number — the permit number itself doubles as the public verification token (see VerifyPermitPage). */
   permitByNumber(permitNumber: string): GeneratedPermit | undefined {
     return Object.values(this.permitsByApp()).find((p) => p.permitNumber === permitNumber);
@@ -238,6 +272,13 @@ export class ApplicationStore {
   /** Creates a Draft application — the applicant fills documents in before submitting. */
   createDraft(input: CreateApplicationInput): ApplicationRecord {
     const uid = this.auth.currentUser()!.id;
+    // The form blocks this too, but a rule enforced only in the template is
+    // enforced only for callers who go through the template.
+    if (!actionReferenceIsComplete(input.applicationAction, input.relatedPermitNumber)) {
+      throw new Error(
+        `A ${input.applicationAction} application must name the permit it acts on.`,
+      );
+    }
     appSeq += 1;
     const record: ApplicationRecord = {
       id: nextId('app'),
@@ -247,6 +288,7 @@ export class ApplicationStore {
       applicantId: uid,
       permitType: input.permitType,
       applicationAction: input.applicationAction,
+      relatedPermitNumber: input.relatedPermitNumber,
       dateSubmitted: null,
       lifecycleStatus: 'Draft',
       evaluationStage: 'Initial',

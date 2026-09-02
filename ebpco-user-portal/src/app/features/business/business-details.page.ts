@@ -17,7 +17,10 @@ import { formatDate } from '../../core/utils/ids';
             <h1>{{ b.name }}</h1>
             <div class="subtitle">{{ b.category }} · Reg. No. {{ b.registrationNumber }} · Registered {{ formatDate(b.dateRegistered) }}</div>
           </div>
-          <a [routerLink]="['/permits']" [queryParams]="{ businessId: b.id }" class="btn btn-primary">Apply for Permit</a>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a [routerLink]="['/businesses', b.id, 'edit']" class="btn btn-secondary">Edit Business</a>
+            <a [routerLink]="['/permits']" [queryParams]="{ businessId: b.id }" class="btn btn-primary">Apply for Permit</a>
+          </div>
         </div>
 
         <div class="card" style="margin-bottom:16px;">

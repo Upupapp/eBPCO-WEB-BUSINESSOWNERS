@@ -3,6 +3,25 @@ import { AuthService } from '../session/auth.service';
 import { Business, BusinessCategory } from '../domain/business.model';
 import { nextId, todayIso } from '../utils/ids';
 
+/**
+ * What a citizen may change about their own business.
+ *
+ * Deliberately NOT the whole of `Business`. `registrationNumber` and
+ * `dateRegistered` are system-generated, `ownerApplicantId` is who the record
+ * belongs to, and `status` is the Municipality's judgement — a form that let a
+ * citizen set their own business to Active would be offering them a decision
+ * that is not theirs to make. Those four are unreachable from here by
+ * construction rather than by the form omitting them.
+ */
+export interface EditBusinessInput {
+  name: string;
+  category: BusinessCategory;
+  street: string;
+  barangay: string;
+  city: string;
+  province: string;
+}
+
 export interface RegisterBusinessInput {
   name: string;
   category: BusinessCategory;
@@ -81,5 +100,39 @@ export class BusinessStore {
     };
     this.businesses.update((list) => [business, ...list]);
     return business;
+  }
+
+  /**
+   * Update a business the signed-in citizen owns.
+   *
+   * Does NOT touch applications already filed. `ApplicationRecord.businessName`
+   * is a snapshot of the name as it stood when the application was submitted,
+   * and the office assessed it under that name — rewriting it here would
+   * silently restate what the Municipality received, and an applicant could
+   * change the name on a filed application after the fact. The correct route
+   * for a name change on a live application is an Amendment, which is why the
+   * wizard now has one.
+   *
+   * Refuses a business the citizen does not own rather than returning
+   * undefined: a silent no-op on someone else's record is indistinguishable
+   * from success.
+   */
+  update(id: string, input: EditBusinessInput): Business {
+    const ownerId = this.auth.currentUser()?.id;
+    const existing = this.businesses().find((b) => b.id === id);
+    if (!existing || !ownerId || existing.ownerApplicantId !== ownerId) {
+      throw new Error('That business could not be found in your account.');
+    }
+    const updated: Business = {
+      ...existing,
+      name: input.name.trim(),
+      category: input.category,
+      street: input.street.trim(),
+      barangay: input.barangay.trim(),
+      city: input.city.trim(),
+      province: input.province.trim(),
+    };
+    this.businesses.update((list) => list.map((b) => (b.id === id ? updated : b)));
+    return updated;
   }
 }

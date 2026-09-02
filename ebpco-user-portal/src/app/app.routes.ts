@@ -40,6 +40,7 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.page').then((m) => m.DashboardPage) },
       { path: 'businesses', loadComponent: () => import('./features/business/business-list.page').then((m) => m.BusinessListPage) },
       { path: 'businesses/register', loadComponent: () => import('./features/business/register-business.page').then((m) => m.RegisterBusinessPage) },
+      { path: 'businesses/:id/edit', loadComponent: () => import('./features/business/edit-business.page').then((m) => m.EditBusinessPage) },
       { path: 'businesses/:id', loadComponent: () => import('./features/business/business-details.page').then((m) => m.BusinessDetailsPage) },
       { path: 'permits', loadComponent: () => import('./features/permits/permit-catalog.page').then((m) => m.PermitCatalogPage) },
       { path: 'permits/apply', loadComponent: () => import('./features/permits/application-wizard.page').then((m) => m.ApplicationWizardPage) },
