@@ -84,10 +84,19 @@ attachments leave the wizard, so it is the one place a future upload hooks.
 **1**, dropping it in the store fails **3**. Neither is a type error, which is
 why nothing caught this before.
 
-## D. Three citizen endpoints now exist — parity work, added 2 September
+## D. Three citizen endpoints — the HTTP layer now exists
 
-From the backend lane. We have **no HTTP layer at all**, so each of these is
-"build the client for it" rather than "call it". Numbered 21–25 because they are
+**Built 2 September.** The backend supplied `contract/citizen-endpoints.openapi.yaml`
+— written for this lane, every field pinned against recorded responses — so the
+client is typed from a contract rather than inferred from prose, and its tests
+decode the backend's **own recorded bytes** from `response-samples.json`.
+
+What exists now: `provideHttpClient`, a bearer interceptor, RFC 9457 problem
+handling, the three typed operations, and `API_BASE_URL` — **null in this
+build**, because the Municipality's API host is theirs to supply. The client
+refuses to issue a request while it is null rather than resolving to nothing.
+
+What remains is the UI for each, below. Numbered 21–25 because they are
 additions to the twenty above, not replacements.
 
 | # | Task | Notes that change the design, not just the wiring |
