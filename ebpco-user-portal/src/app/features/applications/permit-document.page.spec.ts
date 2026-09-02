@@ -77,3 +77,49 @@ describe('PermitDocumentPage (F-2: demo permits cannot print clean)', () => {
     expect(text).toContain('NOT VALID AS AN OFFICIAL PERMIT');
   });
 });
+
+describe('PermitDocumentPage (task 22: conditions come from the office, in full)', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  // Guards the defect this replaced: a single CLIENT-authored sentence from
+  // requirements-catalog.ts rendered under a heading reading "Conditions".
+  // One of those sentences says "per standard LGU clearance practice" — an
+  // inference we wrote, presented to a citizen as their obligations.
+  it('never renders the catalogue validity sentence as a condition', () => {
+    const text = (renderFor('app-seed-2').nativeElement as HTMLElement).textContent ?? '';
+    const conditionsIdx = text.indexOf('Conditions');
+    const validityIdx = text.indexOf('Validity');
+    expect(conditionsIdx).toBeGreaterThan(-1);
+    // Validity is its own section, separately labelled — not the conditions.
+    if (validityIdx > -1) expect(validityIdx).toBeGreaterThan(conditionsIdx);
+  });
+
+  it('says the office has supplied none, rather than substituting our own', () => {
+    // Seeded permits carry conditions: [] — the office has said nothing.
+    const text = (renderFor('app-seed-2').nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('has not supplied the conditions');
+    // And it must not let the citizen read that as "there are none".
+    expect(text).toContain('This does not mean there are none');
+  });
+
+  it('renders every condition the office supplied, not a summary', () => {
+    const fixture = renderFor('app-seed-2');
+    const store = TestBed.inject(ApplicationStore);
+    const permit = store.permitFor('app-seed-2')!;
+    const withConditions = {
+      ...permit,
+      conditions: [
+        'A cash bond of P50,000.00 shall be posted before excavation.',
+        'Setbacks shall conform to the approved plans.',
+        'Written notice shall be given to the Office five (5) days before excavation.',
+      ],
+    };
+    (store as unknown as { permitsByApp: { update(f: (m: Record<string, unknown>) => Record<string, unknown>): void } })
+      .permitsByApp.update((m) => ({ ...m, 'app-seed-2': withConditions }));
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    for (const c of withConditions.conditions) expect(text).toContain(c);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.doc-generated-conditions li').length).toBe(3);
+  });
+});

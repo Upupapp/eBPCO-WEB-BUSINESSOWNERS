@@ -160,6 +160,23 @@ export interface GeneratedPermit {
   permitNumber: string;
   provenance: PermitProvenance;
   /**
+   * The conditions the office attached to THIS permit — cash bond, setbacks,
+   * notice before excavation, and so on. `GET /applications/{id}/permit`
+   * returns them as `conditions[]`.
+   *
+   * Empty means the office has not supplied them, and the document says so.
+   * It does NOT mean there are none, and it must never be filled from the
+   * client's own catalogue: `requirements-catalog.ts` carries `validityRules`,
+   * a sentence WE wrote — one of them reads "per standard LGU clearance
+   * practice", which is an inference, not the office's word. Rendering that
+   * under a heading reading "Conditions" told a citizen their obligations were
+   * a validity note.
+   *
+   * A summary of a legal instrument is a different instrument. Render every
+   * item, verbatim, or say plainly that none have been supplied.
+   */
+  conditions: readonly string[];
+  /**
    * NOTHING sets this today, exactly like `provenance`. It is the seam the
    * backend fills, and until it does the verification page reports Unverified.
    */

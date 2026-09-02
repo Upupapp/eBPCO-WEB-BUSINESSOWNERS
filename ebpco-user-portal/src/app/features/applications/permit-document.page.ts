@@ -9,6 +9,7 @@ import { agencyHeaderFor, documentTitleFor } from '../../core/domain/generated-d
 import { fullName } from '../../core/domain/user.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate } from '../../core/utils/ids';
+import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 
 type WatermarkText = 'DRAFT' | 'FOR REVIEW' | 'NOT VALID AS AN OFFICIAL PERMIT' | null;
 
@@ -181,10 +182,45 @@ interface QrCell {
               }
             </section>
 
+            <!--
+              The office's conditions, in full and verbatim.
+              This used to render requirements()?.validityRules — a single
+              sentence from the CLIENT's own catalogue, one of which reads "per
+              standard LGU clearance practice", an inference we wrote. Under a
+              heading reading "Conditions", that told a citizen their
+              obligations were a validity note. The real list — cash bond,
+              setbacks, notice before excavation — comes from the office via
+              GET /applications/{id}/permit.
+              Render every item. Do not summarise, and never substitute our own.
+            -->
             <section class="doc-generated-section">
-              <h2>Conditions / Remarks</h2>
-              <p>{{ requirements()?.validityRules ?? 'Not yet available.' }}</p>
+              <h2>Conditions</h2>
+              @if (conditions().length) {
+                <ol class="doc-generated-conditions">
+                  @for (c of conditions(); track c) {
+                    <li>{{ c }}</li>
+                  }
+                </ol>
+              } @else {
+                <p class="doc-generated-placeholder">
+                  The Municipality has not supplied the conditions for this permit.
+                  <strong>This does not mean there are none</strong> — ask the
+                  {{ engineerName }} before relying on this document.
+                </p>
+              }
             </section>
+
+            <!--
+              Validity is a separate fact from the conditions, and is labelled as
+              what it is: our reading of the permit's validity period, not the
+              office's conditions.
+            -->
+            @if (requirements()?.validityRules; as validity) {
+              <section class="doc-generated-section">
+                <h2>Validity</h2>
+                <p>{{ validity }}</p>
+              </section>
+            }
 
             <section class="doc-generated-section doc-generated-signature">
               <h2 style="text-align:left; border:none;">Approval</h2>
@@ -322,6 +358,10 @@ export class PermitDocumentPage {
 
   protected readonly watermarkText = computed(() => this.gate().watermarkText);
   protected readonly gateCleared = computed(() => this.gate().cleared);
+
+  /** The office's conditions for this permit. Empty until the office supplies them. */
+  protected readonly conditions = computed<readonly string[]>(() => this.permit()?.conditions ?? []);
+  protected readonly engineerName = MUNICIPAL_ENGINEER.name;
 
   protected readonly verificationUrl = computed(() => {
     const p = this.permit();

@@ -124,6 +124,7 @@ export class ApplicationStore {
         provenance: 'demo',
         // No office has pronounced on this. See PermitStanding.
         standing: null,
+          conditions: [],   // ditto
         issuedDateValue: new Date(app2.issuedDate!),
         issuedDate: app2.issuedDate!,
         expiryDateValue: new Date(app2.expiryDate!),
@@ -470,6 +471,7 @@ export class ApplicationStore {
           // trigger from the Application Details screen. Not an issuance.
           provenance: 'demo',
           standing: null,
+          conditions: [],   // advanceForDemo mints this; no office attached conditions
           issuedDateValue: new Date(issued),
           issuedDate: issued,
           expiryDateValue: expiry ? new Date(expiry) : null,
