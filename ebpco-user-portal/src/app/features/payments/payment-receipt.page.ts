@@ -263,7 +263,7 @@ export class PaymentReceiptPage {
   protected readonly header = computed(() => {
     const a = this.app();
     const reviewingOffice =
-      a && a.permitType !== 'General Business Permit' ? requirementsFor(a.permitType).reviewingOffice : 'Office of the Building Official (OBO)';
+      a && a.permitType !== 'Business Permit' ? requirementsFor(a.permitType).reviewingOffice : 'Office of the Building Official (OBO)';
     return agencyHeaderFor(reviewingOffice);
   });
 

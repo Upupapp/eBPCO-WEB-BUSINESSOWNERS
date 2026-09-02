@@ -259,7 +259,7 @@ export class ApplicationWizardPage {
     const record = this.applicationStore.createDraft({
       businessId: business.id,
       businessName: business.name,
-      permitType: this.isGeneric ? 'General Business Permit' : this.permitType!,
+      permitType: this.isGeneric ? 'Business Permit' : this.permitType!,
       applicationAction: this.applicationAction,
     });
     for (const d of this.documents) {

@@ -2,7 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import { AuthService } from '../session/auth.service';
 import { NotificationStore } from './notification.store';
 import { ApplicationRecord, StatusTimelineEntry } from '../domain/application.model';
-import { ApplicationAction, GeneratedPermit, PermitType } from '../domain/permit.model';
+import { ApplicationAction, GeneratedPermit, PermitType, PublishedPermitType } from '../domain/permit.model';
 import {
   ApplicationLifecycleStatus,
   LIFECYCLE_SEQUENCE,
@@ -19,14 +19,14 @@ import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
 export interface CreateApplicationInput {
   businessId: string;
   businessName: string;
-  permitType: PermitType | 'General Business Permit';
+  permitType: PublishedPermitType;
   applicationAction: ApplicationAction;
 }
 
 let appSeq = 3000;
 
-function prefixFor(permitType: PermitType | 'General Business Permit'): string {
-  if (permitType === 'General Business Permit') return 'E-BPCO';
+function prefixFor(permitType: PublishedPermitType): string {
+  if (permitType === 'Business Permit') return 'E-BPCO';
   if (permitType.startsWith('Building Permit')) return 'BP';
   if (permitType === 'Zoning / Locational Clearance') return 'ZLC';
   if (permitType === 'FSEC for Building Permit (BFP)') return 'FSEC';
@@ -216,7 +216,7 @@ export class ApplicationStore {
   /** True once every REQUIRED document for this application's permit type is on file in a resolved state (never Missing/Rejected/Revision Required/Expired) — the same real "documents resolved" check the generated permit document's draft-watermark gate reads. */
   documentsResolvedFor(applicationId: string): boolean {
     const app = this.applicationById(applicationId);
-    if (!app || app.permitType === 'General Business Permit') return true;
+    if (!app || app.permitType === 'Business Permit') return true;
     const required = requirementsFor(app.permitType).documents.filter((d) => d.required);
     const docs = this.documentsFor(applicationId);
     const unresolved: DocumentStatus[] = ['Missing', 'Rejected', 'Revision Required', 'Expired'];
@@ -448,7 +448,7 @@ export class ApplicationStore {
       return;
     }
     if (next === 'Permit Generated') {
-      const req = app.permitType === 'General Business Permit' ? null : requirementsFor(app.permitType);
+      const req = app.permitType === 'Business Permit' ? null : requirementsFor(app.permitType);
       const validityMonths = req ? req.validityMonths : 12;
       // The generic flow has no catalog entry to read an office from. The
       // fallback used to be the "Business Permit and Licensing Office" — a real

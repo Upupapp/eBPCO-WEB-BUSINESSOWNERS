@@ -1,4 +1,4 @@
-import { PermitType } from './permit.model';
+import { PermitType, PublishedPermitType } from './permit.model';
 
 // Small, honest helpers for the applicant-facing generated permit document
 // (features/applications/permit-document.page.ts) — deliberately leaner
@@ -45,7 +45,7 @@ export interface DocumentTitleInfo {
 }
 
 /** Splits "Building Permit – New Construction" into a title + scope subtitle (matching the Admin Portal's document heading style); every other permit type's full name is already a clean standalone title. */
-export function documentTitleFor(permitType: PermitType | 'General Business Permit'): DocumentTitleInfo {
+export function documentTitleFor(permitType: PublishedPermitType): DocumentTitleInfo {
   if (permitType.includes('–')) {
     const [title, subtitle] = permitType.split('–').map((s) => s.trim());
     return { title, subtitle: subtitle.toUpperCase() };

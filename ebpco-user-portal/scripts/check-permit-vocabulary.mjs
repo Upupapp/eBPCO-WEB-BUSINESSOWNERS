@@ -29,8 +29,8 @@
  */
 import { readFileSync } from 'node:fs';
 
-// The office's nineteen. Transcribed from the backend's 033_permit_vocabulary.sql
-// and verified byte-exact against ebpco-api at 5a0f18a on 2 September 2026.
+// The office's nineteen construction permits. Byte-exact against the backend's
+// 033_permit_vocabulary.sql (ebpco-api @ 5a0f18a), 2 September 2026.
 const OFFICE_19 = [
   'Architectural Permit',
   'Building Permit – Addition / Extension',
@@ -53,7 +53,24 @@ const OFFICE_19 = [
   'Zoning / Locational Clearance',
 ];
 
+/**
+ * The twentieth value. D-10 made the nineteen the server's keys but deliberately
+ * did NOT remove 'Business Permit' — the legacy business-permit flow still files
+ * against it. The migration says so outright: "Deleting it here would strand
+ * that flow."
+ *
+ * It is NOT in requirements-catalog.ts, because it is not one of the office's
+ * construction permits and has no requirements checklist. It IS a value that
+ * arrives on the wire, so `PublishedPermitType` must accept it.
+ *
+ * The mobile lane held nineteen and hit this: validation failed, the type came
+ * through null, and those applications rendered as "Not recorded" — while 443
+ * tests stayed green. Hence the second check below.
+ */
+const WIRE_EXTRA = 'Business Permit';
+
 const src = readFileSync('src/app/core/domain/requirements-catalog.ts', 'utf8');
+const model = readFileSync('src/app/core/domain/permit.model.ts', 'utf8');
 const found = [...src.matchAll(/^ {2}'([^']+)':/gm)].map((m) => m[1]).sort();
 const expected = [...OFFICE_19].sort();
 const failures = [];
@@ -73,10 +90,25 @@ for (const name of found) {
   }
 }
 
+// The published union must carry all twenty. Nineteen is the mobile lane's bug.
+if (!/export type PublishedPermitType\s*=\s*PermitType\s*\|\s*'Business Permit'/.test(model)) {
+  failures.push(
+    "PublishedPermitType must be `PermitType | 'Business Permit'` — TWENTY values. " +
+    'A nineteen-value union rejects the legacy flow the server still files against, ' +
+    'and the type arrives null rather than throwing.',
+  );
+}
+// The invented third spelling must never come back.
+for (const [file, text] of [['requirements-catalog.ts', src], ['permit.model.ts', model]]) {
+  if (text.includes('General Business Permit')) {
+    failures.push(`${file} still contains 'General Business Permit' — a spelling no server sends. The wire value is 'Business Permit'.`);
+  }
+}
+
 if (failures.length) {
   console.error("✘ permit-vocabulary check FAILED — the catalogue and the office's nineteen disagree\n");
   for (const f of failures) console.error(`  - ${f}`);
   console.error('\n  These names are the server\'s keys. Change them only to follow the office and the backend.');
   process.exit(1);
 }
-console.log(`✔ all ${expected.length} permit names match the office's vocabulary, en dashes included`);
+console.log(`✔ ${expected.length} office permit names match byte-exactly (en dashes included), and PublishedPermitType carries all ${expected.length + 1} wire values including '${WIRE_EXTRA}'`);

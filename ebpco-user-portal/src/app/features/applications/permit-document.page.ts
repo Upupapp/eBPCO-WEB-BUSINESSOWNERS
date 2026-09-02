@@ -273,7 +273,7 @@ export class PermitDocumentPage {
   protected readonly assessment = computed(() => this.store.assessmentFor(this.id()));
   protected readonly requirements = computed(() => {
     const a = this.app();
-    return a && a.permitType !== 'General Business Permit' ? requirementsFor(a.permitType) : null;
+    return a && a.permitType !== 'Business Permit' ? requirementsFor(a.permitType) : null;
   });
 
   protected readonly config = computed(() => {

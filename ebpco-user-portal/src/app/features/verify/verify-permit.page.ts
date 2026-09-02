@@ -124,7 +124,7 @@ export class VerifyPermitPage {
 
   protected readonly documentTitle = computed(() => {
     const a = this.app();
-    if (!a || a.permitType === 'General Business Permit') return a?.permitType ?? '';
+    if (!a || a.permitType === 'Business Permit') return a?.permitType ?? '';
     return requirementsFor(a.permitType).requiredForm;
   });
 

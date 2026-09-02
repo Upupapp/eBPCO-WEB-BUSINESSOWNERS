@@ -132,6 +132,29 @@ export function isPermitStanding(value: unknown): value is PermitStanding {
   return typeof value === 'string' && PERMIT_STANDINGS.includes(value);
 }
 
+/**
+ * Every permit type that can arrive on the wire — the office's nineteen
+ * construction permits PLUS `'Business Permit'`. **Twenty, not nineteen.**
+ *
+ * D-10 made the office's nineteen names the server's keys but deliberately did
+ * NOT remove `'Business Permit'`: the legacy business-permit flow still files
+ * against it, and `033_permit_vocabulary.sql` says so in as many words —
+ * *"Deleting it here would strand that flow."*
+ *
+ * The mobile lane held a nineteen-value union and hit exactly this: validation
+ * failed, the type came through `null`, and those applications rendered as
+ * "Not recorded" — the client claiming not to know something the server had
+ * said plainly. Nothing threw. 443 tests stayed green.
+ *
+ * This portal was worse. It carried nineteen plus a literal
+ * `'Business Permit'` — a THIRD spelling, invented here, that no server
+ * has ever sent and none would accept. That is the "cast" the D-10 migration
+ * complains about: a spelling with no authority, in a place no client can see.
+ *
+ * If a twenty-first value ever appears, add it here and nowhere else.
+ */
+export type PublishedPermitType = PermitType | 'Business Permit';
+
 export interface GeneratedPermit {
   applicationId: string;
   permitNumber: string;

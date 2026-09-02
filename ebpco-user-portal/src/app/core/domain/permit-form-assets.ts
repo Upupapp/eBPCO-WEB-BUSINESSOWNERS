@@ -1,4 +1,4 @@
-import { PermitType } from './permit.model';
+import { PermitType, PublishedPermitType } from './permit.model';
 
 // Maps each permit type to the real, official Municipality of
 // Castilla / BFP Castilla application form it uses — sourced directly
@@ -104,7 +104,7 @@ export const PERMIT_FORM_ASSETS: Record<PermitType, PermitFormAsset> = {
   },
 };
 
-export function permitFormAssetFor(permitType: PermitType | 'General Business Permit'): PermitFormAsset {
-  if (permitType === 'General Business Permit') return unifiedFallback;
+export function permitFormAssetFor(permitType: PublishedPermitType): PermitFormAsset {
+  if (permitType === 'Business Permit') return unifiedFallback;
   return PERMIT_FORM_ASSETS[permitType];
 }

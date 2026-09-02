@@ -98,12 +98,30 @@ additions to the twenty above, not replacements.
 | 24 | **`POST /applications/{id}/documents/{documentId}/resubmit`** (18028a8) | Body `{fileName, label, contentBase64}` → 201 `{documentId, supersedesDocumentId, status, removedMetadata}`. **Send an `Idempotency-Key` (UUID)** — a retry with the same key replays the same answer instead of creating a second document. Refuses **409** if the document was already replaced or already accepted; that is a real state to render, not an error toast. |
 | 25 | **Show the rejection and its replacement together** | **Replacements append.** The rejected document stays visible with its reason, alongside what was sent instead. *"What was wrong"* and *"what I sent instead"* is the pair that makes a rejection actionable — showing only the newest upload throws away the half the citizen needs. Design the list around the pair, not around the latest row. |
 
-**Vocabulary — verified, not assumed.** D-10 (live at `43f5187`) makes the
+| 26 | **Read `permitTypeName` before `permitType`** when the HTTP layer lands | From the mobile lane: keep reading `permitTypeName` first **until the server is definitely upgraded everywhere** — on an older deployment the two still differ. A client that reads only `permitType` will be right against the new deployment and quietly wrong against an old one, and the failure looks like a missing value rather than a version mismatch. |
+
+**Vocabulary — verified, corrected, and gated at TWENTY.** D-10 (live at `43f5187`) makes the
 office's nineteen names the server's keys. Checked byte-exact against
-`033_permit_vocabulary.sql`: **all 19 match, en dashes included.** Three contain
-an **en dash (U+2013)**, not a hyphen; four contain a forward slash and must be
-`%2F`-encoded in a path. Now held by `npm run check:vocab`, which reports the
-code point by name when a hyphen creeps in.
+`033_permit_vocabulary.sql`: **all 19 office names match, en dashes included.**
+Three contain an **en dash (U+2013)**, not a hyphen; four contain a forward slash
+and must be `%2F`-encoded in a path.
+
+**But the published set is TWENTY, and ours was nineteen plus a phantom.**
+D-10 deliberately did not remove `'Business Permit'` — the legacy flow still
+files against it, and the migration says *"Deleting it here would strand that
+flow."* The mobile lane held nineteen and hit it: validation failed, the type
+arrived `null`, and those applications rendered **"Not recorded"** — the client
+claiming not to know something the server had said plainly, with 443 tests green.
+
+Ours was worse. We carried nineteen **plus a literal `'General Business Permit'`
+— a third spelling invented here that no server sends and none would accept**,
+repeated as an ad-hoc `PermitType | '…'` union in five places across eight files.
+That is exactly the "cast" the D-10 migration complains about: a spelling with no
+authority, in a place no client can see.
+
+Now one named `PublishedPermitType = PermitType | 'Business Permit'`, and
+`npm run check:vocab` fails if the union shrinks to nineteen or if the invented
+spelling returns.
 
 ## C. Hardening — cheap now, expensive later
 
