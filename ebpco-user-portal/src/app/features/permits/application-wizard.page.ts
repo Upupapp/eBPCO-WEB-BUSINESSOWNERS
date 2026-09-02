@@ -12,6 +12,17 @@ import { ToastService } from '../../shared/ui/toast.service';
 type Step = 1 | 2 | 3 | 4;
 
 interface AttachedDoc {
+  /**
+   * The File itself, not just its name.
+   *
+   * `onFileSelected` used to read `file.name` and let the File go out of scope
+   * on the next line, so by the time `submit()` ran there was nothing left to
+   * upload — the wizard showed every attachment in place, the review step
+   * counted them, and the submission carried no documents at all. That is
+   * precisely how the mobile app filed zero-document applications for its
+   * entire life without anyone noticing.
+   */
+  file: File;
   fileName: string;
   fileType: SavedDocumentFileType;
 }
@@ -210,8 +221,8 @@ export class ApplicationWizardPage {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    this.attached = { ...this.attached, [d.id]: { fileName: file.name, fileType: fileTypeFromName(file.name) } };
-    this.documentLibrary.add({ fileName: file.name, fileType: fileTypeFromName(file.name), category: 'supportingDocument', sizeBytes: file.size });
+    this.attached = { ...this.attached, [d.id]: { file, fileName: file.name, fileType: fileTypeFromName(file.name) } };
+    this.documentLibrary.add({ file, fileName: file.name, fileType: fileTypeFromName(file.name), category: 'supportingDocument', sizeBytes: file.size });
   }
 
   removeAttachment(d: RequirementDocument): void {
@@ -253,7 +264,11 @@ export class ApplicationWizardPage {
     });
     for (const d of this.documents) {
       const a = this.attached[d.id];
-      if (a) this.applicationStore.attachDocument(record.id, d.id, d.label, a.fileName, a.fileType);
+      // Hands over the FILE. This one loop is the only place attachments leave
+      // the wizard, so it is the single point a future upload has to hook —
+      // the same reason the mobile fix went through the draft codecs rather
+      // than editing nineteen wizards.
+      if (a) this.applicationStore.attachDocument(record.id, d.id, d.label, a.file, a.fileType);
     }
     this.applicationStore.submit(record.id);
     // F-14: not "submitted successfully". Nothing was sent to the Municipality,

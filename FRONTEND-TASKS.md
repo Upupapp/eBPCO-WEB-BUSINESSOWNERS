@@ -36,12 +36,53 @@ Payment Officer, which are internal roles, so they are out of this lane).
 | 9 | **Cap the toast stack** | `ToastService.show()` appends with no limit; each dismisses after 3500ms. Fourteen rapid actions produced **10+ stacked toasts** covering the right of a 1440px screen — on a 390px phone that is the whole screen, and they sit above the content. Cap the visible count and coalesce repeats. |
 | 10 | **Give toasts an `aria-live` region** | `toast-host.component.ts` renders a plain `<div>`. A screen-reader user is never told an action succeeded or failed. WCAG 2.1 **4.1.3 Status Messages (AA)** — axe does not flag it because the rule needs a live region to exist before it can judge it. |
 | 11 | **Make the receipt's cleared state something earned, not the absence of data** | `gateCleared = watermarkText() === null`, and `watermarkText()` returns `null` only when `payment()` is undefined. It is dead today because the document sits inside `@if (payment(); as tx)` — but it is the same latent fail-open the verification page had, one refactor from claiming *"This is a system-generated Official Receipt issued by the Municipality"* for a receipt with no payment behind it. |
-| 12 | **Say that uploaded files are not stored** | `my-documents` records `fileName`, `fileType`, `sizeBytes` — the bytes are discarded. The toast now says so, but the list itself shows a filename with no indication the file behind it does not exist. |
+| 12 | ~~**Say that uploaded files are not stored**~~ — **SUPERSEDED: they are now.** See below. | `my-documents` records `fileName`, `fileType`, `sizeBytes` — the bytes are discarded. The toast now says so, but the list itself shows a filename with no indication the file behind it does not exist. |
 | 13 | **Explain the silent logout** | The session is in-memory by design, so a refresh or a shared deep link bounces to `/login` with no explanation. A citizen who reloads mid-application sees a login screen and no reason. Add an explanatory state on that bounce. |
 | 14 | **Finish the CITIZEN vocabulary pass** | The rename covered the brand strings and the Help FAQ. Remaining screens still say "applicant" and "user" in body copy. **Do not touch `Owner / Applicant` on the permit document, `ApplicantStatus`, `applicantId` or `ApplicantType`** — that is a statutory form role and code identifiers respectively. |
 | 15 | **Self-minted business registration numbers** (F-17) | `business.store.ts` mints `REG-{year}-{seq}` and the list renders it as **"Reg. No."**. A business registration number comes from the DTI, the SEC or the licensing office — never this portal. Either mark it as demo-generated on screen or stop displaying it until the field has a real source. |
 
 ---
+
+## B2. Closed 2 September — the attachments were never being kept
+
+Raised by the mobile lane: *"the mobile app filed applications with zero
+documents for its entire life, and nobody noticed."* We are in parity with
+mobile, so it was a candidate here by construction. It was present.
+
+**The trace, from the file input to the end of the line:**
+
+| Step | What happened |
+|---|---|
+| `application-wizard.page.ts:211` | `const file = input.files?.[0]` — the `File` exists, for two statements |
+| `:213` | `{ fileName: file.name, fileType: … }` — **only `.name` is read; the File goes out of scope** |
+| `:256` | `attachDocument(…, a.fileName, a.fileType)` — a name is handed on |
+| `application.store.ts:283` | the store keeps `fileName`, `fileType` |
+| — | **there is no HTTP layer at all**: no `HttpClient`, no `fetch`, no `FormData` anywhere in `src/` |
+
+So the answer to *"what actually uploads it"* was **nothing, and nothing could**
+— the bytes were gone before any store, and there was no request to carry them.
+
+**Severity, stated honestly.** Mobile's defect was *live*: a real POST sent
+`documents: []`, so real applications were filed with no documents. Ours was
+*latent*: nothing is filed anywhere yet, so no citizen has lost a document to a
+server. But the wizard was already in the state that produced mobile's bug —
+**wiring HTTP would have filed zero-document applications on day one**, because
+there would have been nothing to send.
+
+**Fixed following the shape of mobile's `af7b8a1`, not its code.** The fix went
+into the type, so the compiler enumerated every construction site (four) rather
+than us hunting them: `ApplicationDocument.file` and `SavedDocument.file` are now
+`File | null`, `AttachedDoc.file` is a required `File`, and `attachDocument()`
+takes a `File` instead of a filename. Both intake points — the wizard and
+My Documents — keep it. `submit()`'s single loop remains the one place
+attachments leave the wizard, so it is the one place a future upload hooks.
+
+**The first guards I wrote would have passed on mobile.** They called
+`store.attachDocument()` directly, so replacing the File with an empty one at the
+*wizard's intake* — mobile's exact bug — still passed 52/52. The test now drives
+`onFileSelected` itself. Break-checked both halves: discarding at intake fails
+**1**, dropping it in the store fails **3**. Neither is a type error, which is
+why nothing caught this before.
 
 ## C. Hardening — cheap now, expensive later
 

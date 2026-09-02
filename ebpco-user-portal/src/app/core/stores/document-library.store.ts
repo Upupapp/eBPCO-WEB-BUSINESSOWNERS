@@ -4,6 +4,8 @@ import { SavedDocument, SavedDocumentCategory, SavedDocumentFileType } from '../
 import { nextId, todayIso } from '../utils/ids';
 
 export interface AddSavedDocumentInput {
+  /** The chosen file. Required: a filename is not a document. */
+  file: File;
   fileName: string;
   fileType: SavedDocumentFileType;
   category: SavedDocumentCategory;
@@ -16,6 +18,7 @@ export class DocumentLibraryStore {
     {
       id: 'doc-1',
       ownerId: 'user-demo',
+      file: null,   // seeded demo row — there was never a file behind it
       fileName: 'Juan_Dela_Cruz_Valid_ID.pdf',
       fileType: 'pdf',
       category: 'validGovernmentId',
@@ -25,6 +28,7 @@ export class DocumentLibraryStore {
     {
       id: 'doc-2',
       ownerId: 'user-demo',
+      file: null,   // seeded demo row — there was never a file behind it
       fileName: 'Barangay_Clearance_2026.jpg',
       fileType: 'jpg',
       category: 'barangayClearance',

@@ -70,7 +70,7 @@ export class MyDocumentsPage {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    this.store.add({ fileName: file.name, fileType: fileTypeFromName(file.name), category: 'uncategorized', sizeBytes: file.size });
+    this.store.add({ file, fileName: file.name, fileType: fileTypeFromName(file.name), category: 'uncategorized', sizeBytes: file.size });
     // F-14: only the name, type and size are kept — the file's CONTENTS are
     // discarded. "Added" implied the document itself was stored.
     this.toast.success(`${file.name} listed by name only — the file itself was not stored.`);

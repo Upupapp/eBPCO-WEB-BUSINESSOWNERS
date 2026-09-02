@@ -261,13 +261,22 @@ export class ApplicationStore {
     return record;
   }
 
+  /**
+   * `file` is the actual File the citizen chose, and it is REQUIRED.
+   *
+   * It used to take only `fileName` and `fileType`, which meant the bytes were
+   * already gone by the time anything reached this store — the same shape that
+   * let the mobile app file applications with zero documents for its entire
+   * life. Nothing downstream can upload a filename.
+   */
   attachDocument(
     applicationId: string,
     requirementId: string,
     label: string,
-    fileName: string,
+    file: File,
     fileType: SavedDocumentFileType,
   ): void {
+    const fileName = file.name;
     this.documentsByApp.update((map) => {
       const existing = map[applicationId] ?? [];
       const idx = existing.findIndex((d) => d.requirementId === requirementId);
@@ -276,6 +285,7 @@ export class ApplicationStore {
         applicationId,
         requirementId,
         label,
+        file,
         fileName,
         fileType,
         uploadedAt: todayIso(),

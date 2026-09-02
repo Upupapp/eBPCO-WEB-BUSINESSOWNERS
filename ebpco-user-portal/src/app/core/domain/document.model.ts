@@ -24,6 +24,25 @@ export interface ApplicationDocument {
   label: string;
   fileName: string;
   fileType: SavedDocumentFileType;
+  /**
+   * The file the citizen actually chose.
+   *
+   * This exists because a filename is not a document. The mobile app filed
+   * applications with ZERO documents for its entire life and nobody noticed:
+   * every wizard showed the attachments in place, the review step listed them,
+   * the confirmation said the application was filed — and the request carried
+   * `documents: []`, because nothing upstream had ever kept the bytes.
+   *
+   * This portal had the same shape by construction (we are in parity with
+   * mobile): `onFileSelected` read `file.name` and let the `File` go out of
+   * scope on the next line. Nothing downstream could upload anything, because
+   * by then there was nothing left to upload.
+   *
+   * `null` is honest and expected for seeded demo rows, which never had a file.
+   * It must NOT be null for a document a citizen attached — see the guards in
+   * application-wizard.page.spec.ts.
+   */
+  file: File | null;
   uploadedAt: string;
   status: DocumentStatus;
   issuingOffice: string | null;
@@ -63,6 +82,8 @@ export const SAVED_DOCUMENT_CATEGORY_LABELS: Record<SavedDocumentCategory, strin
 };
 
 export interface SavedDocument {
+  /** The chosen file. See ApplicationDocument.file — a filename is not a document. */
+  file: File | null;
   id: string;
   ownerId: string;
   fileName: string;
