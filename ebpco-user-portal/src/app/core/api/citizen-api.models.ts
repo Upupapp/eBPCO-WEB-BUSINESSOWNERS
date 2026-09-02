@@ -110,13 +110,3 @@ export interface ResubmitResult {
    */
   removedMetadata: string[];
 }
-
-/**
- * The server's real ceiling on a resubmitted FILE, in bytes.
- *
- * `contentBase64` is capped at 40,000,000 characters by the schema, but the
- * body limit is 1MB and base64 inflates by about a third — so the true limit is
- * roughly 750KB of file. Checking here means the citizen is told before a
- * 750KB upload is spent, rather than after a bare 413 comes back.
- */
-export const RESUBMIT_MAX_FILE_BYTES = 750_000;

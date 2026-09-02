@@ -1,12 +1,11 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, throwError } from 'rxjs';
-import { API_BASE_URL, ApiNotConfiguredError } from './api-config';
+import { API_BASE_URL, ApiNotConfiguredError, RESUBMIT_MAX_FILE_BYTES } from './api-config';
 import { problemFrom } from './problem';
 import {
   ApplicationDocumentResponse,
   PermitResponse,
-  RESUBMIT_MAX_FILE_BYTES,
   ResubmitRequest,
   ResubmitResult,
 } from './citizen-api.models';
@@ -100,7 +99,15 @@ export function newIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
-/** True when a file is over the server's real ceiling, so the citizen is told before the upload is spent. */
-export function isOverResubmitLimit(file: { size: number }): boolean {
-  return file.size > RESUBMIT_MAX_FILE_BYTES;
+/**
+ * An OPTIMISTIC pre-check, so a citizen is told before spending an upload on a
+ * file that cannot land.
+ *
+ * `limit` is passed in because it echoes the server's configurable
+ * `BODY_LIMIT_BYTES`, which the backend has filed as needing to be raised for
+ * production. **This is not the authority — the server's 413 is**, and the
+ * client handles that regardless of what this returns.
+ */
+export function isOverResubmitLimit(file: { size: number }, limit: number): boolean {
+  return file.size > limit;
 }

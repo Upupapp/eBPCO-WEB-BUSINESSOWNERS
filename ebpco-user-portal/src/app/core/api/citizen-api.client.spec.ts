@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { CitizenApiClient, isOverResubmitLimit, newIdempotencyKey } from './citizen-api.client';
-import { API_BASE_URL, ApiNotConfiguredError } from './api-config';
+import { API_BASE_URL, ApiNotConfiguredError, RESUBMIT_MAX_FILE_BYTES } from './api-config';
 import { ApiError } from './problem';
 import { CONTRACT_SAMPLES } from './contract-samples.fixture';
 
@@ -121,9 +121,42 @@ describe('CitizenApiClient when no API is configured', () => {
 });
 
 describe('Resubmission size ceiling', () => {
-  it('catches an oversized file before the upload is spent', () => {
-    // base64 inflates by a third against a 1MB body limit, so ~750KB of file.
-    expect(isOverResubmitLimit({ size: 700_000 })).toBe(false);
-    expect(isOverResubmitLimit({ size: 800_000 })).toBe(true);
+  it('catches an oversized file before the upload is spent, at the default limit', () => {
+    // Measured by the backend (C-8): base64 inflates by a third against a 1MB
+    // body limit, so ~750KB of file. A ~400KB PDF is accepted; a ~900KB PDF 413s.
+    TestBed.configureTestingModule({});
+    const limit = TestBed.inject(RESUBMIT_MAX_FILE_BYTES);
+    expect(isOverResubmitLimit({ size: 700_000 }, limit)).toBe(false);
+    expect(isOverResubmitLimit({ size: 900_000 }, limit)).toBe(true);
+    TestBed.resetTestingModule();
+  });
+
+  it('follows the limit a deployment configures, not a hardcoded one', () => {
+    // BODY_LIMIT_BYTES is the server's, is configurable, and the backend has
+    // filed that it needs raising for production. A client that hardcoded 750KB
+    // would then refuse files the server would happily accept.
+    TestBed.configureTestingModule({ providers: [{ provide: RESUBMIT_MAX_FILE_BYTES, useValue: 4_000_000 }] });
+    const raised = TestBed.inject(RESUBMIT_MAX_FILE_BYTES);
+    expect(isOverResubmitLimit({ size: 900_000 }, raised)).toBe(false);
+    TestBed.resetTestingModule();
+  });
+
+  it('still handles a 413 whatever the client-side limit says', () => {
+    // The pre-check is optimistic; the server is the authority.
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(),
+                  { provide: API_BASE_URL, useValue: BASE },
+                  { provide: RESUBMIT_MAX_FILE_BYTES, useValue: 50_000_000 }],
+    });
+    const api = TestBed.inject(CitizenApiClient);
+    const http = TestBed.inject(HttpTestingController);
+    let err: ApiError | undefined;
+    api.resubmitDocument(APP, APP, { fileName: 'f.pdf', label: 'L', contentBase64: 'A' }, newIdempotencyKey())
+      .subscribe({ error: (e) => (err = e) });
+    http.expectOne(`${BASE}/applications/${APP}/documents/${APP}/resubmit`)
+      .flush('Payload Too Large', { status: 413, statusText: 'Payload Too Large' });
+    expect(err!.citizenMessage).toContain('too large');
+    http.verify();
+    TestBed.resetTestingModule();
   });
 });
