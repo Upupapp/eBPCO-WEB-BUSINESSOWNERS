@@ -79,7 +79,7 @@
           <div class="card">
             <div class="form-row">
               <div class="field"><label for="profile-current-password-11">Current Password</label><input id="profile-current-password-11" class="input" type="password" [(ngModel)]="currentPassword" /></div>
-              <div class="field"><label for="profile-new-password-12">New Password</label><input id="profile-new-password-12" class="input" type="password" [(ngModel)]="newPassword" /></div>
+              <div class="field"><label for="profile-new-password-12">New Password</label><input id="profile-new-password-12" class="input" type="password" [(ngModel)]="newPassword" /><div class="hint">Minimum 8 characters, at least 1 letter and 1 number.</div></div>
             </div>
             <div class="field field-narrow"><label for="profile-confirm-new-password-13">Confirm New Password</label><input id="profile-confirm-new-password-13" class="input" type="password" [(ngModel)]="confirmPassword" /></div>
             @if (passwordError()) { <div class="field error">{{ passwordError() }}</div> }

@@ -30,24 +30,60 @@
   flex-direction: column;
   background: #ffffff;
   border-right: 1px solid var(--ds-border);
-  padding: 24px 16px;
+  padding: 26px 20px 20px;
   position: sticky;
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 200ms ease, padding 200ms ease;
+
+  // Thin, unobtrusive scrollbar for when the nav list needs to scroll —
+  // the browser default is visually noisy against this otherwise quiet panel.
+  scrollbar-width: thin;
+  scrollbar-color: #d6d9df transparent;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: #d6d9df; border-radius: 999px; }
+  &::-webkit-scrollbar-thumb:hover { background: #bfc4cc; }
 }
 
 .ds-brand {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 8px;
+  gap: 13px;
+  padding: 0 13px;
+  min-width: 0;
 }
+
+// The seal itself is the collapse/expand control — no separate button, per
+// the redesign brief. Padding + a matching negative margin give it a real
+// hit target and a hover halo without shifting its visual size/position.
+.ds-brand-seal-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  margin: -5px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 180ms ease;
+}
+.ds-brand-seal-btn:hover { background: #f8f9fb; }
+.ds-brand-seal-btn:focus-visible {
+  outline: 2px solid var(--ds-red-dark);
+  outline-offset: 2px;
+}
+
 .ds-brand-seal {
   width: 44px;
   height: 44px;
   object-fit: contain;
   flex-shrink: 0;
+  transition: width 200ms ease, height 200ms ease;
 }
 .ds-brand-title {
   font-size: 21px;
@@ -55,15 +91,18 @@
   color: var(--ds-ink);
 }
 .ds-brand-rule {
+  // A touch darker than --ds-border (#e8eaee) — that shade reads as
+  // basically invisible against white at this width/compression, and the
+  // whole point of this rule is to be visibly there, just quiet.
   height: 1px;
-  background: var(--ds-border);
-  margin: 28px 8px 18px;
+  background: #d8dbe2;
+  margin: 24px 0 20px;
 }
 
 .ds-nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
 }
 
 .ds-nav-link {
@@ -71,8 +110,8 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  height: 54px;
-  padding: 0 16px;
+  height: 52px;
+  padding: 0 14px;
   border-radius: 11px;
   color: var(--ds-ink-secondary);
   font-size: 15px;
@@ -83,25 +122,35 @@
   width: 100%;
   text-align: left;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 .ds-nav-icon { width: 20px; height: 20px; flex-shrink: 0; }
-.ds-nav-badge { margin-left: auto; }
+.ds-nav-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  line-height: 1;
+}
 
-.ds-nav-link:hover { background: #f9fafb; text-decoration: none; }
+.ds-nav-link:hover { background: #f8f9fb; text-decoration: none; transform: translateX(1px); }
 .ds-nav-link.active {
-  background: #fff5f6;
+  background: #fff3f4;
   color: var(--ds-red);
   font-weight: 600;
 }
 .ds-nav-link.active::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
+  left: 2px;
+  top: 12px;
+  bottom: 12px;
   width: 3px;
-  border-radius: 0 4px 4px 0;
+  border-radius: 999px;
   background: var(--ds-red);
 }
 .ds-nav-link:focus-visible {
@@ -113,12 +162,55 @@
   border: none;
   height: 1px;
   background: var(--ds-border);
-  margin: auto 8px 14px;
-  width: calc(100% - 16px);
+  margin: auto 0 16px;
+  width: 100%;
 }
 
 .ds-logout { color: var(--ds-red); }
-.ds-logout:hover { background: #fff5f6; color: var(--ds-red-dark); }
+.ds-logout:hover { background: #fff5f5; color: var(--ds-red-dark); }
+
+// ---------------------------------------------------------------------------
+// Desktop icon-only rail (sidebar-collapsed)
+//
+// Scoped to >=1024px on purpose: below that the off-canvas drawer already
+// owns .ds-sidenav's position/width/transform (see the responsive shell
+// section further down), and a stale sidebar-collapsed class from a resize
+// must never fight that — it simply does nothing down there.
+// ---------------------------------------------------------------------------
+@media (min-width: 1024px) {
+  .ds-sidenav.sidebar-collapsed {
+    width: 76px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .sidebar-collapsed .ds-brand {
+    padding: 0;
+    justify-content: center;
+  }
+  .sidebar-collapsed .ds-brand-seal { width: 30px; height: 30px; }
+  .sidebar-collapsed .ds-brand-title { display: none; }
+
+  .sidebar-collapsed .ds-nav-link {
+    justify-content: center;
+    padding: 0;
+    gap: 0;
+  }
+  .sidebar-collapsed .ds-nav-label { display: none; }
+  .sidebar-collapsed .ds-nav-link.active::before { left: 6px; }
+
+  // Reads as a small corner indicator on the bell icon rather than the
+  // normal far-right row badge, since there's no row left to align it to.
+  .sidebar-collapsed .ds-nav-badge {
+    position: absolute;
+    top: 3px;
+    right: 12px;
+    margin-left: 0;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Main column
@@ -218,13 +310,23 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ds-nav-link { transition: none; }
+  .ds-nav-link:hover { transform: none; }
+  .ds-sidenav, .ds-brand-seal, .ds-brand-seal-btn { transition: none; }
 }
 
 // F-14 demo banner. Deliberately not dismissible: a citizen who dismisses it
 // on the dashboard would not see it again on the wizard, which is the screen
 // where the misunderstanding actually costs them something.
 .ds-demo-banner {
-  margin: 0 0 16px;
+  // Sat flush edge-to-edge across the full ds-main width with no cap, so on
+  // a wide monitor its one sentence stretched into a single, hard-to-read
+  // line far longer than the .page content (max-width: 1080px) sitting
+  // right below it. A 32px minimum gutter plus the same 1080px cap keeps
+  // the line length readable and lines the banner up with that content.
+  box-sizing: border-box;
+  width: calc(100% - 64px);
+  max-width: 1080px;
+  margin: 20px auto 16px;
   padding: 10px 14px;
   border: 1px solid var(--warning-text, #a15c00);
   border-radius: 8px;

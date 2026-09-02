@@ -5,6 +5,7 @@ import { StatusPillComponent } from '../../shared/ui/status-pill.component';
 import { LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
+import { ToastService } from '../../shared/ui/toast.service';
 
 @Component({
   selector: 'app-application-details',
@@ -116,6 +117,7 @@ import { formatDate, formatDateTime } from '../../core/utils/ids';
 export class ApplicationDetailsPage {
   private readonly route = inject(ActivatedRoute);
   protected readonly store = inject(ApplicationStore);
+  private readonly toast = inject(ToastService);
 
   protected readonly applicantStatusOf = applicantStatusOf;
   protected readonly formatDate = formatDate;
@@ -158,5 +160,7 @@ export class ApplicationDetailsPage {
 
   advance(id: string): void {
     this.store.advanceForDemo(id);
+    const updated = this.store.applicationById(id);
+    if (updated) this.toast.success(`Status updated: ${applicantStatusOf(updated.lifecycleStatus)}.`);
   }
 }

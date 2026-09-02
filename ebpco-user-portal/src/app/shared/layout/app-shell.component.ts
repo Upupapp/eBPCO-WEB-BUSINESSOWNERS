@@ -24,6 +24,13 @@ export class AppShellComponent {
    *  ignores this entirely and the sidebar is always visible. */
   protected readonly navOpen = signal(false);
 
+  /** Desktop icon-only rail state. Only meaningful at/above 1024px — the CSS
+   *  scopes every collapsed-mode rule to that breakpoint so a stale collapsed
+   *  class can't fight the off-canvas drawer's own width/transform below it.
+   *  Deliberately NOT reset on navigation (unlike navOpen): it's a standing
+   *  layout preference, not a transient overlay. */
+  protected readonly sidebarCollapsed = signal(false);
+
   constructor() {
     // Close on navigation, or the drawer stays over the page the citizen just
     // asked for.
@@ -34,6 +41,7 @@ export class AppShellComponent {
 
   protected toggleNav(): void { this.navOpen.update((v) => !v); }
   protected closeNav(): void { this.navOpen.set(false); }
+  protected toggleSidebarCollapse(): void { this.sidebarCollapsed.update((v) => !v); }
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void { this.closeNav(); }
