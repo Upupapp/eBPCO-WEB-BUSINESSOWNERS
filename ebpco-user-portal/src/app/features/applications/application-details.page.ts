@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
@@ -6,10 +6,13 @@ import { LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../c
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
+import { ApplicationDocumentsComponent } from './application-documents.component';
+import { toContractShape } from './demo-document.adapter';
+import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
 
 @Component({
   selector: 'app-application-details',
-  imports: [RouterLink, StatusPillComponent],
+  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent],
   template: `
     @if (app(); as a) {
       <div class="page">
@@ -76,22 +79,11 @@ import { ToastService } from '../../shared/ui/toast.service';
 
         <div class="card">
           <div class="card-title">Documents</div>
-          @if (docs().length === 0) {
-            <p class="muted small">No documents attached.</p>
-          } @else {
-            <table class="table">
-              <thead><tr><th>Document</th><th>Status</th><th>Uploaded</th></tr></thead>
-              <tbody>
-                @for (d of docs(); track d.id) {
-                  <tr>
-                    <td>{{ d.label }}</td>
-                    <td><app-status-pill kind="document" [label]="d.status" /></td>
-                    <td>{{ formatDate(d.uploadedAt) }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
+          <app-application-documents
+            [documents]="contractDocs()"
+            (replace)="onReplace($event)"
+          />
+        
         </div>
 
         <div class="card">
@@ -135,6 +127,23 @@ export class ApplicationDetailsPage {
   docs() {
     return this.store.documentsFor(this.id());
   }
+
+  /** The office's shape, so the documents view is written once against what the server sends. */
+  protected contractDocs(): ApplicationDocumentResponse[] {
+    return this.docs().map(toContractShape);
+  }
+
+  /**
+   * Where the resubmission flow will start. It does nothing yet and says so,
+   * rather than opening a picker that leads nowhere: POST .../resubmit needs an
+   * API host, and API_BASE_URL is null in this build.
+   */
+  protected onReplace(doc: ApplicationDocumentResponse): void {
+    this.toast.show(
+      `Replacing "${doc.label}" is not available in this build — the Municipality's system is not connected yet.`,
+    );
+  }
+
 
   assessment() {
     return this.store.assessmentFor(this.id());
