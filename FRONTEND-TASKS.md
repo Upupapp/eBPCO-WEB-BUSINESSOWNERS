@@ -84,6 +84,27 @@ attachments leave the wizard, so it is the one place a future upload hooks.
 **1**, dropping it in the store fails **3**. Neither is a type error, which is
 why nothing caught this before.
 
+## D. Three citizen endpoints now exist — parity work, added 2 September
+
+From the backend lane. We have **no HTTP layer at all**, so each of these is
+"build the client for it" rather than "call it". Numbered 21–25 because they are
+additions to the twenty above, not replacements.
+
+| # | Task | Notes that change the design, not just the wiring |
+|---|---|---|
+| 21 | **`GET /applications/{id}/permit`** (f7eb40e) — `{permitNumber, issuedDate, scope, conditions[], release}` | **`release: null` means not yet ready for collection**, not "no release" — the two must not render the same. Before this endpoint a citizen who filed, paid and was approved had **no way to learn their permit number**. |
+| 22 | **Render `conditions[]` in full** | Ours are wrong today, not merely absent. `requirements-catalog.ts` carries `validityRules` — **one client-authored sentence per permit type**, e.g. *"Valid for twelve (12) months from issuance, per standard LGU clearance practice"*, which is an inference we wrote, not the office's word. The server returns a **list**: cash bond, setbacks, notice before excavation. A citizen is currently shown a validity note where their actual obligations belong. Render every item; do not summarise, and do not keep a local copy. |
+| 23 | **`GET /applications/{id}/documents`** (5a0f18a) — per-document verdict | **`reviewStatus: null` means not yet reviewed — NOT approved.** Same fail-closed rule as `PermitStanding`: absence of a verdict is never a pass. Use **`reviewReason.label` from the server**, never our own copy of the catalogue — the LGU can edit it, and a local copy would silently go stale. Also carries the supersession chain and `scanCleared` / `quarantined`. |
+| 24 | **`POST /applications/{id}/documents/{documentId}/resubmit`** (18028a8) | Body `{fileName, label, contentBase64}` → 201 `{documentId, supersedesDocumentId, status, removedMetadata}`. **Send an `Idempotency-Key` (UUID)** — a retry with the same key replays the same answer instead of creating a second document. Refuses **409** if the document was already replaced or already accepted; that is a real state to render, not an error toast. |
+| 25 | **Show the rejection and its replacement together** | **Replacements append.** The rejected document stays visible with its reason, alongside what was sent instead. *"What was wrong"* and *"what I sent instead"* is the pair that makes a rejection actionable — showing only the newest upload throws away the half the citizen needs. Design the list around the pair, not around the latest row. |
+
+**Vocabulary — verified, not assumed.** D-10 (live at `43f5187`) makes the
+office's nineteen names the server's keys. Checked byte-exact against
+`033_permit_vocabulary.sql`: **all 19 match, en dashes included.** Three contain
+an **en dash (U+2013)**, not a hyphen; four contain a forward slash and must be
+`%2F`-encoded in a path. Now held by `npm run check:vocab`, which reports the
+code point by name when a hyphen creeps in.
+
 ## C. Hardening — cheap now, expensive later
 
 | # | Task | Evidence |
