@@ -469,6 +469,10 @@ table.table tr:last-child td { border-bottom: none; }
 .doc-generated-conditions { margin: 4px 0 0; padding-left: 20px; font-size: 9.5pt; line-height: 1.5; }
 .doc-generated-conditions li { margin-bottom: 4px; }
 // Application documents, rendered as chains (task 25).
+.permit-number { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; color: var(--gray-900); }
+.release-state { margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); }
+.release-state.release-ready { background: var(--success-100); border-color: var(--success-text); color: var(--success-text); }
+.release-state.release-waiting { background: var(--gray-50); color: var(--gray-700); }
 .doc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .doc-item { border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 12px 14px; }
 .doc-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }

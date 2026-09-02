@@ -7,12 +7,14 @@ import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ApplicationDocumentsComponent } from './application-documents.component';
+import { PermitReleaseComponent } from './permit-release.component';
+import { PermitRelease } from '../../core/api/citizen-api.models';
 import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
 
 @Component({
   selector: 'app-application-details',
-  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent],
+  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent, PermitReleaseComponent],
   template: `
     @if (app(); as a) {
       <div class="page">
@@ -77,6 +79,12 @@ import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
           </div>
         }
 
+        <app-permit-release
+          [permitNumber]="permit()?.permitNumber ?? null"
+          [issuedDate]="permit() ? formatDate(permit()!.issuedDate) : null"
+          [release]="release()"
+        />
+
         <div class="card">
           <div class="card-title">Documents</div>
           <app-application-documents
@@ -126,6 +134,19 @@ export class ApplicationDetailsPage {
 
   docs() {
     return this.store.documentsFor(this.id());
+  }
+
+  /**
+   * The contract's `release`, adapted from this build's `permitReleaseStatus`.
+   *
+   * Null when no permit exists — matching the server, where null means nobody
+   * has arranged collection. `method` and `releasedAt` are null because this
+   * build does not record them; the component renders neither as a claim.
+   */
+  protected release(): PermitRelease | null {
+    const app = this.app();
+    if (!app || !this.permit()) return null;
+    return { status: app.permitReleaseStatus, method: null, releasedAt: null };
   }
 
   /** The office's shape, so the documents view is written once against what the server sends. */
