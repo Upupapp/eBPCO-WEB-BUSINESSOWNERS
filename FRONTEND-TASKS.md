@@ -18,9 +18,9 @@ Payment Officer, which are internal roles, so they are out of this lane).
 
 | # | Task | Evidence |
 |---|---|---|
-| 1 | **Build the Renewal flow** — REN-001 Select Existing Permit, REN-002 Renewal Form, REN-003 Review Renewal | The wizard offers `Renewal` in a dropdown and then shows the identical New-application form. There is no "select an existing permit" step, so a renewal cannot reference the permit it renews. |
-| 2 | **Build the Amendment flow** — AMD-001/002/003 | Same: an `Amendment` option with no amendment form and no permit to amend. |
-| 3 | **Build Edit Business** — BUS-004 | No route, no control, nothing. A citizen who mistypes a business name cannot correct it. |
+| 1 | ✅ **DONE (93ea4c2)** **Build the Renewal flow** — REN-001 Select Existing Permit, REN-002 Renewal Form, REN-003 Review Renewal | The wizard offers `Renewal` in a dropdown and then shows the identical New-application form. There is no "select an existing permit" step, so a renewal cannot reference the permit it renews. |
+| 2 | ✅ **DONE (93ea4c2)** **Build the Amendment flow** — AMD-001/002/003 | Same: an `Amendment` option with no amendment form and no permit to amend. |
+| 3 | ✅ **DONE (93ea4c2)** **Build Edit Business** — BUS-004 | No route, no control, nothing. A citizen who mistypes a business name cannot correct it. |
 | 4 | **Build Document Preview** — DOC-003 | `My Documents` stores filename, type and size only; there is nothing to preview. Pair this with task 12. |
 | 5 | **Build Payment Success** — PAY-005 | `payment-flow` navigates straight to `/applications/:id`. The citizen never gets a confirmation screen, only a toast that vanishes in 3.5s. |
 | 6 | **Reconcile the wizard against PER-001..005** | The spec names five steps; four are implemented (`step() === 1..4`) and there is **no "Business Activity" step** (PER-003, 0 hits). Either fold it explicitly and record that, or add it. Folding is legitimate — leaving the spec and the code silently disagreeing is not. |
@@ -158,3 +158,39 @@ Listed so nobody picks them up as front-end work.
 | Permit revocation / suspension / expiry | the backend — `generated_permits` has no status and no expiry column |
 | Poppins → Gothic A1 | the mobile lane |
 | `docs/` duplication | the design-system repo decision |
+
+
+---
+
+## Tasks 1–3 — closed 3 September 2026 (93ea4c2)
+
+**The missing screens were hiding a missing fact.** `ApplicationRecord` recorded
+`applicationAction: 'Renewal'` and nothing else. A renewal reached the office
+asserting an existing permit was involved, with no way to tell which one, and
+the citizen had no field in which to say. REN-001 and AMD-001 exist to capture
+exactly that.
+
+- `relatedPermitNumber` added to `ApplicationRecord` — required for Renewal and
+  Amendment, and null for New, so a stray reference on a New application is
+  refused too (it would assert a relationship the citizen never claimed).
+- The rule is a domain predicate, enforced in the **wizard and the store**. A
+  rule enforced only in a template is enforced only for callers who go through
+  the template.
+- The permit list is drawn from permits actually issued to the signed-in
+  citizen, so it cannot offer one that does not exist. Not filtered by expiry:
+  a lapsed permit is often what someone came to renew, and what is still
+  renewable is the office's judgement.
+- **Edit Business** exposes only the citizen's own fields. Registration number,
+  date registered, owner and status are unreachable by construction.
+- **Editing does not rewrite applications already filed.** `businessName` on an
+  application is a submission-time snapshot; syncing it would let a citizen
+  rename an application the Municipality had already assessed. Said on screen,
+  with Amendment named as the real route.
+
+Both guards break-checked separately. 125 tests, 22 files, six gates green,
+verified from a detached worktree at 93ea4c2.
+
+**Caught while writing it:** the on-screen warning first used a
+`.callout-warning` class this codebase does not define — it would have shipped
+as unstyled text. A warning nobody sees is worse than no warning, because it
+is recorded as delivered.
