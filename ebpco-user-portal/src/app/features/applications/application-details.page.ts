@@ -9,6 +9,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { ApplicationDocumentsComponent } from './application-documents.component';
 import { PermitReleaseComponent } from './permit-release.component';
 import { PermitRelease } from '../../core/api/citizen-api.models';
+import { DocumentResubmissionService } from '../../core/api/document-resubmission.service';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
 
@@ -118,6 +120,8 @@ export class ApplicationDetailsPage {
   private readonly route = inject(ActivatedRoute);
   protected readonly store = inject(ApplicationStore);
   private readonly toast = inject(ToastService);
+  private readonly resubmission = inject(DocumentResubmissionService);
+  private readonly api = inject(CitizenApiClient);
 
   protected readonly applicantStatusOf = applicantStatusOf;
   protected readonly formatDate = formatDate;
@@ -155,14 +159,45 @@ export class ApplicationDetailsPage {
   }
 
   /**
-   * Where the resubmission flow will start. It does nothing yet and says so,
-   * rather than opening a picker that leads nowhere: POST .../resubmit needs an
-   * API host, and API_BASE_URL is null in this build.
+   * Replace a rejected document.
+   *
+   * The size is checked BEFORE the file is read, so a citizen with a 5MB scan
+   * is told immediately rather than after their phone has encoded it. The
+   * idempotency key is owned by the service: stable if they retry the same
+   * file, new if they pick a different one — the server treats the file as part
+   * of the key's fingerprint and 409s a mismatch.
    */
   protected onReplace(doc: ApplicationDocumentResponse): void {
-    this.toast.show(
-      `Replacing "${doc.label}" is not available in this build — the Municipality's system is not connected yet.`,
-    );
+    if (!this.api.configured) {
+      this.toast.show(
+        `Replacing "${doc.label}" is not available in this build — the Municipality's system is not connected yet.`,
+      );
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (this.resubmission.tooLarge(file)) {
+        this.toast.error(this.resubmission.explain(new Error('')) || 'That file is too large.');
+        return;
+      }
+      this.resubmission.resubmit(this.id(), doc.id, doc.label, file).subscribe({
+        next: (result) => {
+          // Metadata stripped from the file is reported, never silently
+          // dropped: a site photograph carries its coordinates and the
+          // applicant is entitled to know the LGU removed them.
+          const stripped = result.removedMetadata.length
+            ? ` ${result.removedMetadata.join(', ')} was removed from the file.`
+            : '';
+          this.toast.success(`Replacement sent for "${doc.label}".${stripped}`);
+        },
+        error: (e) => this.toast.error(this.resubmission.explain(e)),
+      });
+    };
+    input.click();
   }
 
 
