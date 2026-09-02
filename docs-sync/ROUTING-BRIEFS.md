@@ -1,4 +1,4 @@
-# Routing briefs — three short messages, one per lane
+# Routing briefs — four short messages, one per lane
 
 Paste the relevant block to each lane. Each is self-contained. Full detail is in
 `HANDOFF_TYPOGRAPHY.md`; the patch is in `docs-sync/`.
@@ -109,3 +109,75 @@ below 16px are the two defects we found that a desktop review never surfaces. Th
 44px minimum applies to your surface directly.
 
 Get it: `git clone --depth 1 https://github.com/Upupapp/eBPCO-WEB-BUSINESSOWNERS.git`
+
+---
+
+## → BACKEND (`Upupapp/eBPCOBackend`)
+
+From the citizen web portal lane, 31 August 2026. Read-only inspection of
+`ebpco-api` at `5a0f18a`; nothing was changed there.
+
+**The public permit-verification page cannot answer, and the reason is in your
+schema.** `generated_permits` is six columns:
+
+```sql
+create table generated_permits (
+  application_id  uuid        primary key references applications (id),
+  permit_number   text        not null unique,
+  issued_date     timestamptz not null,
+  scope           text,
+  conditions      text[]      not null default '{}',
+  generated_by    uuid        not null references accounts (id)
+);
+```
+
+**There is no status column, no revocation, and no expiry.** Once a permit row
+exists it is permanent and unqualified: the schema has no way to say a permit was
+withdrawn, suspended or cancelled, and no way to say when it lapses. The only
+"revoked" in the codebase is refresh-token revocation in `001_identity.sql` and
+`014_revoked_sessions.sql` — that is session auth, not permits. The application
+lifecycle ends at `released`.
+
+### Why this reached us
+
+Our `/verify/:permitNumber` page used to compute validity: *issued and not
+expired → **Valid***. That derivation has no term for revocation, so the moment
+a backend set a permit to issued, **a permit the Municipality had revoked would
+have been reported to the public as Valid**. Nobody would have had to make a
+mistake; it was the default.
+
+We have removed the derivation. The page now only relays an explicit standing
+from the record and reports **Unverified** when it has none — which today is
+always, because there is nothing to relay. `PermitStanding` and
+`standing: PermitStanding | null` are the seam, in
+`ebpco-user-portal/src/app/core/domain/permit.model.ts`. Nothing on our side
+sets them.
+
+### Four questions, and they need answering BEFORE the first real permit issues
+
+1. **What are the withdrawn states?** We render `Revoked`, `Suspended`,
+   `Cancelled` — that is what our page can display, **not** a claim about
+   Castilla's model. Yours is the definition.
+2. **Who may set them?** Issuing is already audited via `generated_by`.
+   Withdrawing a live permit is at least as consequential — is it four-eyes,
+   like the other consequential actions in this system?
+3. **How does the portal learn?** Is standing returned with the permit, or must
+   verification be a live call? **A cached "Valid" for a permit revoked this
+   morning is the same defect in a different place.**
+4. **Is a revoked permit's existence public?** "This number was revoked"
+   discloses more than "no record found". That is a policy call, not a technical
+   one, and it changes what the endpoint may return to an unauthenticated
+   caller.
+
+### One more, found while looking
+
+**There is no `expiry_date` on `generated_permits`**, yet the LGU's own permit
+conditions read *"Valid for twelve (12) months from issuance; work must commence
+within one year or the permit lapses"*, and our document renders a "Valid Until"
+date. Today that date is computed client-side from a validity period in our own
+catalogue. **A lapse date that only the client knows is not a fact the
+Municipality holds** — if the office ever changes a validity period, or grants an
+extension, nothing in the record reflects it.
+
+Get our side: `git clone --depth 1 https://github.com/Upupapp/eBPCO-WEB-BUSINESSOWNERS.git`
+then read `SWEEP-2026-08-31.md` (see L-2) and `permit.model.ts`.
