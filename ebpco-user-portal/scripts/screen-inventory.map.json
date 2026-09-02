@@ -1,0 +1,72 @@
+{
+  "$comment": [
+    "Maps every CITIZEN-facing screen in docs/08-Reusable-Stitch/04-Screen-Inventory.md",
+    "to the route that serves it, or records why it has none.",
+    "",
+    "This file exists so that a screen in the inventory cannot go unruled-on. It",
+    "does NOT claim a screen is well built - only that somebody decided what",
+    "happens to it. check-screen-inventory.mjs fails when the inventory grows an",
+    "ID this file does not mention, when this file names a route the router does",
+    "not have, or when it mentions an ID the inventory no longer contains.",
+    "",
+    "'route' means the router serves it at that path.",
+    "'within' means it is a step or section of that route, not a screen of its",
+    "own - the wizard's steps are the clearest case.",
+    "'absent' means the portal does not have it, with the reason. An absent entry",
+    "is a recorded gap, not an excuse: FRONTEND-TASKS.md is where they get fixed.",
+    "",
+    "Admin-only prefixes (ADM APR INS PVO REP ROL SYS USR) are out of this lane",
+    "entirely - see ebpco-citizen-web-frontend-only. The gate ignores them."
+  ],
+
+  "PUB-001": { "absent": "Splash is a mobile app concept - a web page loads directly. Mobile owns PUB-001." },
+  "PUB-002": { "route": "onboarding" },
+  "PUB-003": { "route": "landing" },
+  "PUB-004": { "route": "login" },
+  "PUB-005": { "route": "register" },
+  "PUB-006": { "route": "forgot-password" },
+  "PUB-007": { "absent": "GAP. Forgot Password collects an address and stops; there is no reset screen for the link to land on, so the journey cannot complete. Needs a backend token to be real." },
+  "PUB-008": { "route": "terms" },
+  "PUB-009": { "route": "privacy" },
+  "PUB-010": { "route": "not-found" },
+  "PUB-011": { "route": "how-it-works" },
+
+  "SHR-001": { "route": "dashboard" },
+  "SHR-002": { "route": "notifications" },
+  "SHR-003": { "route": "profile" },
+  "SHR-004": { "absent": "This build holds no account settings beyond the profile itself - no notification preferences, no language, no linked devices. A settings screen over nothing would be four dead controls." },
+  "SHR-005": { "within": "profile", "note": "A section of the profile page, enforcing the same 8-char/letter/number rule as account creation." },
+
+  "BUS-001": { "route": "businesses" },
+  "BUS-002": { "route": "businesses/register" },
+  "BUS-003": { "route": "businesses/:id" },
+  "BUS-004": { "route": "businesses/:id/edit" },
+
+  "PER-001": { "within": "permits/apply", "note": "Wizard step 1 - business select." },
+  "PER-002": { "within": "permits/apply", "note": "Wizard step 1 - permit type and application type." },
+  "PER-003": { "within": "permits/apply", "note": "Wizard step 2 - project address and scope of work." },
+  "PER-004": { "within": "permits/apply", "note": "Wizard step 4 - review table." },
+  "PER-005": { "within": "permits/apply", "note": "Wizard step 4 - declarations and submit." },
+
+  "REN-001": { "within": "permits/apply", "note": "Wizard step 1 - the permit being renewed. Shipped 93ea4c2; before that a renewal carried no reference to what it renewed." },
+  "REN-002": { "within": "permits/apply", "note": "Wizard steps 2-3. A renewal currently asks for the same fields and documents as a new application; whether it should ask for fewer is an open question for the office." },
+  "REN-003": { "within": "permits/apply", "note": "Wizard step 4 - the review table names the permit being renewed." },
+
+  "AMD-001": { "within": "permits/apply", "note": "Wizard step 1 - the permit being amended. Shipped 93ea4c2." },
+  "AMD-002": { "within": "permits/apply", "note": "Wizard steps 2-3, shared with the new-application path." },
+  "AMD-003": { "within": "permits/apply", "note": "Wizard step 4 - the review table names the permit being amended." },
+
+  "DOC-001": { "within": "permits/apply", "note": "Wizard step 3 - required documents." },
+  "DOC-002": { "route": "documents" },
+  "DOC-003": { "absent": "GAP. A citizen can see that a document is on file and its name, but cannot open it back up to check they attached the right scan." },
+
+  "PAY-001": { "within": "payments/:applicationId", "note": "Method choice at the top of the payment flow." },
+  "PAY-002": { "within": "payments/:applicationId", "note": "Bank transfer branch of the same flow." },
+  "PAY-003": { "within": "payments/:applicationId", "note": "Digital payment branch of the same flow." },
+  "PAY-004": { "route": "payments/:applicationId/receipt" },
+  "PAY-005": { "absent": "DELIBERATE. No 'Payment Success' screen: nothing was paid. The flow returns to Payments with a notice saying the record is a demo and no money moved. A success screen here is the F-14 defect with a bigger heading." },
+
+  "TRA-001": { "route": "applications" },
+  "TRA-002": { "route": "applications/:id" },
+  "TRA-003": { "within": "applications/:id", "note": "Status Timeline card on the application details page." }
+}

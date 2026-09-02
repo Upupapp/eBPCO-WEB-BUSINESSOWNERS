@@ -137,9 +137,9 @@ spelling returns.
 | # | Task | Evidence |
 |---|---|---|
 | 16 | **Gate the demo disclosure on document-like surfaces** | The permit document and the receipt each carry a watermark gate, written twice by two people. A third document will be written by a third person. One gate asserting *"every printable document-like page has a watermark path that cannot clear without positive provenance"* would hold the rule instead of the convention. |
-| 17 | **Add a route-vs-inventory gate** | Task 6 exists because a spec and a router drifted with nothing comparing them — exactly how the heading scale drifted before `check:headings`. Read `04-Screen-Inventory.md`, read `app.routes.ts`, fail on a citizen-facing screen with no route and no recorded deviation. |
-| 18 | **Run axe at mobile viewports too** | `check:a11y` scans 16 screens at 1280×900 only. The drawer, the 44px touch targets and the scrollable table cards only exist below 1024px, so the gate never sees the state most citizens will. Add a 390px pass. |
-| 19 | **Add a WebKit pass to the gate** | Every iOS-specific defect found here — focus zoom under 16px, native `<select>` ignoring author height, the 750×342 landscape viewport — was invisible to Chromium. The browser is already installed. |
+| 17 | ✅ **DONE** **Add a route-vs-inventory gate** | Task 6 exists because a spec and a router drifted with nothing comparing them — exactly how the heading scale drifted before `check:headings`. Read `04-Screen-Inventory.md`, read `app.routes.ts`, fail on a citizen-facing screen with no route and no recorded deviation. |
+| 18 | ✅ **DONE** **Run axe at mobile viewports too** | `check:a11y` scans 16 screens at 1280×900 only. The drawer, the 44px touch targets and the scrollable table cards only exist below 1024px, so the gate never sees the state most citizens will. Add a 390px pass. |
+| 19 | ✅ **DONE** **Add a WebKit pass to the gate** | Every iOS-specific defect found here — focus zoom under 16px, native `<select>` ignoring author height, the 750×342 landscape viewport — was invisible to Chromium. The browser is already installed. |
 | 20 | **Cover the wizard and payment flows with tests** | 49 tests, and the two longest citizen journeys — the five-step application and the payment flow — have none. Both have been driven manually and both work; nothing holds them there. |
 
 ---
@@ -194,3 +194,41 @@ verified from a detached worktree at 93ea4c2.
 `.callout-warning` class this codebase does not define — it would have shipped
 as unstyled text. A warning nobody sees is worse than no warning, because it
 is recorded as delivered.
+
+
+---
+
+## Tasks 17–19 — closed 3 September 2026
+
+**Task 17 — `check:screens`.** Compares the Screen Inventory's 42 citizen
+screens against `app.routes.ts` through a checked-in ruling
+(`scripts/screen-inventory.map.json`). It does not claim a screen is well
+built — it cannot; a route existing is not the screen working. What it makes
+impossible is a citizen screen going *unruled-on*. Fails three ways: an
+inventory ID the map never mentions, a map entry naming a route the router
+lacks, and a map entry for an ID the inventory no longer has. The third
+matters as much as the first — a map keeping entries for deleted screens
+quietly loses its denominator.
+
+**It found two real gaps on its first run:**
+
+| ID | Screen | Gap |
+|----|--------|-----|
+| PUB-007 | Reset Password | Forgot Password collects an address and stops. There is no screen for the reset link to land on, so the journey cannot complete. Needs a backend token to be real. |
+| DOC-003 | Document Preview | A citizen sees that a document is on file and its name, but cannot open it to check they attached the right scan. |
+
+Three more absences are recorded as decisions, not gaps: PUB-001 (splash is a
+mobile concept), SHR-004 (no account settings exist behind it — a settings
+screen over nothing is four dead controls), and PAY-005 (**no "Payment
+Success" screen: nothing was paid** — that screen is the F-14 defect with a
+bigger heading).
+
+**Tasks 18 + 19 — `check:a11y` now runs three profiles**, 50 scans:
+Chromium 1280×900, Chromium 390×844, WebKit 390×844. The mobile passes also
+scan the **open navigation drawer**, a screen state the desktop pass cannot
+reach.
+
+**Break-check, and the reason both tasks existed:** stripping the drawer
+toggle's accessible name produced **zero violations at 1280×900** and flagged
+it on nine screens in each mobile profile. A nav button with no accessible
+name would have shipped past the old gate untouched.
