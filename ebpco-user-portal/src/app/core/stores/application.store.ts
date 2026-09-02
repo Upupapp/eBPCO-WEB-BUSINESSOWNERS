@@ -440,6 +440,49 @@ export class ApplicationStore {
           ...map,
           [applicationId]: { ...assessment, status: 'Paid', amountPaidCentavos: assessment.totalCentavos, balanceCentavos: 0 },
         }));
+
+        // An office cannot verify a payment that was never made.
+        //
+        // This branch marked the assessment Paid and the application
+        // paymentStatus 'Paid' while creating NO PaymentTransaction — so
+        // Payments showed "Paid" and the receipt for the same application said
+        // "No payment has been submitted for this application yet." Two screens,
+        // two answers, one fact.
+        //
+        // Advancing straight past the payment flow is exactly how a citizen
+        // reaches this state, so the advance has to record what it claims
+        // happened. If a payment already exists (the citizen went through the
+        // flow), verify THAT one rather than inventing a second.
+        const existing = this.paymentsByApp()[applicationId] ?? [];
+        const verifiedAt = todayIso();
+        if (existing.length > 0) {
+          this.paymentsByApp.update((map) => ({
+            ...map,
+            [applicationId]: (map[applicationId] ?? []).map((tx, i, all) =>
+              i === all.length - 1 ? { ...tx, status: 'Verified' as const, verifiedAt } : tx,
+            ),
+          }));
+        } else {
+          const tx: PaymentTransaction = {
+            id: nextId('pay'),
+            assessmentId: assessment.id,
+            applicationId,
+            amountCentavos: assessment.totalCentavos,
+            method: 'Onsite',
+            agency: 'OBO/LGU',
+            transactionReference: `DEMO-${nextId('').replace('-', '')}`,
+            proofFileName: null,
+            status: 'Verified',
+            submittedAt: verifiedAt,
+            verifiedAt,
+            rejectionReason: null,
+            // No OR number: only a cashier assigns one, and this is the demo
+            // advance. The receipt keeps its watermark because of this.
+            orNumber: null,
+            orDate: null,
+          };
+          this.paymentsByApp.update((map) => ({ ...map, [applicationId]: [...(map[applicationId] ?? []), tx] }));
+        }
       }
       this.updateApplication(applicationId, {
         lifecycleStatus: next,

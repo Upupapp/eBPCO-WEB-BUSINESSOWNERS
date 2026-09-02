@@ -269,7 +269,16 @@ export class PaymentReceiptPage {
 
   protected readonly watermarkText = computed<WatermarkText>(() => {
     const tx = this.payment();
-    if (!tx) return null;
+    // No payment is not a cleared receipt. This returned null — the same value
+    // that means "genuine, no watermark" — so `gateCleared` was true whenever
+    // the data was ABSENT. Dead today, because the document renders inside
+    // @if (payment(); as tx), but it is the same latent fail-open the
+    // verification page carried: one refactor from a receipt with no payment
+    // behind it claiming to be a system-generated Official Receipt issued by
+    // the Municipality.
+    //
+    // Cleared must be EARNED, never inherited from missing data.
+    if (!tx) return 'NOT VALID AS AN OFFICIAL RECEIPT';
     if (tx.status === 'Rejected') return 'REJECTED';
     if (!tx.orNumber) return 'PENDING VERIFICATION';
     // An OR number here was assigned by the demo "Simulate Office Update"
@@ -279,7 +288,13 @@ export class PaymentReceiptPage {
     return 'NOT VALID AS AN OFFICIAL RECEIPT';
   });
 
-  protected readonly gateCleared = computed(() => this.watermarkText() === null);
+  /**
+   * Clearing requires a positive answer, not the absence of a negative one.
+   * Today nothing can satisfy it: an OR number is only ever assigned by the
+   * demo advance, never a cashier, so `isOfficial()` is never trustworthy — the
+   * same reasoning as PermitProvenance on the generated permit.
+   */
+  protected readonly gateCleared = computed(() => this.watermarkText() === null && !!this.payment());
 
   protected print(): void {
     window.print();
