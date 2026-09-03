@@ -9,6 +9,7 @@ import {
   existingPermitPrompt,
 } from '../../core/domain/application.model';
 import { SavedDocument, SavedDocumentFileType } from '../../core/domain/document.model';
+import { formatDate } from '../../core/utils/ids';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
@@ -177,7 +178,15 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   >
                     <option [ngValue]="null">A document you've already uploaded…</option>
                     @for (saved of reusable(); track saved.id) {
-                      <option [ngValue]="saved">{{ saved.fileName }}</option>
+                      <!--
+                        The upload date is shown because it is the only thing
+                        this portal knows about a saved document's age. The
+                        library carries no expiry date, so the portal cannot say
+                        whether a document is still valid — but it can stop a
+                        citizen reusing a two-year-old clearance without ever
+                        seeing how old it was.
+                      -->
+                      <option [ngValue]="saved">{{ saved.fileName }} · uploaded {{ formatDate(saved.uploadedAt) }}</option>
                     }
                   </select>
                 }
@@ -303,6 +312,8 @@ export class ApplicationWizardPage {
    * recreating precisely the defect that cost the mobile app its entire
    * document history. A name in the list is not a document.
    */
+  protected readonly formatDate = formatDate;
+
   protected readonly reusable = computed(() =>
     this.documentLibrary.myDocuments().filter((d) => d.file !== null),
   );

@@ -1,8 +1,10 @@
 import { Component, computed, input, output } from '@angular/core';
 import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
 import {
-  DocumentChain, canResubmit, groupDocumentChains, rejectionExplanation, reviewLabel, securityState,
+  DocumentChain, DocumentValidity, canResubmit, documentValidity, groupDocumentChains,
+  rejectionExplanation, reviewLabel, securityState,
 } from '../../core/api/document-chains';
+import { formatDate } from '../../core/utils/ids';
 
 /**
  * The application's documents, and the office's verdict on each.
@@ -47,6 +49,34 @@ import {
 
             @if (explain(chain.current); as why) {
               <p class="doc-note doc-note-danger"><strong>Why:</strong> {{ why }}</p>
+            }
+
+            <!--
+              Validity is a THIRD axis, separate from the officer's verdict and
+              from the scanner. An accepted document can still have expired
+              since; an expiry is not a rejection, and saying so in the status
+              badge would conflate a fact about the document with a decision
+              about the application.
+            -->
+            @if (validity(chain.current); as v) {
+              @switch (v.state) {
+                @case ('expired') {
+                  <p class="doc-note doc-note-danger">
+                    <strong>This document expired on {{ formatDate(v.on) }}</strong>
+                    ({{ v.daysAgo }} {{ v.daysAgo === 1 ? 'day' : 'days' }} ago). The Municipality is
+                    likely to ask for a current one.
+                  </p>
+                }
+                @case ('expiring') {
+                  <p class="doc-note">
+                    Valid until {{ formatDate(v.on) }} —
+                    {{ v.daysLeft === 0 ? 'the last day' : v.daysLeft + (v.daysLeft === 1 ? ' day left' : ' days left') }}.
+                  </p>
+                }
+                @case ('valid') {
+                  <p class="doc-note muted">Valid until {{ formatDate(v.on) }}.</p>
+                }
+              }
             }
 
             <button class="btn btn-secondary btn-sm" type="button" data-action="preview" (click)="preview.emit(chain.current)">
@@ -101,6 +131,21 @@ export class ApplicationDocumentsComponent {
   protected readonly explain = rejectionExplanation;
   protected readonly security = securityState;
   protected readonly canReplace = (c: DocumentChain) => canResubmit(c);
+
+  /**
+   * What the document's own expiry date says today.
+   *
+   * The office has been sending `expiresOn` all along; nothing in this portal
+   * ever compared it to anything. Returns null when there is no date, so the
+   * template says nothing rather than inventing a validity the issuing office
+   * never stated.
+   */
+  protected validity(doc: ApplicationDocumentResponse): DocumentValidity | null {
+    const v = documentValidity(doc.expiresOn);
+    return v.state === 'no-expiry' ? null : v;
+  }
+
+  protected readonly formatDate = formatDate;
 
   /**
    * `null` is grey — "not yet reviewed". It must never take the green a citizen

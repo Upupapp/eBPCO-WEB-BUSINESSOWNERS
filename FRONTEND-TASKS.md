@@ -421,3 +421,32 @@ unrepresentable rather than merely tested.
 | Which documents may a **renewal** omit? | Twenty-two documents is a real barrier. Some (lot title, survey plan) plausibly have not changed. |
 | Which may an **amendment** omit, and does it depend on what is being amended? | Amending a contractor is not amending a structure. |
 | Does a reused document need re-certification if it is over a year old? | Some documents carry their own validity; the portal has no rule for this today. |
+
+
+---
+
+## F-24 — document expiry, finally compared to something (3 September 2026)
+
+Went looking in this repo for the shape the mobile lane found — information
+collected, carried, and never brought to the point where it decides something.
+It was here, on every document.
+
+`expiresOn` arrives from the office, is declared in the contract types, sits on
+the model, and is mapped faithfully by the adapter. Nothing read it. No screen
+showed the date; nothing compared it to today.
+
+Now rendered as a third line on each document, separate from the officer's
+verdict and the virus scanner — an expiry is a fact about the document, not a
+decision about the application, and an accepted document can still have expired
+since.
+
+**The trap inside the fix:** a document is valid **through** its expiry day.
+Comparing instants would call a clearance "valid until 3 September" expired at
+00:00 on the 3rd, a day the office still accepts it. Whole-day UTC comparison,
+with tests on the boundary and across month/year rollover. Break-checked both
+ways: reinstating the original defect fails the two render tests; switching to
+an instant comparison fails the two boundary tests.
+
+The reuse picker now shows each saved document's **upload date** — the library
+holds no expiry, so that is the only thing this portal honestly knows about a
+saved document's age.

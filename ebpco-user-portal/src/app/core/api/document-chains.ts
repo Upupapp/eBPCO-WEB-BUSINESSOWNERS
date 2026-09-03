@@ -116,3 +116,51 @@ export function rejectionExplanation(doc: ApplicationDocumentResponse): string |
   const parts = [doc.reviewReason?.label, doc.reviewRemark].filter((p): p is string => !!p && p.trim().length > 0);
   return parts.length ? parts.join(' — ') : null;
 }
+
+/**
+ * What a document's expiry date means TODAY.
+ *
+ * The office sends `expiresOn` on every document. This portal carried it
+ * through the model, mapped it faithfully in the adapter, and then never once
+ * asked whether the date had passed — no screen showed it and nothing compared
+ * it to anything. A citizen whose sanitary clearance expired three months ago
+ * saw "Uploaded" and no reason to look further, and found out when the office
+ * rejected the application.
+ *
+ * That is the same defect the mobile lane found in its wizards: information
+ * collected, carried, and never brought to the point where it decides
+ * something.
+ *
+ * `null` in, `null` out — and that is deliberate. Most documents carry no
+ * expiry, and inventing one would be worse than saying nothing: the validity of
+ * a clearance is the issuing office's to state, not this portal's to guess.
+ */
+export type DocumentValidity =
+  | { state: 'no-expiry' }
+  | { state: 'valid'; on: string; daysLeft: number }
+  | { state: 'expiring'; on: string; daysLeft: number }
+  | { state: 'expired'; on: string; daysAgo: number };
+
+/** Inside this many days, a citizen still has time to act. Beyond it, saying "expiring" is noise. */
+export const EXPIRY_WARNING_DAYS = 60;
+
+const DAY = 86_400_000;
+
+export function documentValidity(
+  expiresOn: string | null,
+  now: Date = new Date(),
+): DocumentValidity {
+  if (!expiresOn) return { state: 'no-expiry' };
+  const due = new Date(expiresOn);
+  if (Number.isNaN(due.getTime())) return { state: 'no-expiry' };
+
+  // Compare whole days, not instants. A clearance valid "until 5 August" is
+  // valid THROUGH the 5th — treating it as expired at 00:00 that morning would
+  // tell a citizen their document is dead on a day the office still accepts it.
+  const startOfDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const days = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
+
+  if (days < 0) return { state: 'expired', on: expiresOn, daysAgo: -days };
+  if (days <= EXPIRY_WARNING_DAYS) return { state: 'expiring', on: expiresOn, daysLeft: days };
+  return { state: 'valid', on: expiresOn, daysLeft: days };
+}

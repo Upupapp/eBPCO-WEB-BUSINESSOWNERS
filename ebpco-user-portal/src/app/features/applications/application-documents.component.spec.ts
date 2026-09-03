@@ -70,6 +70,31 @@ describe('ApplicationDocuments — the office speaking to the citizen', () => {
     expect(rejected).not.toContain('virus');
   });
 
+  it('an EXPIRED document says so on screen, not just in a helper', () => {
+    // The helper being right is not the feature. The whole defect was that
+    // expiresOn was carried correctly all the way to a screen that never
+    // mentioned it.
+    const past = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const text = (render([doc({ expiresOn: past, reviewStatus: 'Accepted' })])
+      .nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toMatch(/expired on/i);
+    // An expiry is a fact about the document, NOT the officer's verdict — the
+    // status badge must still say what the office actually decided.
+    expect(text).toContain('Accepted');
+  });
+
+  it('a document with plenty of validity left does not nag', () => {
+    const future = new Date(Date.now() + 400 * 86_400_000).toISOString();
+    const text = (render([doc({ expiresOn: future })]).nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toMatch(/valid until/i);
+    expect(text).not.toMatch(/expired/i);
+  });
+
+  it('says nothing about validity when the office set no expiry', () => {
+    const text = (render([doc({ expiresOn: null })]).nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toMatch(/valid until|expired/i);
+  });
+
   it('offers "replace" only where the office asked, never where the server would 409', () => {
     // Keyed on data-action="replace", not on "is there any button". Every
     // document now also carries a Preview button (DOC-003), and a bare
