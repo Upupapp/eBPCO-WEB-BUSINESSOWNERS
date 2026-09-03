@@ -62,14 +62,14 @@ type Step = 1 | 2 | 3;
         @if (step() === 2) {
           <div class="field"><label for="register-email-address-8">Email Address*</label><input id="register-email-address-8" class="input" type="email" [(ngModel)]="email" /></div>
           <div class="field"><label for="register-mobile-number-9">Mobile Number*</label><input id="register-mobile-number-9" class="input" placeholder="09XXXXXXXXX" [(ngModel)]="mobileNumber" /></div>
-          <div class="field"><label for="register-house-number-street-10">House Number / Street*</label><input id="register-house-number-street-10" class="input" [(ngModel)]="address" /></div>
+          <div class="field"><label for="register-house-number-street-10">House Number / Street*</label><input id="register-house-number-street-10" class="input" [(ngModel)]="street" /></div>
           <div class="form-row">
             <div class="field"><label for="register-barangay-11">Barangay*</label><input id="register-barangay-11" class="input" [(ngModel)]="barangay" /></div>
             <div class="field"><label for="register-city-municipality-12">City / Municipality*</label><input id="register-city-municipality-12" class="input" [(ngModel)]="city" /></div>
           </div>
           <div class="form-row">
             <div class="field"><label for="register-province-13">Province*</label><input id="register-province-13" class="input" [(ngModel)]="province" /></div>
-            <div class="field"><label for="register-postal-code-14">Postal Code*</label><input id="register-postal-code-14" class="input" maxlength="4" [(ngModel)]="zipCode" /></div>
+            <div class="field"><label for="register-postal-code-14">Postal Code*</label><input id="register-postal-code-14" class="input" maxlength="4" [(ngModel)]="postalCode" /></div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
@@ -123,11 +123,11 @@ export class RegisterPage {
   // Step 2
   email = '';
   mobileNumber = '';
-  address = '';
+  street = '';
   barangay = '';
   city = '';
   province = '';
-  zipCode = '';
+  postalCode = '';
 
   // Step 3
   password = '';
@@ -160,7 +160,7 @@ export class RegisterPage {
   }
 
   toStep3(): void {
-    if (!this.email || !this.mobileNumber || !this.address || !this.barangay || !this.city || !this.province || !this.zipCode) {
+    if (!this.email || !this.mobileNumber || !this.street || !this.barangay || !this.city || !this.province || !this.postalCode) {
       this.error.set('Please complete all required fields.');
       return;
     }
@@ -198,11 +198,11 @@ export class RegisterPage {
       {
         email: this.email,
         mobileNumber: this.mobileNumber,
-        address: this.address,
+        street: this.street,
         barangay: this.barangay,
         city: this.city,
         province: this.province,
-        zipCode: this.zipCode,
+        postalCode: this.postalCode,
       },
       { password: this.password },
     );

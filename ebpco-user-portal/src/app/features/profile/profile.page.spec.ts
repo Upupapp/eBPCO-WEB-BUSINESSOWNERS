@@ -170,7 +170,7 @@ describe('ProfilePage (F-25: a profile change reaches no office)', () => {
     const realSuccess = toast.success.bind(toast);
     toast.success = (m: string) => { messages.push(m); realSuccess(m); };
 
-    page.address = '77 New Street, Barangay Bagumbayan';
+    page.street = '77 New Street, Barangay Bagumbayan';
     page.saveProfile();
 
     expect(messages.length).toBe(1);
@@ -185,8 +185,8 @@ describe('ProfilePage (F-25: a profile change reaches no office)', () => {
     const fixture = TestBed.createComponent(ProfilePage);
     const page = fixture.componentInstance;
     fixture.detectChanges();
-    page.address = '77 New Street, Barangay Bagumbayan';
+    page.street = '77 New Street, Barangay Bagumbayan';
     page.saveProfile();
-    expect(TestBed.inject(AuthService).currentUser()?.address).toBe('77 New Street, Barangay Bagumbayan');
+    expect(TestBed.inject(AuthService).currentUser()?.street).toBe('77 New Street, Barangay Bagumbayan');
   });
 });

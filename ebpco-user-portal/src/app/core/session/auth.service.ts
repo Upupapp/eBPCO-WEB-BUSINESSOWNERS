@@ -24,11 +24,11 @@ export interface RegisterPersonalInfo {
 export interface RegisterContactInfo {
   email: string;
   mobileNumber: string;
-  address: string;
+  street: string;
   barangay: string;
   city: string;
   province: string;
-  zipCode: string;
+  postalCode: string;
 }
 
 export interface RegisterSecurityInfo {
@@ -122,11 +122,11 @@ export class AuthService {
         mobileNumber: '09171234567',
         landlineNumber: null,
         applicantType: 'Individual',
-        address: 'Purok 3, Zone 2',
+        street: 'Purok 3, Zone 2',
         barangay: 'Poblacion',
         city: 'Castilla',
         province: 'Sorsogon',
-        zipCode: '4712',
+        postalCode: '4712',
         photoPath: null,
         accountStatus: 'verified',
         emailVerification: { status: 'Verified', method: 'Email Verification Link', verifiedAt: todayIso() },
@@ -172,11 +172,11 @@ export class AuthService {
       mobileNumber: contact.mobileNumber,
       landlineNumber: null,
       applicantType: null,
-      address: contact.address,
+      street: contact.street,
       barangay: contact.barangay,
       city: contact.city,
       province: contact.province,
-      zipCode: contact.zipCode,
+      postalCode: contact.postalCode,
       photoPath: null,
       accountStatus: 'pending' as AccountStatus,
       emailVerification: unverifiedContact(),
@@ -191,7 +191,7 @@ export class AuthService {
     this.currentUserId.set(null);
   }
 
-  updateProfile(patch: Partial<Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'address' | 'barangay' | 'city' | 'province' | 'zipCode' | 'photoPath'>>): void {
+  updateProfile(patch: Partial<Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'street' | 'barangay' | 'city' | 'province' | 'postalCode' | 'photoPath'>>): void {
     const id = this.currentUserId();
     if (!id) return;
     const entry = this.accounts().get(id);

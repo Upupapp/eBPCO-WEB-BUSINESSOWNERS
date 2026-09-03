@@ -110,7 +110,7 @@ interface QrCell {
                 </div>
                 <div>
                   <dt>Address</dt>
-                  <dd>{{ user()?.address ?? 'Not on file' }}</dd>
+                  <dd>{{ user()?.street ?? 'Not on file' }}</dd>
                 </div>
               </dl>
             </section>

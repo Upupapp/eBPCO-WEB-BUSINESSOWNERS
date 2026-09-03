@@ -33,11 +33,11 @@ export interface UserAccount {
   mobileNumber: string;
   landlineNumber: string | null;
   applicantType: ApplicantType | null;
-  address: string;
+  street: string;
   barangay: string;
   city: string;
   province: string;
-  zipCode: string;
+  postalCode: string;
   photoPath: string | null;
   accountStatus: AccountStatus;
   emailVerification: ContactVerification;

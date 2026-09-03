@@ -9,9 +9,10 @@ import {
   ResubmitRequest,
   ResubmitResult,
 } from './citizen-api.models';
+import { CitizenProfile, ProfileRectification, RectificationResult } from './citizen-profile';
 
 /**
- * Client for the three citizen endpoints.
+ * Client for the citizen endpoints.
  *
  * All three require a citizen bearer token and all three answer **404 for an
  * application that is not the caller's — the same 404 as one that does not
@@ -39,6 +40,38 @@ export class CitizenApiClient {
    */
   getPermit(applicationId: string): Observable<PermitResponse> {
     return this.get<PermitResponse>(`/applications/${encodeURIComponent(applicationId)}/permit`);
+  }
+
+  /**
+   * `GET /me` — the profile the Municipality actually holds.
+   *
+   * Every field is nullable and null means NOT RECORDED, not blank: nobody has
+   * ever been asked for an address, so a null is the absence of a question, not
+   * a citizen's answer.
+   */
+  getMe(): Observable<CitizenProfile> {
+    return this.get<CitizenProfile>('/me');
+  }
+
+  /**
+   * `PATCH /me` — the citizen's right to correct what the LGU holds.
+   *
+   * The body is a PARTIAL and the partiality is load-bearing: absent leaves a
+   * field alone, `null` clears it. See buildRectification, which is where that
+   * distinction is actually made.
+   *
+   * The schema is `.strict()`, so an unknown field is a 400 rather than being
+   * silently dropped — which is the whole point. `email` is refused (400) and
+   * not merely ignored: it is the sign-in identity, so changing it is a
+   * transfer of who can reach the account rather than a correction, and it
+   * needs its own request/confirm flow against the new address. Do NOT put an
+   * email field on this screen.
+   */
+  patchMe(patch: ProfileRectification): Observable<RectificationResult> {
+    if (!this.baseUrl) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .patch<RectificationResult>(`${this.baseUrl}/me`, patch)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 
   /**

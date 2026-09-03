@@ -61,7 +61,7 @@
             </div>
             <div class="form-row">
               <div class="field"><label for="profile-mobile-number-5">Mobile Number</label><input id="profile-mobile-number-5" class="input" [(ngModel)]="mobileNumber" /></div>
-              <div class="field"><label for="profile-address-6">Address</label><input id="profile-address-6" class="input" [(ngModel)]="address" /></div>
+              <div class="field"><label for="profile-address-6">Address</label><input id="profile-address-6" class="input" [(ngModel)]="street" /></div>
             </div>
             <div class="form-row">
               <div class="field"><label for="profile-barangay-7">Barangay</label><input id="profile-barangay-7" class="input" [(ngModel)]="barangay" /></div>
@@ -69,7 +69,7 @@
             </div>
             <div class="form-row">
               <div class="field"><label for="profile-province-9">Province</label><input id="profile-province-9" class="input" [(ngModel)]="province" /></div>
-              <div class="field"><label for="profile-zip-code-10">ZIP Code</label><input id="profile-zip-code-10" class="input" [(ngModel)]="zipCode" /></div>
+              <div class="field"><label for="profile-zip-code-10">ZIP Code</label><input id="profile-zip-code-10" class="input" [(ngModel)]="postalCode" /></div>
             </div>
             <!--
               F-25: no endpoint exists to send any of this. The Municipality
@@ -82,6 +82,38 @@
               gone in four seconds, and this is the sentence that decides
               whether someone rings the office.
             -->
+            @if (addressNeverRecorded()) {
+              <div class="hint" style="margin:8px 0 4px;">
+                The Municipality has no address on file for you. This is not something you left
+                blank — until now there was nowhere in the system to record it, so you were never
+                asked. Filling it in lets the office write to you about an application.
+              </div>
+            }
+
+            @if (mobileUnverified()) {
+              <!--
+                Stated by the server (mobileVerificationCleared), not inferred.
+                The change takes effect IMMEDIATELY and the verification that
+                belonged to the old number is gone with it. A screen that stayed
+                silent would leave a citizen holding an unverified contact they
+                believe is verified.
+              -->
+              <div
+                class="card"
+                style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin:12px 0;"
+              >
+                <strong>Your new mobile number is not verified.</strong>
+                The Municipality has recorded it, but the verification belonged to your old number.
+                eBPCO cannot send a verification code yet, so the office may confirm the number with
+                you directly.
+              </div>
+            }
+
+            @if (saveError(); as err) {
+              <div class="field error" style="margin:12px 0;">{{ err }}</div>
+            }
+
+            @if (!canReachTheOffice()) {
             <div
               class="card"
               style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin:12px 0;"
@@ -92,6 +124,7 @@
               Municipality needs to reach you about an application, contact
               {{ engineer.shortName }} on {{ engineer.mobile }} so they can update your record.
             </div>
+            }
             <button class="btn btn-primary" (click)="saveProfile()">Save Changes</button>
           </div>
         }
