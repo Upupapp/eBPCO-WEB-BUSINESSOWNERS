@@ -58,7 +58,7 @@
 
   "DOC-001": { "within": "permits/apply", "note": "Wizard step 3 - required documents." },
   "DOC-002": { "route": "documents" },
-  "DOC-003": { "absent": "GAP. A citizen can see that a document is on file and its name, but cannot open it back up to check they attached the right scan." },
+  "DOC-003": { "within": "documents", "note": "Preview dialog on My Documents, and on the application details page for documents filed against an application. Renders the bytes the portal actually kept; says plainly when it has none rather than showing an empty frame." },
 
   "PAY-001": { "within": "payments/:applicationId", "note": "Method choice at the top of the payment flow." },
   "PAY-002": { "within": "payments/:applicationId", "note": "Bank transfer branch of the same flow." },

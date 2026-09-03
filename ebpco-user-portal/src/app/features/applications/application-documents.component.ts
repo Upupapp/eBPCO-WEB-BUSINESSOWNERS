@@ -49,8 +49,11 @@ import {
               <p class="doc-note doc-note-danger"><strong>Why:</strong> {{ why }}</p>
             }
 
+            <button class="btn btn-secondary btn-sm" type="button" data-action="preview" (click)="preview.emit(chain.current)">
+              Preview
+            </button>
             @if (canReplace(chain)) {
-              <button class="btn btn-primary btn-sm" type="button" (click)="replace.emit(chain.current)">
+              <button class="btn btn-primary btn-sm" type="button" data-action="replace" (click)="replace.emit(chain.current)">
                 Replace this document
               </button>
             }
@@ -83,6 +86,15 @@ export class ApplicationDocumentsComponent {
   readonly documents = input.required<readonly ApplicationDocumentResponse[]>();
   /** The document the citizen wants to replace. */
   readonly replace = output<ApplicationDocumentResponse>();
+
+  /**
+   * The document the citizen wants to LOOK at (DOC-003).
+   *
+   * Emits the contract shape, which carries no bytes — the server's document
+   * response describes a document, it is not the document. The page resolves
+   * the id back to the file this build actually kept.
+   */
+  readonly preview = output<ApplicationDocumentResponse>();
 
   protected readonly chains = computed(() => groupDocumentChains(this.documents()));
   protected readonly label = reviewLabel;

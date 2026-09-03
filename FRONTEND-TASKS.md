@@ -327,3 +327,49 @@ corrected.
 **This unblocks only from the backend side** — see the message to the backend
 lane for what is needed: an endpoint that issues a single-use, expiring reset
 token to a verified address, and one that redeems it.
+
+
+---
+
+## DOC-003 Document Preview — shipped 3 September 2026
+
+A citizen could see that a document was on file and what it was called, and
+could not open it. "Survey Plan — survey-plan.pdf, Uploaded" is exactly as
+reassuring when they attached the right scan as when they attached last year's,
+and there was no way to tell those apart before an officer did.
+
+Preview is now on **My Documents** and on each document filed against an
+application. It shows the bytes the portal actually kept, and says plainly when
+it has none — seeded example rows have no file, and an empty frame there would
+read as a broken document rather than an absent one.
+
+**The security decision, which is the substance of this change.** The blob's
+MIME type comes from our own `SavedDocumentFileType` enum and **never** from
+`File.type`. `fileTypeFromName()` reads the extension and falls back to `'pdf'`
+for anything it does not recognise, so a file called `notes.html` is stored as a
+`'pdf'` while the browser still reports it as `text/html`. Building the blob
+from `File.type` would put that HTML at a `blob:` URL — which inherits this
+portal's origin — inside an iframe: script execution as the signed-in citizen,
+from a file anyone could have handed them to upload. Break-checked by swapping
+`mimeFor(type)` for `f.type`; the suite fails.
+
+The preview also checks the **magic bytes** and warns when a file's contents do
+not match its extension, so a citizen learns their `.pdf` is not one here rather
+than from a rejection weeks later.
+
+### Two defects found while building it
+
+- **My own effect leaked.** `revoke()` read the `objectUrl` signal while the
+  effect wrote it, so every write retriggered the effect and created another
+  object URL. It exhausted a 4 GB heap in the test run; in a browser it would
+  have held a copy of the file in memory for every cycle the preview was open.
+  The live URL is now held outside the signal graph.
+- **An existing test would have been silently weakened.** "Offers replace only
+  where the office asked" asserted `querySelector('button')` was null — and
+  every document now carries a Preview button, so that assertion would have
+  passed while the replace offer sat on a document the server would 409.
+  Narrowed to `[data-action="replace"]`, which is **stricter** than before, and
+  re-break-checked to confirm it still catches the original defect.
+
+The a11y sweep now scans the preview dialog as its own screen state: 53 screens
+across three profiles.

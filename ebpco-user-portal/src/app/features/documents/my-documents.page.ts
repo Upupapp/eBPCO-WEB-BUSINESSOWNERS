@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
-import { SAVED_DOCUMENT_CATEGORY_LABELS, SavedDocumentCategory, SavedDocumentFileType } from '../../core/domain/document.model';
+import { SAVED_DOCUMENT_CATEGORY_LABELS, SavedDocument, SavedDocumentCategory, SavedDocumentFileType } from '../../core/domain/document.model';
+import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
 import { formatDate } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
 
@@ -12,6 +13,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
 
 @Component({
   selector: 'app-my-documents',
+  imports: [DocumentPreviewComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -42,16 +44,30 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               <div style="font-weight:600; word-break:break-word;">{{ d.fileName }}</div>
               <div class="small muted">{{ (d.sizeBytes / 1024).toFixed(0) }} KB · {{ formatDate(d.uploadedAt) }}</div>
               <div class="card-footer">
-                <button class="btn btn-ghost btn-sm" style="padding-left:0;" (click)="remove(d.id)">Remove</button>
+                <button class="btn btn-secondary btn-sm" (click)="preview.set(d)">Preview</button>
+                <button class="btn btn-ghost btn-sm" (click)="remove(d.id)">Remove</button>
               </div>
             </div>
           }
         </div>
       }
+      @if (preview(); as p) {
+        <app-document-preview
+          [file]="p.file"
+          [fileName]="p.fileName"
+          [fileType]="p.fileType"
+          [label]="labels[p.category]"
+          [seeded]="p.file === null"
+          (close)="preview.set(null)"
+        />
+      }
     </div>
   `,
 })
 export class MyDocumentsPage {
+  /** The document being previewed, or null. DOC-003. */
+  protected readonly preview = signal<SavedDocument | null>(null);
+
   private readonly store = inject(DocumentLibraryStore);
   private readonly toast = inject(ToastService);
 

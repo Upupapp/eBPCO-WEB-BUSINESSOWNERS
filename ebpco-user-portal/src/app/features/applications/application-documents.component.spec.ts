@@ -71,13 +71,18 @@ describe('ApplicationDocuments — the office speaking to the citizen', () => {
   });
 
   it('offers "replace" only where the office asked, never where the server would 409', () => {
+    // Keyed on data-action="replace", not on "is there any button". Every
+    // document now also carries a Preview button (DOC-003), and a bare
+    // `querySelector('button')` would be satisfied by that one — the assertion
+    // would pass while the replace offer was on a document the server would
+    // 409. Narrowed rather than loosened: the check is now stricter than it was.
     const askable = (render([doc({ reviewStatus: 'Rejected' })]).nativeElement as HTMLElement);
-    expect(askable.querySelector('button')).toBeTruthy();
+    expect(askable.querySelector('[data-action="replace"]')).toBeTruthy();
 
     for (const d of [doc({ reviewStatus: 'Accepted' }),
                      doc({ reviewStatus: null }),
                      doc({ reviewStatus: 'Rejected', supersededByDocumentId: 'newer' })]) {
-      expect((render([d]).nativeElement as HTMLElement).querySelector('button')).toBeNull();
+      expect((render([d]).nativeElement as HTMLElement).querySelector('[data-action="replace"]')).toBeNull();
     }
   });
 });

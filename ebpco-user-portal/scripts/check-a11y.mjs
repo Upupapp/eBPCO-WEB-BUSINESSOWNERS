@@ -170,6 +170,20 @@ for (const profile of PROFILES) {
     await page.locator(`a:has-text("${link}")`).first().click();
     await page.waitForTimeout(600);
     await scan(label);
+
+    // The document preview (DOC-003) is a modal over My Documents — a screen
+    // state with its own dialog semantics and focus behaviour, reachable from
+    // nowhere else in this sweep.
+    if (label === 'my documents') {
+      const previewBtn = page.locator('button:has-text("Preview")').first();
+      if (await previewBtn.count() > 0) {
+        await previewBtn.click();
+        await page.waitForTimeout(500);
+        await scan('document preview (dialog)');
+        await page.locator('button[aria-label="Close preview"]').first().click();
+        await page.waitForTimeout(300);
+      }
+    }
   }
 
   await browser.close();

@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
@@ -8,6 +8,8 @@ import { formatDate, formatDateTime } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ApplicationDocumentsComponent } from './application-documents.component';
 import { PermitReleaseComponent } from './permit-release.component';
+import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
+import { ApplicationDocument } from '../../core/domain/document.model';
 import { PermitRelease } from '../../core/api/citizen-api.models';
 import { DocumentResubmissionService } from '../../core/api/document-resubmission.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
@@ -16,7 +18,7 @@ import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
 
 @Component({
   selector: 'app-application-details',
-  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent, PermitReleaseComponent],
+  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent, PermitReleaseComponent, DocumentPreviewComponent],
   template: `
     @if (app(); as a) {
       <div class="page">
@@ -98,7 +100,18 @@ import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
           <app-application-documents
             [documents]="contractDocs()"
             (replace)="onReplace($event)"
+            (preview)="onPreview($event)"
           />
+          @if (previewing(); as p) {
+            <app-document-preview
+              [file]="p.file"
+              [fileName]="p.fileName"
+              [fileType]="p.fileType"
+              [label]="p.label"
+              [seeded]="p.file === null"
+              (close)="previewing.set(null)"
+            />
+          }
         
         </div>
 
@@ -173,6 +186,20 @@ export class ApplicationDetailsPage {
    * file, new if they pick a different one — the server treats the file as part
    * of the key's fingerprint and 409s a mismatch.
    */
+  /** DOC-003. The document currently open for inspection, or null. */
+  protected readonly previewing = signal<ApplicationDocument | null>(null);
+
+  /**
+   * Resolve the contract shape back to the file this build kept.
+   *
+   * The server's document response describes a document; it does not contain
+   * one. Matching on id rather than filename because two requirements can
+   * legitimately hold files of the same name.
+   */
+  protected onPreview(doc: ApplicationDocumentResponse): void {
+    this.previewing.set(this.docs().find((d) => d.id === doc.id) ?? null);
+  }
+
   protected onReplace(doc: ApplicationDocumentResponse): void {
     if (!this.api.configured) {
       this.toast.show(
