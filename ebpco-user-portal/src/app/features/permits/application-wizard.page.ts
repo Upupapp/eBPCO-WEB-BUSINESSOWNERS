@@ -165,7 +165,21 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                 }
               </div>
               <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelected($event, d)" />
+                <!--
+                  The requirement's name lives in a <strong> above, not a
+                  <label>, so this control had no accessible name at all. It
+                  renders once per requirement — twenty-two times on a Zoning
+                  application — so a screen reader user met twenty-two identical
+                  unnamed file pickers with no way to tell which document each
+                  one was for. Named from the requirement itself so the two can
+                  never drift apart.
+                -->
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  [attr.aria-label]="'Attach ' + d.label"
+                  (change)="onFileSelected($event, d)"
+                />
                 @if (reusable().length > 0) {
                   <label [for]="'reuse-' + d.id" class="small muted">or reuse</label>
                   <select
