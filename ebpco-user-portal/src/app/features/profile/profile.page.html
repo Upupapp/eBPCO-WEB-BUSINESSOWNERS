@@ -71,6 +71,27 @@
               <div class="field"><label for="profile-province-9">Province</label><input id="profile-province-9" class="input" [(ngModel)]="province" /></div>
               <div class="field"><label for="profile-zip-code-10">ZIP Code</label><input id="profile-zip-code-10" class="input" [(ngModel)]="zipCode" /></div>
             </div>
+            <!--
+              F-25: no endpoint exists to send any of this. The Municipality
+              cannot receive a profile change from this portal, and the field
+              where believing otherwise costs most is the address - a citizen
+              who moves, updates it here and assumes the office will post their
+              permit to the new one has been misled by a screen, not by a bug.
+              The honest move where nothing can be sent is to say so, not to
+              invent a call. Placed here rather than only in a toast: a toast is
+              gone in four seconds, and this is the sentence that decides
+              whether someone rings the office.
+            -->
+            <div
+              class="card"
+              style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin:12px 0;"
+            >
+              <strong>These details stay on this device.</strong>
+              eBPCO has no way yet to send a profile change to the Municipality, so changing your
+              address or mobile number here does <strong>not</strong> tell the office. If the
+              Municipality needs to reach you about an application, contact
+              {{ engineer.shortName }} on {{ engineer.mobile }} so they can update your record.
+            </div>
             <button class="btn btn-primary" (click)="saveProfile()">Save Changes</button>
           </div>
         }

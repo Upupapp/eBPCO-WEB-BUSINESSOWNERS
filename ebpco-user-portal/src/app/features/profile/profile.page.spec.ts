@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ProfilePage } from './profile.page';
 import { AuthService } from '../../core/session/auth.service';
+import { ToastService } from '../../shared/ui/toast.service';
 
 /**
  * Guards F-15: the Notification Preferences panel bound eight checkboxes to a
@@ -116,5 +117,76 @@ describe('ProfilePage (F-20: Change Password must enforce the same password rule
     page.changePassword();
     expect(page.passwordError()).toBeNull();
     expect(auth.login('juan.delacruz@example.com', 'NewPassword2').ok).toBe(true);
+  });
+});
+
+/**
+ * F-25 — the profile save reaches nothing, and must not imply otherwise.
+ *
+ * No profile endpoint exists: not in CitizenApiClient, and not in the
+ * backend's own citizen-endpoints contract. The mobile lane found the same
+ * thing on their side and drew the distinction this follows — a mis-wired twin
+ * gets fixed, a missing endpoint gets stated. Inventing a call here would have
+ * been worse than the bug.
+ *
+ * The falsehood was never the verb. Within this app the profile IS updated.
+ * What "Profile updated." implied was that the office now knows, and the field
+ * where believing that costs most is the address: a citizen who moves, updates
+ * it here and assumes their permit will be posted to the new one has been
+ * misled by a screen rather than by a bug.
+ */
+describe('ProfilePage (F-25: a profile change reaches no office)', () => {
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [ProfilePage], providers: [provideRouter([])] });
+    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  });
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('says on screen — not only in a toast — that the Municipality has not been told', () => {
+    const fixture = TestBed.createComponent(ProfilePage);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    // A toast is gone in four seconds. This is the sentence that decides
+    // whether someone rings the office about a permit going to an old address.
+    expect(text).toMatch(/has no way yet to send a profile change|does not tell the office|stay on this device/i);
+  });
+
+  it('gives the citizen a real way to actually update their record', () => {
+    const fixture = TestBed.createComponent(ProfilePage);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    // Saying "we cannot do this" without saying who can is only half honest.
+    expect(text).toMatch(/\d{4,}/); // a contact number is on screen
+  });
+
+  it('the confirmation does not claim the office received anything', () => {
+    const fixture = TestBed.createComponent(ProfilePage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const messages: string[] = [];
+    const toast = TestBed.inject(ToastService);
+    const realSuccess = toast.success.bind(toast);
+    toast.success = (m: string) => { messages.push(m); realSuccess(m); };
+
+    page.address = '77 New Street, Barangay Bagumbayan';
+    page.saveProfile();
+
+    expect(messages.length).toBe(1);
+    expect(messages[0]).toMatch(/not been told|this device/i);
+    // The exact wording may change; what must not come back is a bare claim of
+    // success over a request that was never made.
+    expect(messages[0]).not.toBe('Profile updated.');
+    expect(messages[0]).not.toMatch(/successfully/i);
+  });
+
+  it('and the change really is kept locally — the notice is honest in both directions', () => {
+    const fixture = TestBed.createComponent(ProfilePage);
+    const page = fixture.componentInstance;
+    fixture.detectChanges();
+    page.address = '77 New Street, Barangay Bagumbayan';
+    page.saveProfile();
+    expect(TestBed.inject(AuthService).currentUser()?.address).toBe('77 New Street, Barangay Bagumbayan');
   });
 });

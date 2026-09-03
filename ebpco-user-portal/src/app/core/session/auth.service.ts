@@ -59,16 +59,43 @@ export interface RegisterSecurityInfo {
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly accounts = new Map<
-    string,
-    { account: UserAccount; password: string; preferences: NotificationPreferences }
-  >();
+  /**
+   * Accounts, held in a SIGNAL rather than a bare Map.
+   *
+   * F-26. This was a plain `new Map()`, and `currentUser` below is a computed
+   * whose only reactive dependency is `currentUserId`. So every write here —
+   * updateProfile, changePassword, applicantTypeSet, preferences — mutated the
+   * map and the computed NEVER RECOMPUTED, because no signal it read had
+   * changed. `currentUser()` went on returning the account as it stood at
+   * sign-in, for the life of the session.
+   *
+   * A citizen who changed their address was shown "Profile updated", and the
+   * shell's name, the permit document's Address line and the payment receipt's
+   * payor all carried on showing the old values. The profile FORM looked
+   * correct only because it holds its own field variables — nothing that read
+   * the account ever saw the change.
+   *
+   * Writes replace the map rather than mutating it, so the signal actually
+   * changes identity. Mutating the map held inside a signal would leave exactly
+   * the same bug with a signal wrapped round it.
+   */
+  private readonly accounts = signal(
+    new Map<string, { account: UserAccount; password: string; preferences: NotificationPreferences }>(),
+  );
+
+  /** Replace one entry, producing a NEW map so dependent computeds recompute. */
+  private writeAccount(
+    id: string,
+    entry: { account: UserAccount; password: string; preferences: NotificationPreferences },
+  ): void {
+    this.accounts.update((m) => new Map(m).set(id, entry));
+  }
   private readonly currentUserId = signal<string | null>(null);
 
   readonly currentUser = computed<UserAccount | null>(() => {
     const id = this.currentUserId();
     if (!id) return null;
-    return this.accounts.get(id)?.account ?? null;
+    return this.accounts().get(id)?.account ?? null;
   });
 
   readonly isAuthenticated = computed(() => this.currentUserId() !== null);
@@ -79,7 +106,7 @@ export class AuthService {
 
   private seedDemoAccount(): void {
     const id = 'user-demo';
-    this.accounts.set(id, {
+    this.writeAccount(id, {
       password: 'Password1',
       preferences: defaultNotificationPreferences(),
       account: {
@@ -110,7 +137,7 @@ export class AuthService {
   }
 
   login(emailOrMobile: string, password: string): { ok: true } | { ok: false; error: string } {
-    const match = [...this.accounts.values()].find(
+    const match = [...this.accounts().values()].find(
       (entry) =>
         entry.account.email.toLowerCase() === emailOrMobile.toLowerCase() ||
         entry.account.mobileNumber === emailOrMobile,
@@ -126,7 +153,7 @@ export class AuthService {
     contact: RegisterContactInfo,
     security: RegisterSecurityInfo,
   ): { ok: true; id: string } | { ok: false; error: string } {
-    const exists = [...this.accounts.values()].some(
+    const exists = [...this.accounts().values()].some(
       (entry) => entry.account.email.toLowerCase() === contact.email.toLowerCase(),
     );
     if (exists) return { ok: false, error: 'An account with this email already exists.' };
@@ -156,7 +183,7 @@ export class AuthService {
       mobileVerification: unverifiedContact(),
       registeredSince: todayIso(),
     };
-    this.accounts.set(id, { account, password: security.password, preferences: defaultNotificationPreferences() });
+    this.writeAccount(id, { account, password: security.password, preferences: defaultNotificationPreferences() });
     return { ok: true, id };
   }
 
@@ -167,29 +194,29 @@ export class AuthService {
   updateProfile(patch: Partial<Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'address' | 'barangay' | 'city' | 'province' | 'zipCode' | 'photoPath'>>): void {
     const id = this.currentUserId();
     if (!id) return;
-    const entry = this.accounts.get(id);
+    const entry = this.accounts().get(id);
     if (!entry) return;
     entry.account = { ...entry.account, ...patch };
-    this.accounts.set(id, entry);
+    this.writeAccount(id, entry);
   }
 
   changePassword(currentPassword: string, newPassword: string): { ok: true } | { ok: false; error: string } {
     const id = this.currentUserId();
     if (!id) return { ok: false, error: 'Not signed in.' };
-    const entry = this.accounts.get(id)!;
+    const entry = this.accounts().get(id)!;
     if (entry.password !== currentPassword) return { ok: false, error: 'Current password is incorrect.' };
     entry.password = newPassword;
-    this.accounts.set(id, entry);
+    this.writeAccount(id, entry);
     return { ok: true };
   }
 
   applicantTypeSet(type: ApplicantType): void {
     const id = this.currentUserId();
     if (!id) return;
-    const entry = this.accounts.get(id);
+    const entry = this.accounts().get(id);
     if (!entry) return;
     entry.account = { ...entry.account, applicantType: type };
-    this.accounts.set(id, entry);
+    this.writeAccount(id, entry);
   }
 
   /**
@@ -210,15 +237,15 @@ export class AuthService {
   notificationPreferencesFor(): NotificationPreferences {
     const id = this.currentUserId();
     if (!id) return defaultNotificationPreferences();
-    return { ...(this.accounts.get(id)?.preferences ?? defaultNotificationPreferences()) };
+    return { ...(this.accounts().get(id)?.preferences ?? defaultNotificationPreferences()) };
   }
 
   updateNotificationPreferences(next: NotificationPreferences): void {
     const id = this.currentUserId();
     if (!id) return;
-    const entry = this.accounts.get(id);
+    const entry = this.accounts().get(id);
     if (!entry) return;
     entry.preferences = { ...next };
-    this.accounts.set(id, entry);
+    this.writeAccount(id, entry);
   }
 }

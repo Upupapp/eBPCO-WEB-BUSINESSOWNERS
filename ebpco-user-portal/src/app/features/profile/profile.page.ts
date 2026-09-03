@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
 import { TERMS_CONDITIONS_TEXT, PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
 import { ToastService } from '../../shared/ui/toast.service';
+import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 
 type Tab = 'profile' | 'password' | 'notifications' | 'legal';
 
@@ -16,6 +17,9 @@ type Tab = 'profile' | 'password' | 'notifications' | 'legal';
 export class ProfilePage {
   protected readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+
+  /** Named on screen because the office has no other way to learn a new address. */
+  protected readonly engineer = MUNICIPAL_ENGINEER;
 
   readonly tab = signal<Tab>('profile');
   readonly passwordError = signal<string | null>(null);
@@ -92,7 +96,11 @@ export class ProfilePage {
       photoPath: this.photoPreview(),
     });
     this.initials.set(this.computeInitials());
-    this.toast.success('Profile updated.');
+    // Not "Profile updated." on its own. Within this app it IS updated - the
+    // falsehood was never the verb, it was the implication that the office now
+    // knows. That is the question worth asking of any profile screen: does the
+    // citizen believe the office has the new address? Here they would have.
+    this.toast.success('Saved on this device. The Municipality has not been told.');
   }
 
   /**
