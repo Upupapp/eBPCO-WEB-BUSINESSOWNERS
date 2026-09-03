@@ -373,3 +373,51 @@ than from a rejection weeks later.
 
 The a11y sweep now scans the preview dialog as its own screen state: 53 screens
 across three profiles.
+
+
+---
+
+## REN-002 / AMD-002 — what I could decide, and what I could not (3 September 2026)
+
+**I did not shorten the renewal document list, because nothing gives me the
+authority to.** I looked: the design docs name "Permit Renewal" only as a
+workflow for UI standards, the requirements catalogue mentions renewal only in
+validity rules, and the backend contract says nothing at all. Deciding that a
+renewal may omit a document is LGU policy. Getting it wrong costs a citizen a
+rejected application weeks later, which is worse than the burden of being asked
+for one document too many.
+
+**What was decidable, and was a real defect:** the wizard wrote every upload
+into the document library and **never once read it back**. "My Documents" listed
+everything a citizen had ever uploaded and offered no way to use any of it
+again. A renewal made that plain — the same twenty-two files, uploaded a second
+time, all already on file.
+
+So:
+
+- **Documents already on file can now be reused**, on every requirement, in
+  every application type. Policy-neutral: reusing a document does not change
+  which documents are required.
+- **The screen says the truth** on a renewal or amendment: the Municipality has
+  published no shorter list, so the portal asks for everything rather than
+  guessing what it may leave out.
+
+**The dangerous half was the filter.** The library also holds seeded rows with
+`file: null`. Offering one would attach a *filename with no document under it* —
+the exact defect that cost the mobile app its entire document history,
+reintroduced through a convenience feature. Documents without bytes are excluded,
+and the tests follow the bytes rather than the name or the count. One of them
+guards the guard: it asserts file-less rows actually exist in the seed, or the
+exclusion test would pass while checking nothing.
+
+Break-checked. Removing the filter fails two tests. Attaching a hollow document
+does not even compile — `AttachedDoc.file` is non-nullable, so that defect is
+unrepresentable rather than merely tested.
+
+### Still open — needs a ruling from the Municipality
+
+| Question | Why it matters |
+|---|---|
+| Which documents may a **renewal** omit? | Twenty-two documents is a real barrier. Some (lot title, survey plan) plausibly have not changed. |
+| Which may an **amendment** omit, and does it depend on what is being amended? | Amending a contractor is not amending a structure. |
+| Does a reused document need re-certification if it is over a year old? | Some documents carry their own validity; the portal has no rule for this today. |

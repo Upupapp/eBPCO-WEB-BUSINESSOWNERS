@@ -8,7 +8,7 @@ import {
   actionReferenceIsComplete,
   existingPermitPrompt,
 } from '../../core/domain/application.model';
-import { SavedDocumentFileType } from '../../core/domain/document.model';
+import { SavedDocument, SavedDocumentFileType } from '../../core/domain/document.model';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
@@ -139,6 +139,18 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
         <div class="card">
           <div class="card-title">Required Documents</div>
           <p class="small muted">Accepted formats: PDF, JPG, JPEG, PNG.</p>
+          @if (needsExistingPermit()) {
+            <div
+              class="card"
+              style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin-bottom:12px;"
+            >
+              <strong>You are being asked for the full document list.</strong>
+              The Municipality has not published a shorter list for
+              {{ applicationAction === 'Renewal' ? 'renewals' : 'amendments' }}, so this portal asks
+              for everything a new application needs rather than guessing what it can leave out.
+              Anything you have uploaded before can be reused below without uploading it again.
+            </div>
+          }
           @for (d of documents; track d.id) {
             <div style="padding:12px 0; border-bottom:1px solid var(--border-light);">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
@@ -151,8 +163,24 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   <span class="badge badge-green">{{ attached[d.id].fileName }}</span>
                 }
               </div>
-              <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+              <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onFileSelected($event, d)" />
+                @if (reusable().length > 0) {
+                  <label [for]="'reuse-' + d.id" class="small muted">or reuse</label>
+                  <select
+                    [id]="'reuse-' + d.id"
+                    class="input"
+                    style="max-width:260px;"
+                    [ngModel]="null"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="reuseExisting(d, $event)"
+                  >
+                    <option [ngValue]="null">A document you've already uploaded…</option>
+                    @for (saved of reusable(); track saved.id) {
+                      <option [ngValue]="saved">{{ saved.fileName }}</option>
+                    }
+                  </select>
+                }
                 @if (attached[d.id]) {
                   <button class="btn btn-ghost btn-sm" (click)="removeAttachment(d)">Remove</button>
                 }
@@ -264,6 +292,35 @@ export class ApplicationWizardPage {
     if (!file) return;
     this.attached = { ...this.attached, [d.id]: { file, fileName: file.name, fileType: fileTypeFromName(file.name) } };
     this.documentLibrary.add({ file, fileName: file.name, fileType: fileTypeFromName(file.name), category: 'supportingDocument', sizeBytes: file.size });
+  }
+
+  /**
+   * Documents already on file that can actually be reused.
+   *
+   * Filtered on `file !== null`, and that filter is the point. The library also
+   * holds seeded example rows that never had bytes behind them, and attaching
+   * one would put a filename on the application with no document under it —
+   * recreating precisely the defect that cost the mobile app its entire
+   * document history. A name in the list is not a document.
+   */
+  protected readonly reusable = computed(() =>
+    this.documentLibrary.myDocuments().filter((d) => d.file !== null),
+  );
+
+  /**
+   * Attach a document the citizen already uploaded.
+   *
+   * The wizard wrote to the document library and never once read it back, so
+   * every document a citizen had ever uploaded was listed under My Documents
+   * and could never be used again. A renewal made that plain: the same
+   * twenty-two files, uploaded a second time, all already on file.
+   */
+  protected reuseExisting(d: RequirementDocument, saved: SavedDocument | null): void {
+    if (!saved?.file) return;
+    this.attached = {
+      ...this.attached,
+      [d.id]: { file: saved.file, fileName: saved.fileName, fileType: saved.fileType },
+    };
   }
 
   removeAttachment(d: RequirementDocument): void {

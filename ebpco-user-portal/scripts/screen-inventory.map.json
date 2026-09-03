@@ -49,11 +49,11 @@
   "PER-005": { "within": "permits/apply", "note": "Wizard step 4 - declarations and submit." },
 
   "REN-001": { "within": "permits/apply", "note": "Wizard step 1 - the permit being renewed. Shipped 93ea4c2; before that a renewal carried no reference to what it renewed." },
-  "REN-002": { "within": "permits/apply", "note": "Wizard steps 2-3. A renewal currently asks for the same fields and documents as a new application; whether it should ask for fewer is an open question for the office." },
+  "REN-002": { "within": "permits/apply", "note": "Wizard steps 2-3. A renewal asks for the same fields and documents as a new application, and now SAYS SO on screen: the Municipality has published no shorter list for renewals, so the portal asks for everything rather than guessing what it may leave out. Documents already on file can be reused without uploading them again. OPEN RULING for the office: which documents a renewal may omit." },
   "REN-003": { "within": "permits/apply", "note": "Wizard step 4 - the review table names the permit being renewed." },
 
   "AMD-001": { "within": "permits/apply", "note": "Wizard step 1 - the permit being amended. Shipped 93ea4c2." },
-  "AMD-002": { "within": "permits/apply", "note": "Wizard steps 2-3, shared with the new-application path." },
+  "AMD-002": { "within": "permits/apply", "note": "Wizard steps 2-3, shared with the new-application path, with the same on-screen notice and document reuse as REN-002. OPEN RULING for the office: which documents an amendment may omit, and whether it depends on what is being amended." },
   "AMD-003": { "within": "permits/apply", "note": "Wizard step 4 - the review table names the permit being amended." },
 
   "DOC-001": { "within": "permits/apply", "note": "Wizard step 3 - required documents." },
