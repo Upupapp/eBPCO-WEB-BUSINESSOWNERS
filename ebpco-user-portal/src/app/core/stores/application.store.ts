@@ -96,6 +96,28 @@ export class ApplicationStore {
       expiryDate: '2027-08-05T00:00:00.000Z',
     };
     this.applications.set([app1, app2]);
+
+    // Documents for the seeded applications.
+    //
+    // Both used to have NONE. app2 carried an issued permit number and
+    // "Ready for Release" over an empty document list — the office had approved
+    // an application with nothing on file, which cannot happen, and it is the
+    // screen people look at most. A citizen reading their own approved
+    // application saw an empty Documents card, which reads as "the office lost
+    // them" rather than "this is a demo".
+    //
+    // Derived from the requirements catalogue rather than listed here, so the
+    // seed cannot drift from what the permit type actually requires — the
+    // failure that would put this defect straight back.
+    this.documentsByApp.set({
+      // Under evaluation: most accepted, one sent back with a real reason, so
+      // the rejection path is visible in the demo rather than only in tests.
+      [app1.id]: this.seedDocumentsFor(app1, (i, total) =>
+        i === total - 1 ? 'Revision Required' : i === total - 2 ? 'Under Review' : 'Accepted'),
+      // Approved with a permit issued: every required document accepted. Any
+      // other state here would contradict the permit sitting beside it.
+      [app2.id]: this.seedDocumentsFor(app2, () => 'Accepted'),
+    });
     this.timelineByApp.set({
       [app1.id]: [
         { status: 'Submitted', timestamp: '2026-08-10T08:00:00.000Z', remarks: null },
@@ -249,6 +271,48 @@ export class ApplicationStore {
   }
 
   /** True once every REQUIRED document for this application's permit type is on file in a resolved state (never Missing/Rejected/Revision Required/Expired) — the same real "documents resolved" check the generated permit document's draft-watermark gate reads. */
+  /**
+   * Example documents for a seeded application, taken from the catalogue.
+   *
+   * `file: null` is deliberate and already handled everywhere that matters:
+   * these rows never had bytes behind them, and the preview says so rather
+   * than showing an empty frame. See ApplicationDocument.file — a filename is
+   * not a document, and a seed that pretended otherwise would be the very
+   * defect the rest of this store is built to prevent.
+   */
+  private seedDocumentsFor(
+    app: ApplicationRecord,
+    statusAt: (index: number, total: number) => DocumentStatus,
+  ): ApplicationDocument[] {
+    if (app.permitType === 'Business Permit') return [];
+    const required = requirementsFor(app.permitType).documents.filter((d) => d.required);
+    return required.map((doc, i) => {
+      const status = statusAt(i, required.length);
+      return {
+        id: `seed-doc-${app.id}-${doc.id}`,
+        applicationId: app.id,
+        requirementId: doc.id,
+        label: doc.label,
+        fileName: `${doc.id}.pdf`,
+        fileType: 'pdf' as const,
+        file: null,
+        uploadedAt: app.dateSubmitted ?? '2026-07-15T08:00:00.000Z',
+        status,
+        issuingOffice: null,
+        issueDate: null,
+        // One clearance carries a real expiry so the validity line (F-24) is
+        // visible in the demo at all. The office sends this; until now nothing
+        // in the seed ever exercised it.
+        expiryDate: i === 0 ? '2026-11-30T00:00:00.000Z' : null,
+        remarks:
+          status === 'Revision Required'
+            ? 'The setback dimension on sheet 2 cannot be read. Please re-scan at a higher resolution.'
+            : null,
+        history: [],
+      };
+    });
+  }
+
   documentsResolvedFor(applicationId: string): boolean {
     const app = this.applicationById(applicationId);
     if (!app || app.permitType === 'Business Permit') return true;
