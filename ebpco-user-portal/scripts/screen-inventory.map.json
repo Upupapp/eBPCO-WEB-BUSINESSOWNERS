@@ -25,7 +25,7 @@
   "PUB-004": { "route": "login" },
   "PUB-005": { "route": "register" },
   "PUB-006": { "route": "forgot-password" },
-  "PUB-007": { "absent": "GAP. Forgot Password collects an address and stops; there is no reset screen for the link to land on, so the journey cannot complete. Needs a backend token to be real." },
+  "PUB-007": { "absent": "DELIBERATE, and load-bearing. Nothing issues a reset token, so a screen that accepted a new password would set it on the say-so of whoever opened the URL — an account-takeover route with a friendly form on top, and the same deception F-5 removed from Forgot Password. Forgot Password already says plainly that reset is unavailable and gives a real person to contact; it does NOT collect an address it cannot use. Guarded by password-reset-tripwire.spec.ts: the moment a reset route appears, the suite demands the server verification that makes it safe. Build it when the backend issues tokens, not before." },
   "PUB-008": { "route": "terms" },
   "PUB-009": { "route": "privacy" },
   "PUB-010": { "route": "not-found" },

@@ -214,7 +214,7 @@ quietly loses its denominator.
 
 | ID | Screen | Gap |
 |----|--------|-----|
-| PUB-007 | Reset Password | Forgot Password collects an address and stops. There is no screen for the reset link to land on, so the journey cannot complete. Needs a backend token to be real. |
+| PUB-007 | Reset Password | **Correction (3 Sep):** my first reading of this was wrong. Forgot Password does *not* collect an address and stop — F-5 removed that form deliberately, and the page now says plainly that reset is unavailable and names a real person to contact. The absence is the correct state: nothing issues a reset token, so any screen accepting a new password would set it for whoever opened the URL. Now guarded by a tripwire spec. |
 | DOC-003 | Document Preview | A citizen sees that a document is on file and its name, but cannot open it to check they attached the right scan. |
 
 Three more absences are recorded as decisions, not gaps: PUB-001 (splash is a
@@ -287,3 +287,43 @@ for. Covered at its own layer too (`payments-list.page.spec.ts`) — but note
   under My Applications" matched on the *business name*, which the seed shares —
   so it would have passed even if the application had vanished. It now keys on
   the application number the portal actually minted.
+
+
+---
+
+## PUB-007 Reset Password — ruled, not built (3 September 2026)
+
+**The right answer to this task was not to build the screen.**
+
+A Reset Password screen needs something that proves the person asking is the
+account holder. Nothing in this system issues a reset token — no email, no SMS,
+no backend endpoint. A screen that accepted a new password today would set it on
+the say-so of whoever opened the URL. That is not an unfinished feature; it is an
+account-takeover route with a friendly form on top, and it is the same deception
+F-5 removed from Forgot Password, where the screen reported that a reset link had
+been sent and nothing had been sent.
+
+**What was actually dangerous here is the task list itself.** PUB-007 sits among
+ordinary missing work and reads like ordinary missing work. Someone picks it up,
+wires the form to the nearest password setter, and ships an account takeover in
+good faith.
+
+So the deliverable is a **tripwire**, `password-reset-tripwire.spec.ts`:
+
+- A route matching `reset` or `recover` may exist **only** once the API client
+  has an operation that verifies a reset token. Break-checked: renaming
+  `forgot-password` to `reset-password` fails the suite immediately.
+- `AuthService` must expose no password setter other than `changePassword`,
+  which takes the *current* password as well as the new one.
+- And `changePassword` must actually **refuse a wrong current password** — a
+  shape check alone is satisfied by a method that ignores its first argument.
+
+**Correction to my own earlier note.** The gate's first PUB-007 entry said
+"Forgot Password collects an address and stops". That was wrong, and it was
+wrong in the direction that matters: it described a defect the portal had
+already fixed. The page collects nothing. Both the map and the table above are
+corrected.
+
+**This unblocks only from the backend side** — see the message to the backend
+lane for what is needed: an endpoint that issues a single-use, expiring reset
+token to a verified address, and one that redeems it.
