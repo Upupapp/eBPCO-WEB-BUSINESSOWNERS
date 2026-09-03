@@ -186,6 +186,103 @@ for (const profile of PROFILES) {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Screens BEHIND a journey. F-28 is why these are here: twenty-two unnamed
+  // file pickers sat in the wizard and this sweep reported the portal clean,
+  // because it never went to /permits/apply. A screen a sweep does not visit is
+  // UNMEASURED, not clean — and the wizard is where a citizen does the most
+  // consequential work in the whole portal.
+  //
+  // These deliberately FAIL rather than skip when a control cannot be found.
+  // A silently skipped screen reads exactly like a clean one, which is the
+  // defect this whole section exists to correct.
+  // ─────────────────────────────────────────────────────────────────────────
+  async function must(label, fn) {
+    try {
+      await fn();
+    } catch (e) {
+      failures++;
+      console.error(`\n  ✘ ${label} — could not be reached: ${String(e).split('\n')[0]}`);
+      console.error('      An unreachable screen is UNMEASURED, not clean.');
+      return false;
+    }
+    return true;
+  }
+
+  // Register a business — a long form, and the screen the original F-20 defect
+  // lived on.
+  await openDrawerIfNeeded();
+  if (await must('businesses', async () => {
+    await page.locator('a:has-text("My Businesses"), a:has-text("Businesses")').first().click();
+    await page.waitForTimeout(600);
+  })) {
+    await scan('my businesses');
+    if (await must('register business', async () => {
+      await page.locator('a:has-text("Register")').first().click();
+      await page.waitForURL(/businesses\/register/, { timeout: 15000 });
+      await page.waitForTimeout(500);
+    })) await scan('register business');
+  }
+
+  // The application wizard, step by step. Each step is its own screen.
+  if (await must('wizard step 1', async () => {
+    await openDrawerIfNeeded();
+    await page.locator('a:has-text("Permit Services")').first().click();
+    await page.waitForTimeout(600);
+    await page.locator('a:has-text("Start Application")').first().click();
+    await page.waitForURL(/permits\/apply/, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  })) {
+    await scan('wizard step 1 (business & type)');
+
+    if (await must('wizard step 2', async () => {
+      await page.locator('#application-wizard-business-1').selectOption({ index: 1 });
+      await page.locator('button:has-text("Continue")').first().click();
+      await page.waitForTimeout(400);
+    })) await scan('wizard step 2 (project details)');
+
+    if (await must('wizard step 3', async () => {
+      await page.locator('#application-wizard-project-business-address-3').fill('12 Rizal Street');
+      await page.locator('#application-wizard-scope-of-work-4').fill('Two-storey residential.');
+      await page.locator('button:has-text("Continue")').first().click();
+      await page.waitForTimeout(400);
+    })) await scan('wizard step 3 (documents — F-28 lived here)');
+
+    if (await must('wizard step 4', async () => {
+      const inputs = page.locator('input[type=file]');
+      const n = await inputs.count();
+      if (n === 0) throw new Error('no document slots rendered');
+      for (let i = 0; i < n; i++) {
+        await inputs.nth(i).setInputFiles({
+          name: `a11y-${i}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4'),
+        });
+      }
+      await page.locator('button:has-text("Continue")').first().click();
+      await page.waitForTimeout(400);
+    })) await scan('wizard step 4 (review & declarations)');
+  }
+
+  // An application in flight, its permit document, and the payment screens.
+  if (await must('application details', async () => {
+    await openDrawerIfNeeded();
+    await page.locator('a:has-text("My Applications")').first().click();
+    await page.waitForTimeout(600);
+    await page.locator('tbody a, .card a').first().click();
+    await page.waitForURL(/applications\//, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  })) await scan('application details');
+
+  if (await must('payment receipt', async () => {
+    await openDrawerIfNeeded();
+    await page.locator('a:has-text("Payments")').first().click();
+    await page.waitForTimeout(600);
+    const receipt = page.locator('a:has-text("View Receipt")').first();
+    if (await receipt.count() === 0) throw new Error('no settled payment to show a receipt for');
+    await receipt.click();
+    await page.waitForURL(/receipt/, { timeout: 15000 });
+    await page.waitForTimeout(500);
+  })) await scan('payment receipt');
+
   await browser.close();
 }
 

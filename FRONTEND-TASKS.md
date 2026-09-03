@@ -450,3 +450,28 @@ an instant comparison fails the two boundary tests.
 The reuse picker now shows each saved document's **upload date** — the library
 holds no expiry, so that is the only thing this portal honestly knows about a
 saved document's age.
+
+
+---
+
+## The a11y sweep now visits the screens behind a journey (3 September 2026)
+
+F-28 is why. Twenty-two unnamed file pickers sat in the wizard while this sweep
+reported the portal clean — because it never went to `/permits/apply`. **A screen
+a sweep does not visit is unmeasured, not clean**, and the wizard is where a
+citizen does the most consequential work in the portal.
+
+Added, on all three profiles: My Businesses, Register Business, **all four
+wizard steps**, application details, and the payment receipt. **53 → 77 scans.**
+
+Two properties, both break-checked:
+
+- **It catches F-28.** Removing the `aria-label` fix fails wizard step 3 in
+  Chromium 1280, Chromium 390 and WebKit 390 — three independent profiles, plus
+  the source-scan gate, now cover the same defect.
+- **An unreachable screen FAILS, it does not skip.** Pointing the wizard
+  navigation at a link that does not exist produces
+  `✘ wizard step 1 — could not be reached … An unreachable screen is UNMEASURED,
+  not clean` and exit 1. A silently skipped screen reads exactly like a clean
+  one, which is the whole defect being corrected — so the gate refuses to be
+  quietly narrowed.
