@@ -140,7 +140,7 @@ spelling returns.
 | 17 | ✅ **DONE** **Add a route-vs-inventory gate** | Task 6 exists because a spec and a router drifted with nothing comparing them — exactly how the heading scale drifted before `check:headings`. Read `04-Screen-Inventory.md`, read `app.routes.ts`, fail on a citizen-facing screen with no route and no recorded deviation. |
 | 18 | ✅ **DONE** **Run axe at mobile viewports too** | `check:a11y` scans 16 screens at 1280×900 only. The drawer, the 44px touch targets and the scrollable table cards only exist below 1024px, so the gate never sees the state most citizens will. Add a 390px pass. |
 | 19 | ✅ **DONE** **Add a WebKit pass to the gate** | Every iOS-specific defect found here — focus zoom under 16px, native `<select>` ignoring author height, the 750×342 landscape viewport — was invisible to Chromium. The browser is already installed. |
-| 20 | **Cover the wizard and payment flows with tests** | 49 tests, and the two longest citizen journeys — the five-step application and the payment flow — have none. Both have been driven manually and both work; nothing holds them there. |
+| 20 | ✅ **DONE** **Cover the wizard and payment flows with tests** | 49 tests, and the two longest citizen journeys — the five-step application and the payment flow — have none. Both have been driven manually and both work; nothing holds them there. |
 
 ---
 
@@ -232,3 +232,58 @@ reach.
 toggle's accessible name produced **zero violations at 1280×900** and flagged
 it on nine screens in each mobile profile. A nav button with no accessible
 name would have shipped past the old gate untouched.
+
+
+---
+
+## Task 20 — closed 3 September 2026
+
+`npm run check:journeys` drives the **built** app in a real browser through three
+citizen journeys, 22 assertions. Every piece beneath these journeys was already
+covered and the wiring between them was not — the shape of defect that has bitten
+this project three times.
+
+1. **File an application end to end** — open the wizard, select a business,
+   fill the project details, attach a real file to all 22 document slots,
+   accept both declarations, submit. Asserts the **document names survive to
+   the application page**, and that nothing claims the application was
+   "successfully submitted" (F-14).
+2. **A Renewal cannot be filed without naming a permit** — the guard shipped in
+   tasks 1–3, exercised through the actual form.
+3. **The payment flow** — drives the application it just filed to an assessed
+   state through the office's own simulate control, pays it, and checks what
+   the screens must never claim: Bank Transfer shows the honest "not available
+   yet" state with **no deposit account details** (F-4), the confirmation says
+   plainly that no money moved, and the receipt carries a watermark rather than
+   passing itself off as official.
+
+### It found a real defect on its first complete run — F-23
+
+**The payments list invited a citizen to pay twice.**
+
+After paying, the list showed balance ₱5,250.00, status **"Awaiting Payment"**,
+and a **"Pay Now"** button. The store was right: a submitted payment sits at
+`Pending Verification` and the balance correctly does *not* move until the
+Treasurer's cashier verifies it. The list was wrong — it derived both the label
+and the button from `balanceCentavos > 0` alone, ignoring `paymentStatus`
+entirely.
+
+Balance answers *"does the Municipality still expect money"*. It does not answer
+*"has this citizen already sent it"*, and only the second question may decide
+whether to offer to take a payment.
+
+Fixed: rows now read the submitted payments. `Awaiting Verification` with no Pay
+Now while one is pending; `Payment Rejected` **does** offer it again, because
+that is the one case where paying a second time is what the office is asking
+for. Covered at its own layer too (`payments-list.page.spec.ts`) — but note
+**no unit test could have found it**, because every piece was correct alone.
+
+### Two things worth keeping from writing it
+
+- **`page.goto` after sign-in logs the citizen out.** The session is in memory,
+  so the first version timed out hunting a step indicator on the login screen —
+  a lost session that reads exactly like a broken selector.
+- **An assertion passed for the wrong reason.** "The filed application is listed
+  under My Applications" matched on the *business name*, which the seed shares —
+  so it would have passed even if the application had vanished. It now keys on
+  the application number the portal actually minted.
