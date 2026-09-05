@@ -69,6 +69,12 @@ describe('Reusing a document already on file', () => {
 
     const attached = page.attached['req-1'];
     expect(attached).toBeTruthy();
+    // A library document is an UPLOAD — we hold its bytes and send them. That
+    // is a different thing from a document REUSED from a previous permit, which
+    // is a reference to bytes the office already has. The union keeps the two
+    // apart, and this test is about the first.
+    expect(attached.kind).toBe('upload');
+    if (attached.kind !== 'upload') throw new Error('expected an upload slot');
     expect(attached.file).toBeInstanceOf(File);
     // A filename is not a document: read the bytes back.
     const bytes = new Uint8Array(await attached.file.arrayBuffer());
@@ -95,6 +101,7 @@ describe('Reusing a document already on file', () => {
       permitType: 'Zoning / Locational Clearance', applicationAction: 'New', relatedPermitNumber: null,
     });
     const a = page.attached['req-1'];
+    if (a.kind !== 'upload') throw new Error('expected an upload slot');
     store.attachDocument(app.id, req.id, req.label, a.file, a.fileType);
 
     const filed = store.documentsFor(app.id).find((d) => d.requirementId === 'req-1')!;

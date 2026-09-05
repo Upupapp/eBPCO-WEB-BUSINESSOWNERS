@@ -299,7 +299,12 @@ export class ApplicationStore {
         uploadedAt: app.dateSubmitted ?? '2026-07-15T08:00:00.000Z',
         status,
         issuingOffice: null,
-        issueDate: null,
+        // The date the issuing office certified it. Distinct from uploadedAt —
+        // "uploaded 9 months ago" is not the statement "certified on <date>",
+        // and the officer judges a reused document by the second. Seeded on the
+        // first two so the reuse note has something real to show; null on the
+        // rest, which is honest: null means NOT RECORDED.
+        issueDate: i < 2 ? '2025-06-12T00:00:00.000Z' : null,
         // One clearance carries a real expiry so the validity line (F-24) is
         // visible in the demo at all. The office sends this; until now nothing
         // in the seed ever exercised it.
@@ -376,12 +381,66 @@ export class ApplicationStore {
    * let the mobile app file applications with zero documents for its entire
    * life. Nothing downstream can upload a filename.
    */
+  /**
+   * Record a document CARRIED OVER from a permit the citizen already holds.
+   *
+   * Not an upload. The Municipality already has these bytes; what this records
+   * is a reference plus the two facts the office needs — that it was reused,
+   * and the date it was certified. See
+   * docs/RULING-2026-09-03-renewal-reuse.md: the officer decides whether a
+   * reused document is still good, and the certification date is what they
+   * decide with. An expiry date cannot answer that question.
+   *
+   * `file` stays null and that is honest: this application did not receive a
+   * file. Pretending otherwise would be the "a filename is not a document"
+   * defect inverted — claiming to carry bytes we never took.
+   */
+  reuseDocument(
+    applicationId: string,
+    requirementId: string,
+    label: string,
+    source: { documentId: string; fileName: string; fileType: SavedDocumentFileType; certifiedOn: string | null },
+  ): void {
+    this.documentsByApp.update((map) => {
+      const existing = map[applicationId] ?? [];
+      const entry: ApplicationDocument = {
+        id: nextId('appdoc'),
+        applicationId,
+        requirementId,
+        label,
+        fileName: source.fileName,
+        fileType: source.fileType,
+        file: null,
+        uploadedAt: todayIso(),
+        status: 'Submitted',
+        issuingOffice: null,
+        issueDate: source.certifiedOn,
+        expiryDate: null,
+        remarks: null,
+        history: [],
+        reusedFromDocumentId: source.documentId,
+      };
+      const idx = existing.findIndex((d) => d.requirementId === requirementId);
+      const next = idx >= 0 ? existing.map((d, i) => (i === idx ? entry : d)) : [...existing, entry];
+      return { ...map, [applicationId]: next };
+    });
+  }
+
   attachDocument(
     applicationId: string,
     requirementId: string,
     label: string,
     file: File,
     fileType: SavedDocumentFileType,
+    /**
+     * The reused document this upload REPLACED, if any.
+     *
+     * A replacement is a fresh document: it does NOT inherit the certification
+     * date of the thing it replaced, or the admin note would read "certified
+     * <old date>" over a file uploaded today. It keeps only the pointer, so the
+     * officer can see the chain without being misinformed about the date.
+     */
+    supersedesDocumentId: string | null = null,
   ): void {
     const fileName = file.name;
     this.documentsByApp.update((map) => {
@@ -398,8 +457,11 @@ export class ApplicationStore {
         uploadedAt: todayIso(),
         status: 'Uploaded',
         issuingOffice: null,
+        // NOT inherited from anything this replaced: a fresh upload has no
+        // certification date, and claiming one would misinform the officer.
         issueDate: null,
         expiryDate: null,
+        supersedesDocumentId,
         remarks: null,
         history: idx >= 0 ? [...existing[idx].history, this.historyEntryFrom(existing[idx])] : [],
       };

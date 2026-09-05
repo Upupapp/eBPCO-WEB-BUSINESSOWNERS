@@ -33,6 +33,32 @@ interface AttachedDoc {
   fileType: SavedDocumentFileType;
 }
 
+/**
+ * A document carried over from a permit the citizen already holds.
+ *
+ * Deliberately NOT an AttachedDoc with a null file. A reused document is a
+ * REFERENCE to something the Municipality already has, not bytes we are
+ * uploading — and the honest shape says so. Modelling it as an upload with a
+ * missing file would be the "a filename is not a document" defect inverted:
+ * claiming to carry something we do not, on the one path where the office
+ * already has the real thing.
+ *
+ * `certifiedOn` is what the admin note is built from. See
+ * docs/RULING-2026-09-03-renewal-reuse.md — an expiry date cannot say when a
+ * document was certified, and the officer needs the certification date to make
+ * the judgement the ruling leaves to them.
+ */
+interface ReusedDoc {
+  documentId: string;
+  fileName: string;
+  fileType: SavedDocumentFileType;
+  certifiedOn: string | null;
+}
+
+type Slot =
+  | ({ kind: 'upload'; supersedesDocumentId?: string | null } & AttachedDoc)
+  | ({ kind: 'reused' } & ReusedDoc);
+
 function fileTypeFromName(name: string): SavedDocumentFileType {
   const ext = name.split('.').pop()?.toLowerCase();
   if (ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'pdf') return ext as SavedDocumentFileType;
@@ -141,15 +167,21 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           <div class="card-title">Required Documents</div>
           <p class="small muted">Accepted formats: PDF, JPG, JPEG, PNG.</p>
           @if (needsExistingPermit()) {
-            <div
-              class="card"
-              style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin-bottom:12px;"
-            >
-              <strong>You are being asked for the full document list.</strong>
-              The Municipality has not published a shorter list for
-              {{ applicationAction === 'Renewal' ? 'renewals' : 'amendments' }}, so this portal asks
-              for everything a new application needs rather than guessing what it can leave out.
-              Anything you have uploaded before can be reused below without uploading it again.
+            <!--
+              Municipal ruling, 3 Sep 2026 (docs/RULING-2026-09-03-renewal-reuse.md).
+              The previous copy told a renewing citizen the Municipality had not
+              published a shorter list. That was honest when written and is now
+              wrong: there is no shorter list and there was never going to be
+              one. Nothing is omitted; what changes is that documents already on
+              file are carried over. Neutral styling, not a warning: being asked
+              for the full list is the normal case, not a problem.
+            -->
+            <div class="card" style="background:var(--secondary-50); margin-bottom:12px;">
+              <strong>Your documents are already attached.</strong>
+              {{ reusedCount() }} of your
+              {{ applicationAction === 'Renewal' ? 'existing permit' : 'permit' }}'s documents have
+              been carried over, so you do not need to upload them again. You can replace any of
+              them with a newer copy if something has changed.
             </div>
           }
           @for (d of documents; track d.id) {
@@ -160,8 +192,8 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   <strong>{{ d.label }}</strong>
                   @if (d.description) { <div class="small muted">{{ d.description }}</div> }
                 </div>
-                @if (attached[d.id]) {
-                  <span class="badge badge-green">{{ attached[d.id].fileName }}</span>
+                @if (attached[d.id]; as slot) {
+                  <span class="badge badge-green">{{ slot.fileName }}</span>
                 }
               </div>
               <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -174,10 +206,29 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   one was for. Named from the requirement itself so the two can
                   never drift apart.
                 -->
+                <!--
+                  A reused document says so, and says WHEN IT WAS CERTIFIED,
+                  because that is the fact the officer needs to make the
+                  judgement the Municipal ruling leaves to them.
+
+                  Deliberately NEUTRAL: no amber, no warning icon, and nothing
+                  about age even when the document is long past its validity.
+                  The ruling is explicit that an expired reused document is
+                  accepted and that the officer decides — and a warning we add
+                  for kindness becomes a refusal the citizen believes. See
+                  docs/RULING-2026-09-03-renewal-reuse.md.
+                -->
+                @if (attached[d.id]; as slot) {
+                  @if (slot.kind === 'reused') {
+                    <div class="small muted" style="flex-basis:100%;">
+                      Reused from your previous permit@if (slot.certifiedOn) {, certified {{ formatDate(slot.certifiedOn) }}}.
+                    </div>
+                  }
+                }
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  [attr.aria-label]="'Attach ' + d.label"
+                  [attr.aria-label]="(attached[d.id]?.kind === 'reused' ? 'Replace ' : 'Attach ') + d.label"
                   (change)="onFileSelected($event, d)"
                 />
                 @if (reusable().length > 0) {
@@ -278,7 +329,61 @@ export class ApplicationWizardPage {
   scopeOfWork = '';
   professionalName = '';
   prcNumber = '';
-  attached: Record<string, AttachedDoc> = {};
+  attached: Record<string, Slot> = {};
+
+  /**
+   * Carry the previous permit's documents over, pre-selected.
+   *
+   * Reuse is the DEFAULT state of a renewal or amendment, not an opt-in — the
+   * Municipality ruled that nothing is omitted and that what changes is who
+   * supplies the documents. So this runs the moment a permit is chosen, and the
+   * citizen arrives at step 3 with the list already satisfied.
+   */
+  protected carryOverDocuments(): void {
+    if (!actionNeedsExistingPermit(this.applicationAction) || !this.relatedPermitNumber) return;
+    const source = this.applicationStore
+      .renewablePermits()
+      .find((p) => p.permitNumber === this.relatedPermitNumber);
+    if (!source) return;
+
+    // A renewal or amendment is of the SAME permit type as the permit it acts
+    // on — you cannot renew a Zoning clearance through the generic form. The
+    // chosen permit therefore decides the form, and this is also what makes the
+    // requirement ids line up so the carry-over below can match anything at all.
+    if (source.permitType !== 'Business Permit') {
+      this.isGeneric = false;
+      this.permitType = source.permitType as PermitType;
+      this.documents = this.applicationStore.requiredDocumentsFor(source.permitType);
+    }
+
+    const previous = this.applicationStore.documentsFor(source.applicationId);
+    const next: Record<string, Slot> = {};
+    for (const d of this.documents) {
+      const match = previous.find((p) => p.requirementId === d.id);
+      if (!match) continue;
+      next[d.id] = {
+        kind: 'reused',
+        documentId: match.id,
+        fileName: match.fileName,
+        fileType: match.fileType,
+        // The issue date ONLY. Falling back to uploadedAt was wrong: an upload
+        // date is not a certification date, and "uploaded 9 months ago" is not
+        // the statement "certified on <date>". A null here means NOT RECORDED,
+        // which is honest — the officer is told nothing rather than told
+        // something invented. (backend #0391: nothing in the estate records a
+        // certification date yet, and who supplies it is an open owner question.)
+        certifiedOn: match.issueDate ?? null,
+      };
+    }
+    // A citizen who has already replaced something keeps their choice.
+    this.attached = { ...next, ...this.attached };
+  }
+
+  /** How many of this application's documents came from the previous permit. */
+  protected reusedCount(): number {
+    return Object.values(this.attached).filter((a) => a.kind === 'reused').length;
+  }
+
   understandRequirements = false;
   agreeTerms = false;
 
@@ -313,7 +418,26 @@ export class ApplicationWizardPage {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    this.attached = { ...this.attached, [d.id]: { file, fileName: file.name, fileType: fileTypeFromName(file.name) } };
+    // Replacing a REUSED document does not inherit its certification date.
+    // The natural implementation copies the record and swaps the file, and the
+    // admin note would then read "certified <old date>" over a document
+    // uploaded today — misinforming the officer in exactly the direction the
+    // ruling protects. A replacement is a fresh document with NO certification
+    // date, and it keeps a pointer to what it superseded so the chain stays
+    // visible. (citizen-mobile #0387 named this rule; our two lanes converged
+    // on everything else independently.)
+    const previous = this.attached[d.id];
+    const supersedes = previous?.kind === 'reused' ? previous.documentId : null;
+    this.attached = {
+      ...this.attached,
+      [d.id]: {
+        kind: 'upload',
+        file,
+        fileName: file.name,
+        fileType: fileTypeFromName(file.name),
+        supersedesDocumentId: supersedes,
+      },
+    };
     this.documentLibrary.add({ file, fileName: file.name, fileType: fileTypeFromName(file.name), category: 'supportingDocument', sizeBytes: file.size });
   }
 
@@ -344,7 +468,7 @@ export class ApplicationWizardPage {
     if (!saved?.file) return;
     this.attached = {
       ...this.attached,
-      [d.id]: { file: saved.file, fileName: saved.fileName, fileType: saved.fileType },
+      [d.id]: { kind: 'upload', file: saved.file, fileName: saved.fileName, fileType: saved.fileType },
     };
   }
 
@@ -381,6 +505,10 @@ export class ApplicationWizardPage {
       }
     }
     this.error.set(null);
+    // Reuse is the DEFAULT state of a renewal or amendment, so the documents are
+    // already carried over by the time the citizen reaches step 3 rather than
+    // being something they have to ask for.
+    if (next >= 3) this.carryOverDocuments();
     this.step.set(next);
   }
 
@@ -399,11 +527,22 @@ export class ApplicationWizardPage {
     });
     for (const d of this.documents) {
       const a = this.attached[d.id];
-      // Hands over the FILE. This one loop is the only place attachments leave
-      // the wizard, so it is the single point a future upload has to hook —
-      // the same reason the mobile fix went through the draft codecs rather
-      // than editing nineteen wizards.
-      if (a) this.applicationStore.attachDocument(record.id, d.id, d.label, a.file, a.fileType);
+      if (!a) continue;
+      if (a.kind === 'upload') {
+        // Hands over the FILE. This one loop is the only place attachments
+        // leave the wizard, so it is the single point a future upload has to
+        // hook — the same reason the mobile fix went through the draft codecs
+        // rather than editing nineteen wizards.
+        this.applicationStore.attachDocument(
+          record.id, d.id, d.label, a.file, a.fileType, a.supersedesDocumentId ?? null,
+        );
+      } else {
+        // A reused document is a REFERENCE to one the office already holds. It
+        // is flagged as reused and carries the date it was certified, because
+        // the ruling leaves the judgement to the officer and that is the fact
+        // they need in front of them.
+        this.applicationStore.reuseDocument(record.id, d.id, d.label, a);
+      }
     }
     this.applicationStore.submit(record.id);
     // F-14: not "submitted successfully". Nothing was sent to the Municipality,

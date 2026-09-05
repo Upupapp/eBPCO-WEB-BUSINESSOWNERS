@@ -96,7 +96,10 @@ describe('Attachments carry the file, not just its name', () => {
     fixture.detectChanges();
     const page = fixture.componentInstance as unknown as {
       documents: { id: string; label: string; required: boolean }[];
-      attached: Record<string, { file: File }>;
+      // Mirrors the component's Slot union. A reused document is a REFERENCE to
+      // bytes the office already holds and carries no File; an upload carries
+      // the real one. This test is about the upload half.
+      attached: Record<string, { kind: 'upload'; file: File } | { kind: 'reused' }>;
       onFileSelected(e: Event, d: { id: string; label: string }): void;
     };
 
@@ -108,7 +111,9 @@ describe('Attachments carry the file, not just its name', () => {
     page.onFileSelected(event, requirement);
 
     // What the wizard is holding must BE the file, not a copy of its name.
-    expect(page.attached[requirement.id].file).toBe(chosen);
+    const slot = page.attached[requirement.id];
+    if (slot.kind !== 'upload') throw new Error('a chosen file must be an upload slot');
+    expect(slot.file).toBe(chosen);
 
     // And it must survive the hand-off into the store with its bytes intact.
     const app = appStore.createDraft({
@@ -116,7 +121,7 @@ describe('Attachments carry the file, not just its name', () => {
       permitType: 'Zoning / Locational Clearance', applicationAction: 'New', relatedPermitNumber: null,
     });
     appStore.attachDocument(app.id, requirement.id, requirement.label,
-                            page.attached[requirement.id].file, 'pdf');
+                            slot.file, 'pdf');
     const stored = appStore.documentsFor(app.id)[0];
     expect(stored.file).toBe(chosen);
     expect(await stored.file!.arrayBuffer()).toEqual(await chosen.arrayBuffer());

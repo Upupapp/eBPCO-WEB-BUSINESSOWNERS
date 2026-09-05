@@ -51,6 +51,23 @@ export interface ApplicationDocument {
   /** Required whenever status is 'Rejected' or 'Revision Required'. */
   remarks: string | null;
   history: DocumentHistoryEntry[];
+  /**
+   * Set when this document was CARRIED OVER from a permit the citizen already
+   * holds, naming the document it came from.
+   *
+   * The office is shown that a document is reused — the Municipal ruling
+   * requires it — and `issueDate` carries the date it was certified, which is
+   * what the officer judges it by.
+   */
+  reusedFromDocumentId?: string | null;
+  /**
+   * The document this one REPLACED, when a citizen swapped out a reused one.
+   *
+   * Keeps the chain visible to the officer. A replacement is a fresh document
+   * and carries NO certification date of its own — inheriting one would tell
+   * the officer a file uploaded today was certified long ago.
+   */
+  supersedesDocumentId?: string | null;
 }
 
 export type SavedDocumentFileType = 'pdf' | 'jpg' | 'jpeg' | 'png';
