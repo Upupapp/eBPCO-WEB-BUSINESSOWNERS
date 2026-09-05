@@ -8,6 +8,7 @@
  * ours only because no server field existed to match. Where the server has a
  * name, the server's name wins.
  */
+/** The profile fields both responses carry. */
 export interface CitizenProfile {
   firstName: string | null;
   middleName: string | null;
@@ -18,12 +19,32 @@ export interface CitizenProfile {
   city: string | null;
   province: string | null;
   postalCode: string | null;
-  /** Null means the number has not been verified — not that there is no number. */
-  mobileVerifiedAt: string | null;
+}
+
+/**
+ * `GET /me`. Identity fields, and NO mobileVerifiedAt.
+ *
+ * The two /me responses have DIFFERENT shapes and this one is not a superset:
+ * GET carries `id`, `kind`, `email` and `emailVerifiedAt`; PATCH carries
+ * `mobileVerifiedAt` and `mobileVerificationCleared` and none of the identity
+ * fields. Typing one interface for both — which is what this file did until the
+ * recorded samples were read — declares a field that is simply absent at
+ * runtime, and `undefined` would have rendered as a verified-looking blank.
+ *
+ * `email` is present here and MUST NOT be offered for editing: PATCH refuses it
+ * with a 400 because it is the sign-in identity.
+ */
+export interface MeResponse extends CitizenProfile {
+  id: string;
+  kind: string;
+  email: string;
+  emailVerifiedAt: string | null;
 }
 
 /** What PATCH /me answers with: the new profile, plus what the change cost. */
 export interface RectificationResult extends CitizenProfile {
+  /** Null means the number has not been verified — not that there is no number. */
+  mobileVerifiedAt: string | null;
   /**
    * True when this change un-verified the mobile number.
    *

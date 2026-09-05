@@ -9,7 +9,7 @@ import {
   ResubmitRequest,
   ResubmitResult,
 } from './citizen-api.models';
-import { CitizenProfile, ProfileRectification, RectificationResult } from './citizen-profile';
+import { MeResponse, ProfileRectification, RectificationResult } from './citizen-profile';
 
 /**
  * Client for the citizen endpoints.
@@ -49,8 +49,8 @@ export class CitizenApiClient {
    * ever been asked for an address, so a null is the absence of a question, not
    * a citizen's answer.
    */
-  getMe(): Observable<CitizenProfile> {
-    return this.get<CitizenProfile>('/me');
+  getMe(): Observable<MeResponse> {
+    return this.get<MeResponse>('/me');
   }
 
   /**

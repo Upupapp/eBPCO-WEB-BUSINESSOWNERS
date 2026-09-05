@@ -8,6 +8,40 @@
 //
 // Do not hand-edit. Re-copy from that file if the contract moves.
 export const CONTRACT_SAMPLES = {
+  "me.applicant": {
+    "status": 200,
+    "body": {
+      "id": "00000000-0000-4000-8000-000000000000",
+      "kind": "applicant",
+      "email": "maria.santos@example.ph",
+      "emailVerifiedAt": null,
+      "firstName": "Maria",
+      "middleName": null,
+      "lastName": "Santos",
+      "mobileNumber": null,
+      "street": null,
+      "barangay": null,
+      "city": null,
+      "province": null,
+      "postalCode": null
+    }
+  },
+  "me.rectify": {
+    "status": 200,
+    "body": {
+      "firstName": "Maria Cristina",
+      "middleName": null,
+      "lastName": "Santos",
+      "mobileNumber": null,
+      "street": "12 Rizal Street",
+      "barangay": "Poblacion Uno",
+      "city": "Castilla",
+      "province": "Sorsogon",
+      "postalCode": "4718",
+      "mobileVerifiedAt": null,
+      "mobileVerificationCleared": false
+    }
+  },
   "applicant.applications.permit": {
     "status": 200,
     "body": {

@@ -45,7 +45,6 @@ export class ProfilePage {
       firstName: u.firstName, middleName: u.middleName ?? null, lastName: u.lastName,
       mobileNumber: u.mobileNumber, street: u.street || null, barangay: u.barangay || null,
       city: u.city || null, province: u.province || null, postalCode: u.postalCode || null,
-      mobileVerifiedAt: null,
     };
   }
 

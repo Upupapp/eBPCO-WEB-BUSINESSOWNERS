@@ -1,14 +1,15 @@
 import {
   buildRectification, rectificationProblem, heldValue, CitizenProfile,
   POSTAL_CODE, MOBILE_NUMBER,
+  MeResponse, RectificationResult,
 } from './citizen-profile';
+import { CONTRACT_SAMPLES } from './contract-samples.fixture';
 
 const held: CitizenProfile = {
   firstName: 'Juan', middleName: 'Santos', lastName: 'Dela Cruz',
   mobileNumber: '09171234567',
   street: 'Purok 3, Zone 2', barangay: 'Poblacion', city: 'Castilla',
   province: 'Sorsogon', postalCode: '4713',
-  mobileVerifiedAt: '2026-08-01T00:00:00.000Z',
 };
 
 const form = (over: Record<string, string> = {}) => ({
@@ -100,5 +101,59 @@ describe('A value the office does not hold', () => {
     expect(heldValue(null)).toBe('Not recorded');
     expect(heldValue('')).toBe('Not recorded');
     expect(heldValue('Purok 3')).toBe('Purok 3');
+  });
+});
+
+/**
+ * Decoded against the backend's OWN recorded bytes, not against a shape we
+ * invented. `me.applicant` and `me.rectify` are copied verbatim from
+ * `contract/response-samples.json` on origin/main.
+ *
+ * These found a real defect in this client: the two /me responses have
+ * DIFFERENT shapes, and one interface was typed for both. `GET /me` carries no
+ * `mobileVerifiedAt` at all, so the old type declared a field that is simply
+ * absent at runtime — and `undefined` would have rendered as a
+ * verified-looking blank on the one screen where that matters.
+ */
+describe('The recorded /me bytes', () => {
+  const meApplicant = CONTRACT_SAMPLES['me.applicant'].body as unknown as MeResponse;
+  const meRectify = CONTRACT_SAMPLES['me.rectify'].body as unknown as RectificationResult;
+
+  it('GET /me carries the identity fields and NO mobileVerifiedAt', () => {
+    expect(meApplicant.email).toBe('maria.santos@example.ph');
+    expect(meApplicant.kind).toBe('applicant');
+    expect('mobileVerifiedAt' in meApplicant).toBe(false);
+  });
+
+  it('PATCH /me carries mobileVerifiedAt and the cleared flag, and NOT the identity fields', () => {
+    expect('mobileVerificationCleared' in meRectify).toBe(true);
+    expect(meRectify.mobileVerificationCleared).toBe(false);
+    expect('email' in meRectify).toBe(false);
+    expect('id' in meRectify).toBe(false);
+  });
+
+  it('uses the server field names — street, not address; postalCode, not zipCode', () => {
+    expect(meRectify.street).toBe('12 Rizal Street');
+    expect(meRectify.postalCode).toBe('4718');
+    expect('address' in meRectify).toBe(false);
+    expect('zipCode' in meRectify).toBe(false);
+  });
+
+  it('a null field in the recorded bytes reads as NOT RECORDED, never as blank', () => {
+    // Every address field on GET /me is null in the sample: nobody has been
+    // asked for one. That is the absence of a question, not an empty answer.
+    expect(meApplicant.street).toBeNull();
+    expect(heldValue(meApplicant.street)).toBe('Not recorded');
+    expect(heldValue(meRectify.street)).toBe('12 Rizal Street');
+  });
+
+  it('a rectification against the recorded profile sends only what changed', () => {
+    const patch = buildRectification(meRectify, {
+      firstName: 'Maria Cristina', middleName: '', lastName: 'Santos',
+      mobileNumber: '', street: '12 Rizal Street', barangay: 'Poblacion Uno',
+      city: 'Castilla', province: 'Sorsogon', postalCode: '4718',
+    });
+    // middleName was already null — clearing nothing is not a correction.
+    expect(patch).toEqual({});
   });
 });
