@@ -1,8 +1,32 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ProfilePage } from './profile.page';
 import { AuthService } from '../../core/session/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
+
+function configure(): void {
+  TestBed.configureTestingModule({
+    imports: [ProfilePage],
+    providers: [
+      provideRouter([]),
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+    ],
+  });
+}
+
+async function signInAndCreate() {
+  const auth = TestBed.inject(AuthService);
+  await auth.login('juan.delacruz@example.com', 'Password1');
+  const fixture = TestBed.createComponent(ProfilePage);
+  fixture.detectChanges();
+  return { fixture, auth };
+}
 
 /**
  * Guards F-15: the Notification Preferences panel bound eight checkboxes to a
@@ -14,26 +38,22 @@ import { ToastService } from '../../shared/ui/toast.service';
  * Bound is not persisted.
  */
 describe('ProfilePage (F-15: preferences must actually persist)', () => {
-  function setup() {
-    TestBed.configureTestingModule({ imports: [ProfilePage], providers: [provideRouter([])] });
-    const auth = TestBed.inject(AuthService);
-    auth.login('juan.delacruz@example.com', 'Password1');
-    const fixture = TestBed.createComponent(ProfilePage);
-    fixture.detectChanges();
-    return { fixture, auth };
+  async function setup() {
+    configure();
+    return signInAndCreate();
   }
   afterEach(() => TestBed.resetTestingModule());
 
-  it('reads preferences from the account, not from a fresh default each time', () => {
-    const { auth } = setup();
+  it('reads preferences from the account, not from a fresh default each time', async () => {
+    const { auth } = await setup();
     const stored = auth.notificationPreferencesFor();
     stored.smsNotifications = !stored.smsNotifications;
     auth.updateNotificationPreferences(stored);
     expect(auth.notificationPreferencesFor().smsNotifications).toBe(stored.smsNotifications);
   });
 
-  it('survives a change round-trip through the page', () => {
-    const { fixture, auth } = setup();
+  it('survives a change round-trip through the page', async () => {
+    const { fixture, auth } = await setup();
     const page = fixture.componentInstance as unknown as {
       prefs: Record<string, boolean>;
       savePreferences(): void;
@@ -44,8 +64,8 @@ describe('ProfilePage (F-15: preferences must actually persist)', () => {
     expect(auth.notificationPreferencesFor().emailNotifications).toBe(!before);
   });
 
-  it('offers a control to save them', () => {
-    const { fixture } = setup();
+  it('offers a control to save them', async () => {
+    const { fixture } = await setup();
     (fixture.componentInstance as unknown as { tab: { set(t: string): void } }).tab.set('notifications');
     fixture.detectChanges();
     const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].map(
@@ -54,8 +74,8 @@ describe('ProfilePage (F-15: preferences must actually persist)', () => {
     expect(labels).toContain('Save Preferences');
   });
 
-  it('hands out a copy, so an unsaved edit cannot leak into the account', () => {
-    const { auth } = setup();
+  it('hands out a copy, so an unsaved edit cannot leak into the account', async () => {
+    const { auth } = await setup();
     const a = auth.notificationPreferencesFor();
     a.pushNotifications = !a.pushNotifications;
     expect(auth.notificationPreferencesFor().pushNotifications).not.toBe(a.pushNotifications);
@@ -63,19 +83,19 @@ describe('ProfilePage (F-15: preferences must actually persist)', () => {
 });
 
 /**
- * Guards F-20: Change Password only checked that the two new-password fields
- * matched each other, not that either one was a real password. Two blank
- * fields matched, so a correct current password plus nothing else silently
- * cleared the account's password.
+ * Guards F-20's ORIGINAL intent — Change Password must never silently accept
+ * a blank/weak new password — under the real backend's constraints.
+ *
+ * F-20 itself no longer applies as written: there is no local password-set
+ * path left to have a weak-input bug in. The backend has no "change password
+ * while signed in" route at all (only forgot/reset by email — see
+ * `AuthService.changePassword`'s own doc comment), so this now guards that
+ * the screen is HONEST about that rather than pretending to change anything.
  */
-describe('ProfilePage (F-20: Change Password must enforce the same password rule as Register)', () => {
-  function setup() {
-    TestBed.configureTestingModule({ imports: [ProfilePage], providers: [provideRouter([])] });
-    const auth = TestBed.inject(AuthService);
-    auth.login('juan.delacruz@example.com', 'Password1');
-    const fixture = TestBed.createComponent(ProfilePage);
-    fixture.detectChanges();
-    return { fixture, auth };
+describe('ProfilePage (Change Password honestly refuses — no backend route exists)', () => {
+  async function setup() {
+    configure();
+    return signInAndCreate();
   }
   afterEach(() => TestBed.resetTestingModule());
 
@@ -87,36 +107,24 @@ describe('ProfilePage (F-20: Change Password must enforce the same password rule
     changePassword(): void;
   };
 
-  it('rejects a blank new password instead of clearing the account password', () => {
-    const { fixture, auth } = setup();
+  it('refuses any change, with an honest reason, rather than silently accepting one', async () => {
+    const { fixture } = await setup();
     const page = fixture.componentInstance as unknown as PasswordPage;
     page.currentPassword = 'Password1';
-    page.newPassword = '';
-    page.confirmPassword = '';
+    page.newPassword = 'NewPassword2';
+    page.confirmPassword = 'NewPassword2';
     page.changePassword();
-    expect(page.passwordError()).toBe('Password must be at least 8 characters with at least 1 letter and 1 number.');
-    expect(auth.login('juan.delacruz@example.com', 'Password1').ok).toBe(true);
+    expect(page.passwordError()).toMatch(/isn.?t connected yet|forgot password/i);
   });
 
-  it('rejects a new password that is too short or missing a letter/number', () => {
-    const { fixture } = setup();
+  it('still enforces its own client-side checks before even trying', async () => {
+    const { fixture } = await setup();
     const page = fixture.componentInstance as unknown as PasswordPage;
     page.currentPassword = 'Password1';
     page.newPassword = 'short1';
     page.confirmPassword = 'short1';
     page.changePassword();
     expect(page.passwordError()).toBe('Password must be at least 8 characters with at least 1 letter and 1 number.');
-  });
-
-  it('still accepts a valid new password', () => {
-    const { fixture, auth } = setup();
-    const page = fixture.componentInstance as unknown as PasswordPage;
-    page.currentPassword = 'Password1';
-    page.newPassword = 'NewPassword2';
-    page.confirmPassword = 'NewPassword2';
-    page.changePassword();
-    expect(page.passwordError()).toBeNull();
-    expect(auth.login('juan.delacruz@example.com', 'NewPassword2').ok).toBe(true);
   });
 });
 
@@ -134,12 +142,17 @@ describe('ProfilePage (F-20: Change Password must enforce the same password rule
  * where believing that costs most is the address: a citizen who moves, updates
  * it here and assumes their permit will be posted to the new one has been
  * misled by a screen rather than by a bug.
+ *
+ * Still true after real auth landed: `PATCH /me` exists on the backend now,
+ * but this portal's `API_BASE_URL` in a unit test is not the live proxy, so
+ * `CitizenApiClient.configured` is false here exactly as it always was —
+ * the screen's "not connected" branch is still the one under test.
  */
 describe('ProfilePage (F-25: a profile change reaches no office)', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({ imports: [ProfilePage], providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+    configure();
+    await signInAndCreate();
   });
   afterEach(() => TestBed.resetTestingModule());
 

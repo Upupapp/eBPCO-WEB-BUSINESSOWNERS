@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, from, switchMap, throwError } from 'rxjs';
 import { CitizenApiClient, isOverResubmitLimit } from './citizen-api.client';
-import { RESUBMIT_MAX_FILE_BYTES } from './api-config';
+import { UploadLimitsService } from './upload-limits.service';
 import { ResubmitResult } from './citizen-api.models';
 import { ApiError } from './problem';
 
@@ -31,7 +31,7 @@ export class FileTooLargeError extends Error {
 @Injectable({ providedIn: 'root' })
 export class DocumentResubmissionService {
   private readonly api = inject(CitizenApiClient);
-  private readonly limit = inject(RESUBMIT_MAX_FILE_BYTES);
+  private readonly limits = inject(UploadLimitsService);
 
   /** (documentId + file identity) -> the key issued for that attempt. */
   private readonly keys = new Map<string, string>();
@@ -57,13 +57,13 @@ export class DocumentResubmissionService {
 
   /** Whether this file can be sent at all. Checked BEFORE encoding, not after. */
   tooLarge(file: File): boolean {
-    return isOverResubmitLimit(file, this.limit);
+    return isOverResubmitLimit(file, this.limits.maxFileBytes());
   }
 
   resubmit(applicationId: string, documentId: string, label: string, file: File): Observable<ResubmitResult> {
     // Size first: base64-encoding a 5MB file to then reject it wastes the
     // citizen's time and their phone's memory for nothing.
-    if (this.tooLarge(file)) return throwError(() => new FileTooLargeError(file.size, this.limit));
+    if (this.tooLarge(file)) return throwError(() => new FileTooLargeError(file.size, this.limits.maxFileBytes()));
 
     const key = this.keyFor(documentId, file);
     return from(toBase64(file)).pipe(

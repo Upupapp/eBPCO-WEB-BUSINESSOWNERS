@@ -29,6 +29,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/forgot-password.page').then((m) => m.ForgotPasswordPage),
   },
   {
+    // No guestGuard here, deliberately (matches the Admin Portal's own
+    // reset-password route): a citizen already signed in on another tab
+    // must still be able to complete a reset from an emailed link — this is
+    // the one flow specifically meant to help with an access problem, and
+    // blocking it for someone who happens to have a session elsewhere would
+    // defeat the point.
+    path: 'reset-password',
+    loadComponent: () => import('./features/auth/reset-password.page').then((m) => m.ResetPasswordPage),
+  },
+  {
     path: 'registration-success',
     loadComponent: () => import('./features/auth/registration-success.page').then((m) => m.RegistrationSuccessPage),
   },

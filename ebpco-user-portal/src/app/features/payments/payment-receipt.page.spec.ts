@@ -1,9 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { PaymentReceiptPage } from './payment-receipt.page';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { AuthService } from '../../core/session/auth.service';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
 
 /**
  * Guards task 8: an application could be "Paid" with NO payment record.
@@ -15,9 +19,16 @@ import { AuthService } from '../../core/session/auth.service';
  */
 describe('Payment state is one fact (task 8)', () => {
   let store: ApplicationStore;
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     store = TestBed.inject(ApplicationStore);
   });
   afterEach(() => TestBed.resetTestingModule());
@@ -81,6 +92,9 @@ describe('PaymentReceiptPage (task 11: cleared is earned, not inherited)', () =>
       imports: [PaymentReceiptPage],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ applicationId: 'app-x' }) } } },
         { provide: ApplicationStore, useValue: {
             applicationById: () => ({ id: 'app-x', permitType: 'Zoning / Locational Clearance',

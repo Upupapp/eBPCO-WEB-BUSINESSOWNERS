@@ -55,8 +55,8 @@ export class AppShellComponent {
     return this.auth.currentUser()?.photoPath ?? null;
   }
 
-  logout(): void {
-    this.auth.logout();
+  async logout(): Promise<void> {
+    await this.auth.logout();
     this.router.navigate(['/login']);
   }
 }

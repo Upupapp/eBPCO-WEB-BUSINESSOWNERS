@@ -1,8 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { AuthService } from '../../core/session/auth.service';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
 
 /**
  * BUS-004 — editing a business changes the business, and NOTHING already filed.
@@ -18,9 +22,16 @@ describe('Editing a business', () => {
   let businesses: BusinessStore;
   let applications: ApplicationStore;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     businesses = TestBed.inject(BusinessStore);
     applications = TestBed.inject(ApplicationStore);
   });

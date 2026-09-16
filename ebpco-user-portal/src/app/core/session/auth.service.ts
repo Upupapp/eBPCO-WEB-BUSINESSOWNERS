@@ -1,15 +1,17 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import {
-  AccountStatus,
   ApplicantType,
   CivilStatus,
-  Sex,
   NotificationPreferences,
+  Sex,
   UserAccount,
   defaultNotificationPreferences,
   unverifiedContact,
 } from '../domain/user.model';
-import { nextId, todayIso } from '../utils/ids';
+import { CitizenIdentityApi } from '../api/citizen-identity.api';
+import { CitizenTokenStore } from '../api/citizen-token-store';
+import { MeResponse } from '../api/citizen-profile';
+import { ApiError } from '../api/problem';
 
 export interface RegisterPersonalInfo {
   firstName: string;
@@ -36,216 +38,276 @@ export interface RegisterSecurityInfo {
 }
 
 /**
- * Mock authentication: a real, working UI flow against an in-memory store,
- * structured so a genuine HTTP-backed AuthService can replace this one without
- * touching call sites. It mirrors the convention in the citizen mobile app's
- * MockAuthRepository.
+ * Real, HTTP-backed authentication against `eBPCOBackend`.
  *
- * Deliberately in-memory only, never persisted to localStorage — a page refresh
- * always logs out, by design, rather than silently keeping a "signed in" state
- * alive across reloads.
+ * Replaces the in-memory mock this file used to hold (a `Map<string,
+ * account>` seeded with a demo account, matching the citizen mobile app's
+ * MockAuthRepository convention). The mock's own doc comment said this
+ * service was "structured so a genuine HTTP-backed AuthService can replace
+ * this one without touching call sites" — true for every consumer except
+ * `login.page.ts` and `register.page.ts`, which called `login()`/`register()`
+ * expecting a synchronous result. A real network call cannot be synchronous;
+ * both call sites were updated to `await` these methods, which is the one
+ * unavoidable ripple from going from a Map to HTTP.
  *
- * WHY IT IS STILL A MOCK, as of 2026-08-31. This comment used to justify itself
- * with "there is no backend anywhere in the eBPCO system yet (see master command
- * Section 15, Open Decision #3)". That premise has EXPIRED: Upupapp/eBPCOBackend
- * exists and carries a branch, and the admin portal already calls it over HTTP.
- * What remains true is narrower — no backend is wired to THIS portal, and its
- * auth contract has not been settled for citizens.
+ * ── A genuine gap this file does NOT paper over ──────────────────────────
  *
- * The distinction matters because this comment is the load-bearing justification
- * for the whole in-memory design, and a stale premise quietly converts a
- * deliberate decision into an unexamined one. Re-date it or replace it; do not
- * leave it asserting something that has stopped being true.
+ * `POST /auth/register` accepts exactly five fields — firstName, lastName,
+ * email, mobileNumber, password (`.strict()`, see auth.controller.ts) — and
+ * `PATCH /me` accepts firstName/middleName/lastName/mobileNumber/street/
+ * barangay/city/province/postalCode. Neither has a field for dateOfBirth,
+ * sex, civilStatus or nationality — the register screen still collects them
+ * (age-gating 18+ depends on dateOfBirth), but nothing sends them anywhere.
+ * `meResponseToAccount` below always returns null/'' for these four fields,
+ * on every account, because the server has no column for them to come back
+ * from. This is a real, unclosed gap in the backend's applicant model, not
+ * an oversight in this wiring — flag it if it matters for a screen, do not
+ * invent a server field to fix it here.
+ *
+ * `CitizenTokenStore` is injected directly only for `restore()`'s fast
+ * path — every write to it still happens inside `CitizenIdentityApi`
+ * (`signIn`/`signOut`), never here.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  /**
-   * Accounts, held in a SIGNAL rather than a bare Map.
-   *
-   * F-26. This was a plain `new Map()`, and `currentUser` below is a computed
-   * whose only reactive dependency is `currentUserId`. So every write here —
-   * updateProfile, changePassword, applicantTypeSet, preferences — mutated the
-   * map and the computed NEVER RECOMPUTED, because no signal it read had
-   * changed. `currentUser()` went on returning the account as it stood at
-   * sign-in, for the life of the session.
-   *
-   * A citizen who changed their address was shown "Profile updated", and the
-   * shell's name, the permit document's Address line and the payment receipt's
-   * payor all carried on showing the old values. The profile FORM looked
-   * correct only because it holds its own field variables — nothing that read
-   * the account ever saw the change.
-   *
-   * Writes replace the map rather than mutating it, so the signal actually
-   * changes identity. Mutating the map held inside a signal would leave exactly
-   * the same bug with a signal wrapped round it.
-   */
-  private readonly accounts = signal(
-    new Map<string, { account: UserAccount; password: string; preferences: NotificationPreferences }>(),
-  );
+  private readonly identity = inject(CitizenIdentityApi);
+  private readonly tokens = inject(CitizenTokenStore);
 
-  /** Replace one entry, producing a NEW map so dependent computeds recompute. */
-  private writeAccount(
-    id: string,
-    entry: { account: UserAccount; password: string; preferences: NotificationPreferences },
-  ): void {
-    this.accounts.update((m) => new Map(m).set(id, entry));
-  }
-  private readonly currentUserId = signal<string | null>(null);
+  private readonly _profile = signal<UserAccount | null>(null);
+
+  /**
+   * `applicantType` has no server field either (see class doc). Kept as a
+   * local-only override layered onto the real profile, the same shape the
+   * old mock had, so the applicant-type picker screen keeps working within
+   * this session — it is never sent anywhere and does not survive a reload.
+   */
+  private readonly _applicantTypeOverride = signal<ApplicantType | null>(null);
+
+  private readonly _preferences = signal<NotificationPreferences>(defaultNotificationPreferences());
 
   readonly currentUser = computed<UserAccount | null>(() => {
-    const id = this.currentUserId();
-    if (!id) return null;
-    return this.accounts().get(id)?.account ?? null;
+    const profile = this._profile();
+    if (!profile) return null;
+    const override = this._applicantTypeOverride();
+    return override === null ? profile : { ...profile, applicantType: override };
   });
 
-  readonly isAuthenticated = computed(() => this.currentUserId() !== null);
+  /**
+   * True once a real profile has been loaded — NOT merely "a token exists".
+   * A token can survive in localStorage from a previous visit while this
+   * signal is still null on a fresh page load; that gap is closed by the
+   * session-restore step (Stage 3), not by this flag.
+   */
+  readonly isAuthenticated = computed(() => this._profile() !== null);
 
-  constructor() {
-    this.seedDemoAccount();
+  async login(email: string, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      const me = await this.identity.signIn(email, password);
+      if (me.kind !== 'applicant') {
+        // Defensive only — this portal has no path to a staff account, but a
+        // wrong answer here must not be shown as a normal profile.
+        await this.identity.signOut();
+        return { ok: false, error: 'This is a staff account. Staff sign in through the Admin Portal.' };
+      }
+      this._profile.set(meResponseToAccount(me));
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: describeError(error) };
+    }
   }
 
-  private seedDemoAccount(): void {
-    const id = 'user-demo';
-    this.writeAccount(id, {
-      password: 'Password1',
-      preferences: defaultNotificationPreferences(),
-      account: {
-        id,
-        firstName: 'Juan',
-        middleName: 'Santos',
-        lastName: 'Dela Cruz',
-        dateOfBirth: '1988-04-12',
-        sex: 'Male',
-        civilStatus: 'Married',
-        nationality: 'Filipino',
-        email: 'juan.delacruz@example.com',
-        mobileNumber: '09171234567',
-        landlineNumber: null,
-        applicantType: 'Individual',
-        street: 'Purok 3, Zone 2',
-        barangay: 'Poblacion',
-        city: 'Castilla',
-        province: 'Sorsogon',
-        postalCode: '4712',
-        photoPath: null,
-        accountStatus: 'verified',
-        emailVerification: { status: 'Verified', method: 'Email Verification Link', verifiedAt: todayIso() },
-        mobileVerification: { status: 'Verified', method: 'Mobile OTP', verifiedAt: todayIso() },
-        registeredSince: '2026-01-15T00:00:00.000Z',
-      },
-    });
-  }
-
-  login(emailOrMobile: string, password: string): { ok: true } | { ok: false; error: string } {
-    const match = [...this.accounts().values()].find(
-      (entry) =>
-        entry.account.email.toLowerCase() === emailOrMobile.toLowerCase() ||
-        entry.account.mobileNumber === emailOrMobile,
-    );
-    if (!match) return { ok: false, error: 'No account found with that email or mobile number.' };
-    if (match.password !== password) return { ok: false, error: 'Incorrect password. Please try again.' };
-    this.currentUserId.set(match.account.id);
-    return { ok: true };
-  }
-
-  register(
+  async register(
     personal: RegisterPersonalInfo,
     contact: RegisterContactInfo,
     security: RegisterSecurityInfo,
-  ): { ok: true; id: string } | { ok: false; error: string } {
-    const exists = [...this.accounts().values()].some(
-      (entry) => entry.account.email.toLowerCase() === contact.email.toLowerCase(),
-    );
-    if (exists) return { ok: false, error: 'An account with this email already exists.' };
-
-    const id = nextId('user');
-    const account: UserAccount = {
-      id,
-      firstName: personal.firstName,
-      middleName: personal.middleName,
-      lastName: personal.lastName,
-      dateOfBirth: personal.dateOfBirth,
-      sex: personal.sex,
-      civilStatus: personal.civilStatus,
-      nationality: personal.nationality,
-      email: contact.email,
-      mobileNumber: contact.mobileNumber,
-      landlineNumber: null,
-      applicantType: null,
-      street: contact.street,
-      barangay: contact.barangay,
-      city: contact.city,
-      province: contact.province,
-      postalCode: contact.postalCode,
-      photoPath: null,
-      accountStatus: 'pending' as AccountStatus,
-      emailVerification: unverifiedContact(),
-      mobileVerification: unverifiedContact(),
-      registeredSince: todayIso(),
-    };
-    this.writeAccount(id, { account, password: security.password, preferences: defaultNotificationPreferences() });
-    return { ok: true, id };
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await this.identity.register({
+        firstName: personal.firstName,
+        lastName: personal.lastName,
+        email: contact.email,
+        mobileNumber: contact.mobileNumber,
+        password: security.password,
+      });
+      // The server does not return an id (202, no body) and does not say
+      // whether the address was already registered — identical either way,
+      // by design (enumeration). middleName/street/barangay/city/province/
+      // postalCode were collected on this form and are NOT sent: no field
+      // exists for them at registration (see class doc).
+      return { ok: true };
+    } catch (error) {
+      // A weak/breached/repetitive password comes back as a 400 with a field
+      // error pointing at `/password` — the server's own explanation
+      // (password-policy.ts), not a generic "request did not validate".
+      // `describeError`'s `citizenMessage` reads `title` as its last resort,
+      // which is that generic line, not the specific one this endpoint
+      // actually sends.
+      if (error instanceof ApiError) {
+        const passwordErrors = (error.problem?.fieldErrors ?? []).filter((e) => e.pointer === '/password');
+        if (passwordErrors.length > 0) {
+          return { ok: false, error: passwordErrors.map((e) => e.message).join(' ') };
+        }
+      }
+      return { ok: false, error: describeError(error) };
+    }
   }
 
-  logout(): void {
-    this.currentUserId.set(null);
-  }
-
-  updateProfile(patch: Partial<Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'street' | 'barangay' | 'city' | 'province' | 'postalCode' | 'photoPath'>>): void {
-    const id = this.currentUserId();
-    if (!id) return;
-    const entry = this.accounts().get(id);
-    if (!entry) return;
-    entry.account = { ...entry.account, ...patch };
-    this.writeAccount(id, entry);
-  }
-
-  changePassword(currentPassword: string, newPassword: string): { ok: true } | { ok: false; error: string } {
-    const id = this.currentUserId();
-    if (!id) return { ok: false, error: 'Not signed in.' };
-    const entry = this.accounts().get(id)!;
-    if (entry.password !== currentPassword) return { ok: false, error: 'Current password is incorrect.' };
-    entry.password = newPassword;
-    this.writeAccount(id, entry);
-    return { ok: true };
-  }
-
-  applicantTypeSet(type: ApplicantType): void {
-    const id = this.currentUserId();
-    if (!id) return;
-    const entry = this.accounts().get(id);
-    if (!entry) return;
-    entry.account = { ...entry.account, applicantType: type };
-    this.writeAccount(id, entry);
+  async logout(): Promise<void> {
+    await this.identity.signOut();
+    this.dropSession();
   }
 
   /**
-   * F-15: this used to return a FRESH default object on every call, and nothing
-   * called it. The Profile screen bound its eight preference checkboxes to a
-   * local `defaultNotificationPreferences()` instead, so toggling one changed an
-   * object that was discarded on navigation — a settings panel that looked
-   * functional and configured nothing.
+   * Drops the local session without calling the API.
    *
-   * Bound is not persisted. The controls all had bindings, which is why a
-   * dead-control scan (looking for handler-less buttons and unbound selects)
-   * reported this screen clean.
+   * For when the server has already said the token is no good (a 401 on an
+   * authenticated request — see `citizen-auth.interceptor.ts`) rather than
+   * the citizen choosing to sign out. Calling `logout()` there would try to
+   * revoke a token that is, by definition, already refused, and — more
+   * importantly — `citizen-auth.interceptor.ts` cannot call an async
+   * `logout()` mid-request and wait for it.
    *
-   * Preferences now live on the account, like every other profile field, so the
-   * panel works end-to-end within the demo's own world — the same standard the
-   * mocked login already meets. They are still in-memory only.
+   * The interceptor clearing `CitizenTokenStore` alone is not enough: this
+   * class's `isAuthenticated` reads its own `_profile` signal, which the
+   * interceptor cannot reach. Without this, a citizen whose token expired
+   * mid-session stayed `isAuthenticated() === true` on stale, cached profile
+   * data — invisible until they tried an action and got a 401, and even
+   * then: `citizen-auth.interceptor.ts` redirects to `/login`, but
+   * `guestGuard` there reads the same stale `isAuthenticated()` and bounced
+   * them straight back to `/dashboard`, as if signing out did nothing.
+   * Caught live, filing a real application, when the access token expired
+   * mid-wizard.
    */
+  dropSession(): void {
+    this._profile.set(null);
+    this._applicantTypeOverride.set(null);
+  }
+
+  /**
+   * Re-establishes a session from a token that survived a reload.
+   *
+   * Without this, refreshing the page (or reopening a tab — this portal
+   * deliberately keeps citizens signed in across a browser close, see
+   * `CitizenTokenStore`'s own doc comment) would sign the citizen out even
+   * though the token in localStorage is still valid, which defeats the
+   * whole point of using localStorage instead of sessionStorage here.
+   *
+   * Called once, at app bootstrap, via `provideAppInitializer` in
+   * `app.config.ts` — so by the time the router activates the first route,
+   * `isAuthenticated()` already reflects reality and the guard never has to
+   * redirect a citizen who was already signed in.
+   */
+  async restore(): Promise<void> {
+    if (!this.tokens.hasSession() || this._profile() !== null) return;
+    try {
+      const me = await this.identity.me();
+      if (me.kind === 'applicant') this._profile.set(meResponseToAccount(me));
+    } catch {
+      // An expired or revoked token is not an error worth showing on load —
+      // the guard sends the citizen to sign in, same as if they had never
+      // had a session.
+    }
+  }
+
+  /**
+   * Not yet wired to `PATCH /me` — that is Stage 10 of the connection plan.
+   * For now this updates the local copy only, same as before wiring began,
+   * so the Profile screen's own `saveProfile()` (which calls `PATCH /me`
+   * directly through `CitizenApiClient` when `canReachTheOffice()`) is what
+   * actually reaches the server; this keeps the in-memory account in sync
+   * with what that screen just showed as saved.
+   */
+  updateProfile(
+    patch: Partial<
+      Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'street' | 'barangay' | 'city' | 'province' | 'postalCode' | 'photoPath'>
+    >,
+  ): void {
+    const current = this._profile();
+    if (!current) return;
+    this._profile.set({ ...current, ...patch });
+  }
+
+  /**
+   * No backend route exists for "change my password while signed in" — only
+   * the forgot/reset-by-email flow (`POST /auth/password/forgot` →
+   * `POST /auth/password/reset`, wired in `CitizenIdentityApi`). This method
+   * stays a local-only stand-in and refuses honestly rather than claim a
+   * change that was never sent anywhere.
+   */
+  changePassword(): { ok: false; error: string } {
+    return {
+      ok: false,
+      error: 'Changing your password here isn’t connected yet — use "Forgot password?" on the sign-in screen instead.',
+    };
+  }
+
+  applicantTypeSet(type: ApplicantType): void {
+    if (!this._profile()) return;
+    this._applicantTypeOverride.set(type);
+  }
+
   notificationPreferencesFor(): NotificationPreferences {
-    const id = this.currentUserId();
-    if (!id) return defaultNotificationPreferences();
-    return { ...(this.accounts().get(id)?.preferences ?? defaultNotificationPreferences()) };
+    return { ...this._preferences() };
   }
 
   updateNotificationPreferences(next: NotificationPreferences): void {
-    const id = this.currentUserId();
-    if (!id) return;
-    const entry = this.accounts().get(id);
-    if (!entry) return;
-    entry.preferences = { ...next };
-    this.writeAccount(id, entry);
+    this._preferences.set({ ...next });
   }
+}
+
+/**
+ * `MeResponse` (the server's shape) → `UserAccount` (this portal's shape).
+ *
+ * Every server field the applicant `/me` route sends is nullable, and null
+ * means NOT RECORDED — see `citizen-profile.ts`. `UserAccount`'s address
+ * fields predate that distinction and are typed as plain strings, so a null
+ * becomes '' here; that loses the "never asked" vs "answered blank" fact
+ * `MeResponse` itself preserves, which is a real narrowing, not a neutral
+ * default. Screens that need the distinction should read `CitizenApiClient
+ * .getMe()` directly (as `profile.page.ts` already does for `heldProfile()`)
+ * rather than trust this mapping.
+ */
+function meResponseToAccount(me: MeResponse): UserAccount {
+  return {
+    id: me.id,
+    firstName: me.firstName ?? '',
+    middleName: me.middleName,
+    lastName: me.lastName ?? '',
+    // No server field exists for any of these four (see class doc on
+    // AuthService) — null/empty here is not "not recorded", it is "this
+    // account has never been asked", which is a real, standing gap.
+    dateOfBirth: null,
+    sex: null,
+    civilStatus: null,
+    nationality: '',
+    email: me.email,
+    mobileNumber: me.mobileNumber ?? '',
+    landlineNumber: null,
+    applicantType: null,
+    street: me.street ?? '',
+    barangay: me.barangay ?? '',
+    city: me.city ?? '',
+    province: me.province ?? '',
+    postalCode: me.postalCode ?? '',
+    photoPath: null,
+    // No server field for this either. Derived from email verification as
+    // the closest real signal, rather than invented: an unverified email
+    // reads as "pending", a verified one as "verified". This is an
+    // approximation, not a server-stated fact — do not treat it as one.
+    accountStatus: me.emailVerifiedAt ? 'verified' : 'pending',
+    emailVerification: me.emailVerifiedAt
+      ? { status: 'Verified', method: 'Email Verification Link', verifiedAt: me.emailVerifiedAt }
+      : unverifiedContact(),
+    mobileVerification: me.mobileVerifiedAt
+      ? { status: 'Verified', method: 'Mobile OTP', verifiedAt: me.mobileVerifiedAt }
+      : unverifiedContact(),
+    // No server field for account-creation time either — not returned by
+    // `/me`. '' rather than a guessed date.
+    registeredSince: '',
+  };
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof ApiError) return error.citizenMessage;
+  return 'We could not reach the Municipality’s system. Check your connection and try again.';
 }

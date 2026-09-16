@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
@@ -6,6 +7,10 @@ import { DEFAULT_BANK_INFO, PaymentMethod } from '../../core/domain/payment.mode
 import { MUNICIPAL_ENGINEER, MUNICIPAL_HALL_ADDRESS } from '../../core/domain/lgu-contact';
 import { pesos } from '../../core/domain/assessment.model';
 import { ToastService } from '../../shared/ui/toast.service';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { UploadLimitsService } from '../../core/api/upload-limits.service';
+import { toBase64 } from '../../core/api/document-resubmission.service';
+import { ApiError } from '../../core/api/problem';
 
 @Component({
   selector: 'app-payment-flow',
@@ -74,8 +79,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 
             @if (error()) { <div class="field error" style="margin-top:10px;">{{ error() }}</div> }
             @if (method() !== 'Bank Transfer' || bank) {
-              <button class="btn btn-primary btn-block" style="margin-top:14px;" (click)="submit(a.id)">
-                {{ method() === 'Bank Transfer' ? 'Submit Payment' : 'Mark as Paid' }}
+              <button class="btn btn-primary btn-block" style="margin-top:14px;" [disabled]="submitting()" (click)="submit(a.id)">
+                {{ submitting() ? 'Sending…' : (method() === 'Bank Transfer' ? 'Submit Payment' : 'Mark as Paid') }}
               </button>
             }
           </div>
@@ -98,6 +103,8 @@ export class PaymentFlowPage {
   private readonly router = inject(Router);
   private readonly store = inject(ApplicationStore);
   private readonly toast = inject(ToastService);
+  private readonly api = inject(CitizenApiClient);
+  private readonly uploadLimits = inject(UploadLimitsService);
 
   protected readonly bank = DEFAULT_BANK_INFO;
   protected readonly engineer = MUNICIPAL_ENGINEER;
@@ -105,7 +112,35 @@ export class PaymentFlowPage {
   protected readonly pesos = pesos;
   readonly method = signal<PaymentMethod>('Bank Transfer');
   readonly error = signal<string | null>(null);
+  readonly submitting = signal(false);
   proofFileName: string | null = null;
+  private proofFile: File | null = null;
+
+  /**
+   * The real Order of Payment, from `GET /applications/{id}` — `payment
+   * .orderOfPayment` (see `ApplicationSummary`). `realChecked` is a separate
+   * flag rather than folding "not fetched" into the value itself: `null`
+   * has to keep meaning "confirmed — no Order of Payment issued yet" (a
+   * real, common state, not an error), which is different from "the
+   * request just hasn't come back yet."
+   */
+  private readonly realChecked = signal(false);
+  private readonly realOrderOfPayment = signal<{ totalCentavos: number } | null>(null);
+
+  constructor() {
+    if (this.api.configured) {
+      this.api.getApplication(this.id()).subscribe({
+        next: (summary) => {
+          this.realOrderOfPayment.set(summary.payment.orderOfPayment ?? null);
+          this.realChecked.set(true);
+        },
+        // A local demo application id 404s against the real backend —
+        // expected, not an error. Leaves realChecked false, so assessment()
+        // falls back to the local demo data below.
+        error: () => {},
+      });
+    }
+  }
 
   private id(): string {
     return this.route.snapshot.paramMap.get('applicationId')!;
@@ -115,24 +150,108 @@ export class PaymentFlowPage {
     return this.store.applicationById(this.id());
   }
 
-  assessment() {
-    return this.store.assessmentFor(this.id());
+  /**
+   * `{ totalCentavos, balanceCentavos }` only — the two fields this screen
+   * actually renders. Real applications have no "partially paid" state
+   * server-side (payment.status only reaches Pending Verification or Paid,
+   * never a partial balance), so balance === total until this screen's own
+   * submission changes that.
+   */
+  assessment(): { totalCentavos: number; balanceCentavos: number } | undefined {
+    if (this.api.configured) {
+      if (!this.realChecked()) return undefined;
+      const real = this.realOrderOfPayment();
+      return real ? { totalCentavos: real.totalCentavos, balanceCentavos: real.totalCentavos } : undefined;
+    }
+    const a = this.store.assessmentFor(this.id());
+    return a ? { totalCentavos: a.totalCentavos, balanceCentavos: a.balanceCentavos } : undefined;
   }
 
   onProofSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.proofFileName = input.files?.[0]?.name ?? null;
+    const file = input.files?.[0] ?? null;
+    this.proofFile = file;
+    this.proofFileName = file?.name ?? null;
   }
 
-  submit(applicationId: string): void {
+  async submit(applicationId: string): Promise<void> {
     if (this.method() === 'Bank Transfer' && !this.proofFileName) {
       this.error.set('Please attach your proof of payment.');
       return;
     }
+
+    if (this.api.configured && this.realOrderOfPayment()) {
+      await this.submitReal(applicationId);
+      return;
+    }
+
     const reference = this.method() === 'Bank Transfer' ? this.proofFileName! : `ONSITE-${Date.now()}`;
     this.store.submitPayment(applicationId, this.method(), reference);
     // F-14: nobody will verify this. No payment record leaves the browser.
     this.toast.success('Recorded in this demo. No payment was sent or received.');
     this.router.navigate(['/applications', applicationId]);
+  }
+
+  /**
+   * Submits for real, against `POST /applications/{id}/payments`.
+   *
+   * `amountCentavos` is the real Order of Payment's own `totalCentavos` —
+   * never derived from anything the citizen typed, since inventing the
+   * amount to pay is the one mistake this screen cannot afford. A bank-
+   * transfer proof is uploaded for real first (same `POST /documents` path
+   * as the application wizard's attachments — Stage 6), and its real id is
+   * what travels as `proofDocumentId`; Onsite carries none, matching the
+   * existing UI (no file picker shown for that method).
+   */
+  private async submitReal(applicationId: string): Promise<void> {
+    const real = this.realOrderOfPayment()!;
+    this.submitting.set(true);
+    try {
+      let proofDocumentId: string | null = null;
+      if (this.method() === 'Bank Transfer' && this.proofFile) {
+        if (this.proofFile.size > this.uploadLimits.maxFileBytes()) {
+          this.error.set(
+            `"${this.proofFile.name}" is ${Math.round(this.proofFile.size / 1000)} KB. The Municipality's system ` +
+            `accepts up to about ${Math.round(this.uploadLimits.maxFileBytes() / 1000)} KB.`,
+          );
+          return;
+        }
+        try {
+          const contentBase64 = await toBase64(this.proofFile);
+          const uploaded = await firstValueFrom(
+            this.api.uploadDocument({ fileName: this.proofFile.name, label: 'Proof of Payment', contentBase64 }),
+          );
+          proofDocumentId = uploaded.documentId;
+        } catch (error) {
+          this.error.set(
+            error instanceof ApiError
+              ? error.citizenMessage
+              : 'Your proof of payment could not be sent to the Municipality. Please try again.',
+          );
+          return;
+        }
+      }
+
+      const reference = this.method() === 'Bank Transfer' ? this.proofFile!.name : `ONSITE-${Date.now()}`;
+      const result = await this.store.submitPaymentReal(applicationId, {
+        referenceNumber: reference,
+        method: this.method(),
+        paidOn: new Date().toISOString().slice(0, 10),
+        amountCentavos: real.totalCentavos,
+        proofDocumentId,
+      });
+      if (!result.ok) {
+        this.error.set(result.error);
+        return;
+      }
+      this.toast.success(
+        result.settles
+          ? 'Payment submitted to the Municipality — this settles your balance, pending verification.'
+          : 'Payment submitted to the Municipality, pending verification.',
+      );
+      this.router.navigate(['/applications', applicationId]);
+    } finally {
+      this.submitting.set(false);
+    }
   }
 }

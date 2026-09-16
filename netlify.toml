@@ -11,6 +11,72 @@
   # Remove this only if the deploy is ever changed to run the gate.
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
 
+# ── API paths, BEFORE the catch-all. Order matters: Netlify takes the first
+# rule that matches, so these must precede `/*` or the catch-all swallows
+# them. Mirrors the Admin Portal's netlify.toml — same reasoning: this site
+# has no backend of its own, so without these rules an XHR to e.g. `GET /me`
+# gets the SPA shell back as **200 text/html**, which HttpClient then tries
+# to parse as JSON and fails as malformed data — indistinguishable from a
+# broken server, when the honest answer is "no API here" (404).
+#
+# If this site is ever put in front of a real API (reverse-proxied rather
+# than same-origin-by-coincidence), replace these with proxy rules
+# (`to = "https://<api-host>/:splat"`, `status = 200`) rather than deleting
+# them — leaving no rule at all returns to the silent-200 behaviour.
+[[redirects]]
+  from   = "/auth/*"
+  to     = "/index.html"
+  status = 404
+
+[[redirects]]
+  from   = "/me"
+  to     = "/index.html"
+  status = 404
+
+[[redirects]]
+  from   = "/me/*"
+  to     = "/index.html"
+  status = 404
+
+[[redirects]]
+  from   = "/requirements/*"
+  to     = "/index.html"
+  status = 404
+
+[[redirects]]
+  from   = "/limits"
+  to     = "/index.html"
+  status = 404
+
+[[redirects]]
+  from   = "/notification-preferences"
+  to     = "/index.html"
+  status = 404
+
+[[redirects]]
+  from   = "/devices/*"
+  to     = "/index.html"
+  status = 404
+
+# NOT listed here: /applications, /documents, /notifications, /businesses.
+# Those four are simultaneously real API path prefixes AND this app's own
+# page routes (My Applications, My Documents, Notifications, Businesses) —
+# see proxy.conf.js's bypassBrowserNavigations for the dev-server's fix,
+# which tells an XHR apart from a browser navigation by its Accept header.
+# Netlify's declarative [[redirects]] has no equivalent header condition, so
+# there is no way to 404 the API shape of these without also 404ing the page
+# route. Left to the catch-all below (200, HTML) rather than break deep
+# links / refresh on those four pages. The cost: an XHR to one of these four
+# paths against this backend-less deploy gets a 200 of HTML instead of an
+# honest 404, same as before this stage. Only matters once this site is
+# actually put in front of a real API — at that point these four need an
+# Edge Function (or a gateway in front of Netlify) that can see the Accept
+# header, not a plain redirect rule.
+
+# Angular routes on the client. Without this every deep link — /login,
+# /applications, /businesses — is a 404 on refresh or when opened directly,
+# because no file exists at that path. 200 rather than 301: the URL the
+# citizen sees must not change.
 [[redirects]]
   from   = "/*"
   to     = "/index.html"

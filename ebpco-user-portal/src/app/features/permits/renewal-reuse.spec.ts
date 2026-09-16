@@ -1,8 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationWizardPage } from './application-wizard.page';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { AuthService } from '../../core/session/auth.service';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
 
 /**
  * The Municipal ruling of 3 September 2026.
@@ -20,9 +24,16 @@ describe('Renewal and amendment reuse (Municipal ruling)', () => {
   let store: ApplicationStore;
   let page: ApplicationWizardPage;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     store = TestBed.inject(ApplicationStore);
     page = TestBed.createComponent(ApplicationWizardPage).componentInstance;
   });

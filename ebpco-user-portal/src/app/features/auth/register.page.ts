@@ -82,7 +82,7 @@ type Step = 1 | 2 | 3;
           <div class="field">
             <label for="register-password-15">Password*</label>
             <input id="register-password-15" class="input" type="password" [(ngModel)]="password" />
-            <div class="hint">Minimum 8 characters, at least 1 letter and 1 number.</div>
+            <div class="hint">At least 12 characters. A longer phrase is easier to remember and harder to guess than a short one with symbols in it.</div>
           </div>
           <div class="field"><label for="register-confirm-password-16">Confirm Password*</label><input id="register-confirm-password-16" class="input" type="password" [(ngModel)]="confirmPassword" /></div>
           <label class="checkbox-row" style="margin-bottom:8px;">
@@ -93,8 +93,10 @@ type Step = 1 | 2 | 3;
           </label>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
-            <button class="btn btn-secondary" style="flex:1" (click)="step.set(2)">Back</button>
-            <button class="btn btn-primary" style="flex:2" (click)="submit()">Create Account</button>
+            <button class="btn btn-secondary" style="flex:1" [disabled]="submitting()" (click)="step.set(2)">Back</button>
+            <button class="btn btn-primary" style="flex:2" [disabled]="submitting()" (click)="submit()">
+              {{ submitting() ? 'Creating account…' : 'Create Account' }}
+            </button>
           </div>
         }
 
@@ -172,9 +174,17 @@ export class RegisterPage {
     this.step.set(3);
   }
 
-  submit(): void {
-    if (this.password.length < 8 || !/[a-zA-Z]/.test(this.password) || !/\d/.test(this.password)) {
-      this.error.set('Password must be at least 8 characters with at least 1 letter and 1 number.');
+  readonly submitting = signal(false);
+
+  async submit(): Promise<void> {
+    // 12, matching the server's real policy (password-policy.ts,
+    // MIN_PASSWORD_LENGTH — NIST SP 800-63B length-over-composition, no
+    // letter/digit mix required). The server also screens for repetitive,
+    // sequential, context-specific and breached passwords; those cannot be
+    // replicated client-side, so a password that passes this check can still
+    // come back with a specific reason from the server.
+    if ([...this.password].length < 12) {
+      this.error.set('Password must be at least 12 characters.');
       return;
     }
     if (this.password !== this.confirmPassword) {
@@ -185,31 +195,36 @@ export class RegisterPage {
       this.error.set('You must agree to the Terms & Conditions and Privacy Policy.');
       return;
     }
-    const result = this.auth.register(
-      {
-        firstName: this.firstName,
-        middleName: this.middleName || null,
-        lastName: this.lastName,
-        dateOfBirth: this.dateOfBirth,
-        sex: this.sex!,
-        civilStatus: this.civilStatus!,
-        nationality: this.nationality,
-      },
-      {
-        email: this.email,
-        mobileNumber: this.mobileNumber,
-        street: this.street,
-        barangay: this.barangay,
-        city: this.city,
-        province: this.province,
-        postalCode: this.postalCode,
-      },
-      { password: this.password },
-    );
-    if (!result.ok) {
-      this.error.set(result.error);
-      return;
+    this.submitting.set(true);
+    try {
+      const result = await this.auth.register(
+        {
+          firstName: this.firstName,
+          middleName: this.middleName || null,
+          lastName: this.lastName,
+          dateOfBirth: this.dateOfBirth,
+          sex: this.sex!,
+          civilStatus: this.civilStatus!,
+          nationality: this.nationality,
+        },
+        {
+          email: this.email,
+          mobileNumber: this.mobileNumber,
+          street: this.street,
+          barangay: this.barangay,
+          city: this.city,
+          province: this.province,
+          postalCode: this.postalCode,
+        },
+        { password: this.password },
+      );
+      if (!result.ok) {
+        this.error.set(result.error);
+        return;
+      }
+      this.router.navigate(['/registration-success']);
+    } finally {
+      this.submitting.set(false);
     }
-    this.router.navigate(['/registration-success']);
   }
 }

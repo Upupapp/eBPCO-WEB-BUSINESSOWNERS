@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationAction, PermitType, isValidPermitType } from '../../core/domain/permit.model';
@@ -14,6 +15,10 @@ import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { ToastService } from '../../shared/ui/toast.service';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { UploadLimitsService } from '../../core/api/upload-limits.service';
+import { toBase64 } from '../../core/api/document-resubmission.service';
+import { ApiError } from '../../core/api/problem';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -192,8 +197,13 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   <strong>{{ d.label }}</strong>
                   @if (d.description) { <div class="small muted">{{ d.description }}</div> }
                 </div>
-                @if (attached[d.id]; as slot) {
+                @if (uploadingRequirementId() === d.id) {
+                  <span class="badge">Sending…</span>
+                } @else if (attached[d.id]; as slot) {
                   <span class="badge badge-green">{{ slot.fileName }}</span>
+                  @if (slot.kind === 'upload' && api.configured && !uploadedDocumentIds()[d.id]) {
+                    <span class="small muted">Not sent yet</span>
+                  }
                 }
               </div>
               <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -292,8 +302,10 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           </label>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
-            <button class="btn btn-secondary" (click)="step.set(3)">Back</button>
-            <button class="btn btn-primary" (click)="submit()">Submit Application</button>
+            <button class="btn btn-secondary" [disabled]="submitting()" (click)="step.set(3)">Back</button>
+            <button class="btn btn-primary" [disabled]="submitting() || uploadingRequirementId() !== null" (click)="submit()">
+              {{ submitting() ? 'Submitting…' : 'Submit Application' }}
+            </button>
           </div>
         </div>
       }
@@ -307,6 +319,22 @@ export class ApplicationWizardPage {
   private readonly applicationStore = inject(ApplicationStore);
   private readonly documentLibrary = inject(DocumentLibraryStore);
   private readonly toast = inject(ToastService);
+  protected readonly api = inject(CitizenApiClient);
+  private readonly uploadLimits = inject(UploadLimitsService);
+  readonly submitting = signal(false);
+
+  /**
+   * Real, server-assigned document ids for this wizard's FRESH uploads,
+   * keyed by requirement id — populated as each file finishes a real
+   * `POST /documents` (see `onFileSelected`). A reused document (from the
+   * library, or from a previous permit) never gets an entry here: the
+   * library itself is not wired to real storage yet, so there is no real id
+   * to send for it. `submitReal()` reads this map, not `attached`, to build
+   * `documentIds` — the two are allowed to disagree, and when they do, the
+   * citizen is told so rather than it being papered over.
+   */
+  protected readonly uploadedDocumentIds = signal<Record<string, string>>({});
+  protected readonly uploadingRequirementId = signal<string | null>(null);
 
   readonly step = signal<Step>(1);
   readonly error = signal<string | null>(null);
@@ -414,7 +442,7 @@ export class ApplicationWizardPage {
     return Object.keys(this.attached).length;
   }
 
-  onFileSelected(event: Event, d: RequirementDocument): void {
+  async onFileSelected(event: Event, d: RequirementDocument): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -439,6 +467,45 @@ export class ApplicationWizardPage {
       },
     };
     this.documentLibrary.add({ file, fileName: file.name, fileType: fileTypeFromName(file.name), category: 'supportingDocument', sizeBytes: file.size });
+    // A real id for THIS attachment, invalidated the moment a different file
+    // replaces it — hence the delete before every fresh attempt below.
+    this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
+    if (this.api.configured) await this.uploadReal(d, file);
+  }
+
+  /**
+   * `POST /documents` for real, unattached (no `applicationId` yet — the
+   * application does not exist until `submitReal()` files it, and this
+   * upload has to survive the citizen changing their mind about which
+   * requirement it answers before then).
+   *
+   * Checked against `UploadLimitsService`'s LIVE ceiling, not the wizard's
+   * own guess — the same real number `DocumentResubmissionService` uses.
+   */
+  private async uploadReal(d: RequirementDocument, file: File): Promise<void> {
+    if (file.size > this.uploadLimits.maxFileBytes()) {
+      this.error.set(
+        `"${file.name}" is ${Math.round(file.size / 1000)} KB. The Municipality's system accepts up to about ` +
+        `${Math.round(this.uploadLimits.maxFileBytes() / 1000)} KB.`,
+      );
+      return;
+    }
+    this.uploadingRequirementId.set(d.id);
+    try {
+      const contentBase64 = await toBase64(file);
+      const result = await firstValueFrom(
+        this.api.uploadDocument({ fileName: file.name, label: d.label, contentBase64 }),
+      );
+      this.uploadedDocumentIds.update((map) => ({ ...map, [d.id]: result.documentId }));
+    } catch (error) {
+      this.error.set(
+        error instanceof ApiError
+          ? error.citizenMessage
+          : `"${file.name}" could not be sent to the Municipality. It is still attached here — try again, or remove it.`,
+      );
+    } finally {
+      this.uploadingRequirementId.set(null);
+    }
   }
 
   /**
@@ -464,17 +531,23 @@ export class ApplicationWizardPage {
    * and could never be used again. A renewal made that plain: the same
    * twenty-two files, uploaded a second time, all already on file.
    */
-  protected reuseExisting(d: RequirementDocument, saved: SavedDocument | null): void {
+  protected async reuseExisting(d: RequirementDocument, saved: SavedDocument | null): Promise<void> {
     if (!saved?.file) return;
     this.attached = {
       ...this.attached,
       [d.id]: { kind: 'upload', file: saved.file, fileName: saved.fileName, fileType: saved.fileType },
     };
+    // A real File IS available here (see SavedDocument's own file-not-null
+    // filter on `reusable()`), so this is not the "reused" pointer case
+    // above — it can go out for real the same way a fresh pick can.
+    this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
+    if (this.api.configured) await this.uploadReal(d, saved.file);
   }
 
   removeAttachment(d: RequirementDocument): void {
     const { [d.id]: _removed, ...rest } = this.attached;
     this.attached = rest;
+    this.uploadedDocumentIds.update(({ [d.id]: _drop, ...ids }) => ids);
   }
 
   toStep(next: Step): void {
@@ -512,11 +585,17 @@ export class ApplicationWizardPage {
     this.step.set(next);
   }
 
-  submit(): void {
+  async submit(): Promise<void> {
     if (!this.understandRequirements || !this.agreeTerms) {
       this.error.set('Please check both declarations to continue.');
       return;
     }
+
+    if (this.api.configured) {
+      await this.submitReal();
+      return;
+    }
+
     const business = this.businesses.myBusinesses().find((b) => b.id === this.businessId)!;
     const record = this.applicationStore.createDraft({
       businessId: business.id,
@@ -550,5 +629,60 @@ export class ApplicationWizardPage {
     // could let construction proceed thinking a permit application is in progress.
     this.toast.success('Saved to this demo. NOT sent to the Municipality.');
     this.router.navigate(['/applications', record.id]);
+  }
+
+  /**
+   * Files for real, against `POST /applications`.
+   *
+   * `businessId` goes out as null. Businesses are not wired to the backend
+   * yet (connection plan Stage 8) — the ids selected above are local-demo
+   * ids, not real UUIDs, and the server's schema requires a real UUID or
+   * nothing at all. Sending the demo id would be refused 400; sending
+   * nothing is honest about what this build can actually attest to today.
+   *
+   * `documentIds` carries exactly the requirements whose upload actually
+   * completed (`uploadedDocumentIds` — real server ids, not merely
+   * "attached in the UI"). A REUSED document (from a previous permit, or
+   * from the library before this stage wired real upload) has no real id
+   * and is never in that map, so it is correctly left out here too — the
+   * toast below is what tells the citizen that plainly, by name, rather
+   * than letting "Application filed" imply everything they saw attached
+   * actually went.
+   */
+  private async submitReal(): Promise<void> {
+    if (this.uploadingRequirementId() !== null) {
+      this.error.set('Please wait for the current file to finish sending.');
+      return;
+    }
+    this.submitting.set(true);
+    try {
+      const ids = this.uploadedDocumentIds();
+      const result = await this.applicationStore.fileReal({
+        permitType: this.isGeneric ? 'Business Permit' : this.permitType!,
+        applicationAction: this.applicationAction,
+        renewsPermitNumber: this.relatedPermitNumber,
+        businessId: null,
+        location: this.projectAddress,
+        documentIds: Object.values(ids),
+        form: {
+          scopeOfWork: this.scopeOfWork,
+          professionalName: this.professionalName || null,
+          prcNumber: this.prcNumber || null,
+        },
+      });
+      if (!result.ok) {
+        this.error.set(result.error);
+        return;
+      }
+      const notSent = this.documents.filter((d) => this.attached[d.id] && !ids[d.id]).map((d) => d.label);
+      this.toast.success(
+        notSent.length > 0
+          ? `Application filed. These documents were NOT sent — reuse-from-file isn’t connected yet: ${notSent.join(', ')}.`
+          : 'Application filed, with your attached documents.',
+      );
+      this.router.navigate(['/applications', result.id]);
+    } finally {
+      this.submitting.set(false);
+    }
   }
 }

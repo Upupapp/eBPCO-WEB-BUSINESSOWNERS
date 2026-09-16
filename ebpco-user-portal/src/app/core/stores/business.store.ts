@@ -1,7 +1,11 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../session/auth.service';
 import { Business, BusinessCategory } from '../domain/business.model';
 import { nextId, todayIso } from '../utils/ids';
+import { CitizenApiClient } from '../api/citizen-api.client';
+import { BusinessSummary, SubmitBusinessRequest } from '../api/citizen-api.models';
+import { ApiError } from '../api/problem';
 
 /**
  * What a citizen may change about their own business.
@@ -33,12 +37,68 @@ export interface RegisterBusinessInput {
 
 let regSeq = 100;
 
+/**
+ * `BusinessSummary` (the server's real wire shape) → `Business` (this
+ * portal's local domain type). A faithful mapping, unlike
+ * `ApplicationStore`'s equivalent — `businesses.controller.ts`'s
+ * `onTheWire()` already returns exactly the same fields this type needs,
+ * so nothing here is a placeholder. `status` is cast rather than validated
+ * against `BusinessStatus`'s two literals: the server column is a plain
+ * string and this portal has never had a route that could produce a third
+ * value, but do not treat the cast as proof one cannot appear.
+ */
+function fromServerBusiness(row: BusinessSummary, ownerApplicantId: string): Business {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    ownerApplicantId,
+    street: row.street,
+    barangay: row.barangay,
+    city: row.city,
+    province: row.province,
+    registrationNumber: row.registrationNumber,
+    dateRegistered: row.dateRegistered,
+    status: row.status as Business['status'],
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class BusinessStore {
   private readonly businesses = signal<Business[]>([]);
+  private readonly api = inject(CitizenApiClient);
+
+  /**
+   * Real businesses, from `GET /businesses`. `null` means "not fetched"
+   * (or not configured, e.g. a unit test) — distinct from `[]`, "fetched,
+   * genuinely none yet" — the same pattern `ApplicationStore.realApplications`
+   * uses, for the same reason.
+   */
+  private readonly realBusinesses = signal<Business[] | null>(null);
+
+  /** True once real data is the source of truth — gates the Edit action (C-5, write-once server-side). */
+  readonly usingReal = computed(() => this.realBusinesses() !== null);
 
   constructor(private readonly auth: AuthService) {
     this.seed();
+    effect(() => {
+      if (this.auth.isAuthenticated() && this.api.configured) {
+        void this.refreshMine();
+      } else {
+        this.realBusinesses.set(null);
+      }
+    });
+  }
+
+  async refreshMine(): Promise<void> {
+    try {
+      const response = await firstValueFrom(this.api.listBusinesses());
+      const ownerId = this.auth.currentUser()?.id ?? '';
+      this.realBusinesses.set(response.data.map((row) => fromServerBusiness(row, ownerId)));
+    } catch {
+      // Leave whatever was there before — a transient failure should not
+      // make a citizen's own businesses appear to vanish.
+    }
   }
 
   private seed(): void {
@@ -73,12 +133,17 @@ export class BusinessStore {
   }
 
   readonly myBusinesses = computed(() => {
+    const real = this.realBusinesses();
+    if (real !== null) return real;
     const ownerId = this.auth.currentUser()?.id;
     if (!ownerId) return [];
     return this.businesses().filter((b) => b.ownerApplicantId === ownerId);
   });
 
   businessById(id: string): Business | undefined {
+    const real = this.realBusinesses();
+    const foundReal = real?.find((b) => b.id === id);
+    if (foundReal) return foundReal;
     return this.businesses().find((b) => b.id === id);
   }
 
@@ -100,6 +165,26 @@ export class BusinessStore {
     };
     this.businesses.update((list) => [business, ...list]);
     return business;
+  }
+
+  /**
+   * `POST /businesses` for real. `registrationNumber`/`dateRegistered` are
+   * REQUIRED by the server (unlike the local `register()` above, which
+   * invents them) — the caller must collect both from the citizen.
+   */
+  async registerReal(
+    request: SubmitBusinessRequest,
+  ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+    try {
+      const summary = await firstValueFrom(this.api.registerBusiness(request));
+      await this.refreshMine();
+      return { ok: true, id: summary.id };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Check your connection and try again.',
+      };
+    }
   }
 
   /**

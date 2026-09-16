@@ -2,8 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { Route } from '@angular/router';
 import { routes } from '../../app.routes';
 import { AuthService } from '../../core/session/auth.service';
-import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
 import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
 /**
  * PUB-007 Reset Password — a tripwire, not a screen.
@@ -23,10 +24,24 @@ import { provideHttpClient } from '@angular/common/http';
  * verification that makes it safe.
  *
  * Delete these tests only together with the reason for them.
+ *
+ * Updated once real auth landed (`CitizenIdentityApi`, `AuthService`): a
+ * server-issued, token-verified reset path now genuinely exists —
+ * `POST /auth/password/forgot` then `POST /auth/password/reset`, wired as
+ * `CitizenIdentityApi.requestPasswordReset`/`resetPassword` — so the first
+ * test below now looks for it on `CitizenIdentityApi`, not
+ * `CitizenApiClient` (which never held it). `AuthService.changePassword()`
+ * went the other direction: it used to take a current password and verify
+ * it locally against the in-memory mock; the real backend has no
+ * "change password while signed in" route at all, only the forgot/reset
+ * flow, so it now takes NO arguments and always refuses — an even stronger
+ * guarantee than before, since there is no argument shape left to get
+ * wrong. `app.routes.ts` has no reset route yet (that is Stage 11 of the
+ * connection plan), so the first test's early return still applies today.
  */
 describe('PUB-007 — a password reset cannot be faked', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
   });
   afterEach(() => TestBed.resetTestingModule());
 
@@ -39,7 +54,7 @@ describe('PUB-007 — a password reset cannot be faked', () => {
   it('a reset route may exist ONLY once something can verify a reset token', () => {
     if (resetRoutes().length === 0) return; // nothing to guard yet — the state today
 
-    const api = TestBed.inject(CitizenApiClient) as unknown as Record<string, unknown>;
+    const api = TestBed.inject(CitizenIdentityApi) as unknown as Record<string, unknown>;
     const verifies = Object.getOwnPropertyNames(Object.getPrototypeOf(api))
       .some((m) => /reset|recover|verifyToken/i.test(m));
     expect(verifies).toBe(true);
@@ -48,32 +63,28 @@ describe('PUB-007 — a password reset cannot be faked', () => {
     // add the verified server call it needs.
   });
 
-  it('AuthService offers no way to set a password without proving who you are', () => {
+  it('AuthService offers no local way to set a password at all', () => {
     const proto = Object.getPrototypeOf(TestBed.inject(AuthService));
     const setters = Object.getOwnPropertyNames(proto).filter((m) => /password/i.test(m));
 
-    // changePassword(currentPassword, newPassword) is safe: it demands the
-    // password the account already has. Anything else taking only a new
-    // password would be a reset with nothing verifying the requester.
+    // changePassword() takes zero arguments and always refuses — see its own
+    // doc comment. Anything else matching /password/ that is not it, or that
+    // is it but accepts arguments, would be a local password-set path with
+    // nothing verifying the requester.
     for (const name of setters) {
-      const fn = proto[name] as (...a: unknown[]) => unknown;
-      if (name === 'changePassword') {
-        expect(fn.length).toBeGreaterThanOrEqual(2);
-      } else {
+      if (name !== 'changePassword') {
         throw new Error(
           `AuthService.${name} sets a password and is not changePassword. ` +
             `If this is a reset, it must verify a server-issued token first.`,
         );
       }
+      const fn = proto[name] as (...a: unknown[]) => unknown;
+      expect(fn.length).toBe(0);
     }
   });
 
-  it('changePassword actually refuses a wrong current password', () => {
+  it('changePassword always refuses — the real reset path is CitizenIdentityApi.resetPassword', () => {
     const auth = TestBed.inject(AuthService);
-    auth.login('juan.delacruz@example.com', 'Password1');
-    // Not a shape assertion: the guard has to BITE, or the two-argument check
-    // above is satisfied by a method that ignores its first argument.
-    expect(auth.changePassword('NotTheRightOne1', 'BrandNewPass1').ok).toBe(false);
-    expect(auth.changePassword('Password1', 'BrandNewPass1').ok).toBe(true);
+    expect(auth.changePassword().ok).toBe(false);
   });
 });

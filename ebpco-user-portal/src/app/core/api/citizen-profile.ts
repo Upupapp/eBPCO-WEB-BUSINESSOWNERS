@@ -22,14 +22,15 @@ export interface CitizenProfile {
 }
 
 /**
- * `GET /me`. Identity fields, and NO mobileVerifiedAt.
+ * `GET /me`. Identity fields, plus verification state.
  *
- * The two /me responses have DIFFERENT shapes and this one is not a superset:
- * GET carries `id`, `kind`, `email` and `emailVerifiedAt`; PATCH carries
- * `mobileVerifiedAt` and `mobileVerificationCleared` and none of the identity
- * fields. Typing one interface for both — which is what this file did until the
- * recorded samples were read — declares a field that is simply absent at
- * runtime, and `undefined` would have rendered as a verified-looking blank.
+ * Re-verified 2026-09-15 against the live `auth.controller.ts` (`MeController.me`,
+ * the `common` object): GET now carries `mobileVerifiedAt` too, alongside
+ * `id`/`kind`/`email`/`emailVerifiedAt` — the doc comment here used to say GET
+ * carried none, which was true only until F-32's fix landed. PATCH's response
+ * is still not a superset of this one: it carries `mobileVerificationCleared`,
+ * which describes what a correction DID rather than a fact about the account,
+ * and has no `id`/`kind`/`email`/`emailVerifiedAt`.
  *
  * `email` is present here and MUST NOT be offered for editing: PATCH refuses it
  * with a 400 because it is the sign-in identity.
@@ -39,6 +40,7 @@ export interface MeResponse extends CitizenProfile {
   kind: string;
   email: string;
   emailVerifiedAt: string | null;
+  mobileVerifiedAt: string | null;
 }
 
 /** What PATCH /me answers with: the new profile, plus what the change cost. */

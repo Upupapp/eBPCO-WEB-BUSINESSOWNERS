@@ -14,6 +14,8 @@
     notice does not authorise.
   -->
   <link rel="preload" href="/assets/fonts/gothic-a1-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <!-- Must load before the Angular bundle: sets globalThis.EBPCO_API_BASE_URL, read by core/api/api-config.ts. -->
+  <script src="config.js"></script>
 </head>
 <body>
   <app-root></app-root>

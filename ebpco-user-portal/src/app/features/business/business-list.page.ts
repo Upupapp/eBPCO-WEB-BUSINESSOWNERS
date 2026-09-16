@@ -240,8 +240,10 @@ export class BusinessListPage {
         return ICONS.wrench;
       case 'Manufacturing':
         return ICONS.factory;
-      case 'Wholesale':
-        return ICONS.package;
+      // 'Wholesale' is gone — it was never a real server category (see
+      // business.model.ts). Construction/Transport/Agriculture, which ARE
+      // real, have no dedicated icon of their own yet and fall through to
+      // the default below, same as Retail/Other always have.
       default:
         return ICONS.store;
     }

@@ -1,9 +1,99 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { AppNotification, NotificationCategory } from '../domain/notification.model';
 import { nextId, todayIso } from '../utils/ids';
+import { AuthService } from '../session/auth.service';
+import { CitizenApiClient } from '../api/citizen-api.client';
+import { NotificationEntry } from '../api/citizen-api.models';
+
+/**
+ * Real category names (`NotificationEntry.category`) → this portal's local,
+ * narrower vocabulary. Lossy on purpose, not a bug: `notifications.page.ts`
+ * never switches on category (only title/message/applicationId/createdAt/
+ * isRead drive the UI), so a coarser local label costs nothing today. Do
+ * not use this mapping anywhere that needs to tell 'appointments' and
+ * 'account' apart — collapse either to 'system' loses that distinction.
+ */
+function toLocalCategory(category: NotificationEntry['category']): NotificationCategory {
+  switch (category) {
+    case 'applicationUpdates': return 'application';
+    case 'payments': return 'payment';
+    case 'permitStatus': return 'permit';
+    case 'documentReminders': return 'document';
+    default: return 'system'; // appointments, account
+  }
+}
+
+function fromServerNotification(entry: NotificationEntry): AppNotification {
+  return {
+    id: entry.id,
+    applicationId: entry.applicationId,
+    category: toLocalCategory(entry.category),
+    title: entry.title,
+    message: entry.body,
+    createdAt: entry.createdAt,
+    isRead: entry.readAt !== null,
+  };
+}
 
 @Injectable({ providedIn: 'root' })
 export class NotificationStore {
+  private readonly auth = inject(AuthService);
+  private readonly api = inject(CitizenApiClient);
+
+  /**
+   * Real notifications, from `GET /notifications`. `null` means "not
+   * fetched" — same pattern as `ApplicationStore.realApplications` and
+   * `BusinessStore.realBusinesses`, for the same reason.
+   */
+  private readonly realNotifications = signal<AppNotification[] | null>(null);
+  readonly usingReal = computed(() => this.realNotifications() !== null);
+
+  constructor() {
+    effect(() => {
+      if (this.auth.isAuthenticated() && this.api.configured) {
+        void this.refreshMine();
+      } else {
+        this.realNotifications.set(null);
+      }
+    });
+  }
+
+  async refreshMine(): Promise<void> {
+    try {
+      const response = await firstValueFrom(this.api.getNotifications());
+      this.realNotifications.set(response.data.map(fromServerNotification));
+    } catch {
+      // Leave whatever was there before — a transient failure should not
+      // make a citizen's own notifications appear to vanish.
+    }
+  }
+
+  /** `POST /notifications/{id}/read` for real. */
+  async markReadReal(id: string): Promise<void> {
+    try {
+      await firstValueFrom(this.api.markNotificationRead(id));
+      await this.refreshMine();
+    } catch {
+      // The click already felt like it worked locally in no case here —
+      // there is no optimistic local flip to undo. A retry (opening the
+      // notification again) is the recovery path; nothing to show inline
+      // for a background refresh failure this small.
+    }
+  }
+
+  /**
+   * No bulk "mark all read" route exists server-side — only the one-at-a-
+   * time `POST /notifications/{id}/read`. This is genuinely N requests,
+   * not a shortcut standing in for one; do not "simplify" it into a single
+   * call without first confirming the server grew a bulk route.
+   */
+  async markAllReadReal(): Promise<void> {
+    const unread = (this.realNotifications() ?? []).filter((n) => !n.isRead);
+    await Promise.all(unread.map((n) => firstValueFrom(this.api.markNotificationRead(n.id)).catch(() => {})));
+    await this.refreshMine();
+  }
+
   private readonly items = signal<AppNotification[]>([
     {
       id: 'notif-1',
@@ -25,8 +115,12 @@ export class NotificationStore {
     },
   ]);
 
-  readonly all = computed(() => [...this.items()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)));
-  readonly unreadCount = computed(() => this.items().filter((n) => !n.isRead).length);
+  readonly all = computed(() => {
+    const real = this.realNotifications();
+    const source = real ?? this.items();
+    return [...source].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  });
+  readonly unreadCount = computed(() => this.all().filter((n) => !n.isRead).length);
 
   push(title: string, message: string, category: NotificationCategory, applicationId: string | null = null): void {
     this.items.update((list) => [

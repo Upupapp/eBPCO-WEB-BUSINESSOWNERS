@@ -61,6 +61,10 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.js",
+            "port": 4201
+          },
           "configurations": {
             "production": {
               "buildTarget": "ebpco-user-portal:build:production"

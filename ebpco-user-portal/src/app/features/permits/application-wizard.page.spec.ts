@@ -1,10 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationWizardPage } from './application-wizard.page';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { AuthService } from '../../core/session/auth.service';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
 
 /**
  * Guards the defect that cost the mobile app its entire document history: every
@@ -25,9 +29,16 @@ describe('Attachments carry the file, not just its name', () => {
   let store: ApplicationStore;
   let library: DocumentLibraryStore;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     store = TestBed.inject(ApplicationStore);
     library = TestBed.inject(DocumentLibraryStore);
   });
@@ -86,11 +97,14 @@ describe('Attachments carry the file, not just its name', () => {
       imports: [ApplicationWizardPage],
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
         { provide: ActivatedRoute, useValue: {
             snapshot: { queryParamMap: convertToParamMap({ type: 'Zoning / Locational Clearance' }) } } },
       ],
     });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     const appStore = TestBed.inject(ApplicationStore);
     const fixture = TestBed.createComponent(ApplicationWizardPage);
     fixture.detectChanges();

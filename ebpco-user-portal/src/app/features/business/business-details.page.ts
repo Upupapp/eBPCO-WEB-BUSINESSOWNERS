@@ -18,7 +18,9 @@ import { formatDate } from '../../core/utils/ids';
             <div class="subtitle">{{ b.category }} · Reg. No. {{ b.registrationNumber }} · Registered {{ formatDate(b.dateRegistered) }}</div>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a [routerLink]="['/businesses', b.id, 'edit']" class="btn btn-secondary">Edit Business</a>
+            @if (!businessStore.usingReal()) {
+              <a [routerLink]="['/businesses', b.id, 'edit']" class="btn btn-secondary">Edit Business</a>
+            }
             <a [routerLink]="['/permits']" [queryParams]="{ businessId: b.id }" class="btn btn-primary">Apply for Permit</a>
           </div>
         </div>
@@ -62,7 +64,7 @@ import { formatDate } from '../../core/utils/ids';
 })
 export class BusinessDetailsPage {
   private readonly route = inject(ActivatedRoute);
-  private readonly businessStore = inject(BusinessStore);
+  protected readonly businessStore = inject(BusinessStore);
   private readonly applicationStore = inject(ApplicationStore);
 
   protected readonly formatDate = formatDate;

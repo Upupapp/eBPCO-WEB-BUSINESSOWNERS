@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { BusinessStore } from '../../core/stores/business.store';
 import { BUSINESS_CATEGORIES, BusinessCategory } from '../../core/domain/business.model';
 import { ToastService } from '../../shared/ui/toast.service';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
 
 @Component({
   selector: 'app-register-business',
@@ -31,12 +32,26 @@ import { ToastService } from '../../shared/ui/toast.service';
           <div class="field"><label for="register-business-city-municipality-5">City / Municipality*</label><input id="register-business-city-municipality-5" class="input" [(ngModel)]="city" /></div>
         </div>
         <div class="field"><label for="register-business-province-6">Province*</label><input id="register-business-province-6" class="input" [(ngModel)]="province" /></div>
+        @if (api.configured) {
+          <div class="form-row">
+            <div class="field">
+              <label for="register-business-registration-number-7">DTI / SEC / CDA Registration No.*</label>
+              <input id="register-business-registration-number-7" class="input" [(ngModel)]="registrationNumber" />
+            </div>
+            <div class="field">
+              <label for="register-business-date-registered-8">Date Registered*</label>
+              <input id="register-business-date-registered-8" class="input" type="date" [(ngModel)]="dateRegistered" />
+            </div>
+          </div>
+        }
 
         @if (error()) { <div class="field error">{{ error() }}</div> }
 
         <div style="display:flex; gap:10px; margin-top:8px;">
           <a routerLink="/businesses" class="btn btn-secondary" style="flex:1">Cancel</a>
-          <button class="btn btn-primary" style="flex:2" (click)="submit()">Register Business</button>
+          <button class="btn btn-primary" style="flex:2" [disabled]="submitting()" (click)="submit()">
+            {{ submitting() ? 'Registering…' : 'Register Business' }}
+          </button>
         </div>
       </div>
     </div>
@@ -46,9 +61,11 @@ export class RegisterBusinessPage {
   private readonly store = inject(BusinessStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  protected readonly api = inject(CitizenApiClient);
 
   readonly categories = BUSINESS_CATEGORIES;
   readonly error = signal<string | null>(null);
+  readonly submitting = signal(false);
 
   name = '';
   category: BusinessCategory = 'Retail';
@@ -56,12 +73,21 @@ export class RegisterBusinessPage {
   barangay = '';
   city = '';
   province = '';
+  /** Required only for a real submission — see class doc and the server's `businessShape`. */
+  registrationNumber = '';
+  dateRegistered = '';
 
-  submit(): void {
+  async submit(): Promise<void> {
     if (!this.name || !this.street || !this.barangay || !this.city || !this.province) {
       this.error.set('Please complete all required fields.');
       return;
     }
+
+    if (this.api.configured) {
+      await this.submitReal();
+      return;
+    }
+
     const business = this.store.register({
       name: this.name,
       category: this.category,
@@ -73,5 +99,33 @@ export class RegisterBusinessPage {
     // F-14: "registered" reads as registered WITH THE MUNICIPALITY. It is not.
     this.toast.success(`${business.name} saved to this demo, not registered with the Municipality.`);
     this.router.navigate(['/businesses', business.id]);
+  }
+
+  private async submitReal(): Promise<void> {
+    if (!this.registrationNumber || !this.dateRegistered) {
+      this.error.set('Please complete all required fields.');
+      return;
+    }
+    this.submitting.set(true);
+    try {
+      const result = await this.store.registerReal({
+        name: this.name,
+        category: this.category,
+        street: this.street,
+        barangay: this.barangay,
+        city: this.city,
+        province: this.province,
+        registrationNumber: this.registrationNumber,
+        dateRegistered: this.dateRegistered,
+      });
+      if (!result.ok) {
+        this.error.set(result.error);
+        return;
+      }
+      this.toast.success(`${this.name} registered with the Municipality.`);
+      this.router.navigate(['/businesses', result.id]);
+    } finally {
+      this.submitting.set(false);
+    }
   }
 }

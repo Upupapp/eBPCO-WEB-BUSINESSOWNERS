@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { AppShellComponent } from './app-shell.component';
 
@@ -16,7 +18,12 @@ describe('AppShell (F-14: the demo disclosure is build-wide)', () => {
   function render() {
     TestBed.configureTestingModule({
       imports: [AppShellComponent],
-      providers: [provideRouter([])],
+      // AppShellComponent injects AuthService, which now injects
+      // CitizenIdentityApi (real HTTP), which injects HttpClient — so this
+      // test needs a provider for it even though rendering never fires a
+      // request. provideHttpClientTesting() ensures nothing escapes to a
+      // real network if a future change makes it try.
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     const fixture = TestBed.createComponent(AppShellComponent);
     fixture.detectChanges();
@@ -29,10 +36,14 @@ describe('AppShell (F-14: the demo disclosure is build-wide)', () => {
     expect(banner).toBeTruthy();
   });
 
-  it('says the Municipality receives nothing, and that data is lost on refresh', () => {
+  it('says accounts are real but application data is lost on refresh', () => {
+    // Updated once account sign-up/sign-in were wired to the real backend —
+    // "the Municipality receives nothing" stopped being true the day
+    // POST /auth/register started really creating a row. See the HTML's own
+    // comment on `.ds-demo-banner` for the full reasoning.
     const text = (render().nativeElement as HTMLElement).querySelector('.ds-demo-banner')?.textContent ?? '';
-    expect(text).toContain('Demonstration build');
-    expect(text).toContain('reaches the Municipality of Castilla');
+    expect(text).toContain('Account sign-up and sign-in are real');
+    expect(text).toContain('genuinely created and stored');
     expect(text).toContain('erased when you close or refresh');
   });
 

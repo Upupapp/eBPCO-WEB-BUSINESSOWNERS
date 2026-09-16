@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { ApplicationWizardPage } from './application-wizard.page';
 import { AuthService } from '../../core/session/auth.service';
@@ -7,6 +9,8 @@ import {
   actionNeedsExistingPermit,
   actionReferenceIsComplete,
 } from '../../core/domain/application.model';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
 
 /**
  * A Renewal must say WHAT it renews.
@@ -24,9 +28,16 @@ import {
 describe('A Renewal or Amendment names the permit it acts on', () => {
   let store: ApplicationStore;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     store = TestBed.inject(ApplicationStore);
   });
   afterEach(() => TestBed.resetTestingModule());

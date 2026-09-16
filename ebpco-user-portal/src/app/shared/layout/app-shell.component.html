@@ -144,14 +144,23 @@
       "we couldn't find that" branch — so a citizen saw it after their data was
       already gone, never before they spent an hour on the application wizard.
       A disclosure that arrives only on failure is a consolation, not a warning.
-      The whole build is a demonstration, so the notice is a property of the
-      build, not of a screen. Guarded by app-shell.component.spec.ts.
+      Guarded by app-shell.component.spec.ts.
+
+      Updated once account sign-up/sign-in were wired to the real backend
+      (eBPCOBackend): "the whole build is a demonstration" stopped being true
+      the day `POST /auth/register` started really creating a row. Claiming
+      otherwise here would now be the false statement F-14 was written to
+      prevent, just about a different fact. What is still genuinely true —
+      applications, documents, payments and businesses are not connected —
+      is what the notice says now; it will keep narrowing, one connected
+      area at a time, as the rest of the connection plan lands.
     -->
     <div class="ds-demo-banner" role="status">
-      <strong>Demonstration build.</strong>
-      Nothing you enter here reaches the Municipality of Castilla. Data is kept in your browser only
-      and is erased when you close or refresh the page. Do not file a real permit application here —
-      contact the Office of the Municipal Engineer on {{ engineerMobile }}.
+      <strong>Account sign-up and sign-in are real.</strong>
+      Your account is genuinely created and stored by the Municipality of Castilla. Everything else —
+      applications, documents, payments and businesses — is still a demonstration and is kept in your
+      browser only, erased when you close or refresh the page. Do not file a real permit application
+      here — contact the Office of the Municipal Engineer on {{ engineerMobile }}.
     </div>
 
     <router-outlet />

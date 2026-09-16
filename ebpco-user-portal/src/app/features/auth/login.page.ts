@@ -28,7 +28,9 @@ import { AuthService } from '../../core/session/auth.service';
           <div class="field error">{{ error() }}</div>
         }
 
-        <button class="btn btn-primary btn-block" (click)="submit()">Log In</button>
+        <button class="btn btn-primary btn-block" [disabled]="submitting()" (click)="submit()">
+          {{ submitting() ? 'Signing in…' : 'Log In' }}
+        </button>
 
         <div style="text-align:center; margin-top:14px;">
           <a routerLink="/forgot-password" class="small">Forgot password?</a>
@@ -36,9 +38,6 @@ import { AuthService } from '../../core/session/auth.service';
         <hr class="divider" />
         <div style="text-align:center;" class="small muted">
           Don't have an account? <a routerLink="/register">Register</a>
-        </div>
-        <div class="card" style="margin-top:16px; background:var(--info-100); border:none;">
-          <p class="small" style="color:var(--info-text); margin:0;">Demo account — <strong>juan.delacruz&#64;example.com</strong> / <strong>Password1</strong></p>
         </div>
       </div>
     </div>
@@ -52,7 +51,9 @@ export class LoginPage {
   password = '';
   readonly error = signal<string | null>(null);
 
-  submit(): void {
+  readonly submitting = signal(false);
+
+  async submit(): Promise<void> {
     if (!this.identifier && !this.password) {
       this.error.set('Please enter your email/mobile number and password.');
       return;
@@ -65,12 +66,17 @@ export class LoginPage {
       this.error.set('Please enter your password.');
       return;
     }
-    const result = this.auth.login(this.identifier, this.password);
-    if (!result.ok) {
-      this.error.set(result.error);
-      return;
+    this.submitting.set(true);
+    try {
+      const result = await this.auth.login(this.identifier, this.password);
+      if (!result.ok) {
+        this.error.set(result.error);
+        return;
+      }
+      this.error.set(null);
+      this.router.navigate(['/dashboard']);
+    } finally {
+      this.submitting.set(false);
     }
-    this.error.set(null);
-    this.router.navigate(['/dashboard']);
   }
 }

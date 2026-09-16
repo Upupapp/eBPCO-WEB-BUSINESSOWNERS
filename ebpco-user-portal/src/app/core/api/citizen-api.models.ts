@@ -98,6 +98,246 @@ export interface ResubmitRequest {
   contentBase64: string;
 }
 
+/**
+ * `GET /applications` (one row) and `GET /applications/{id}` — the
+ * applicant's own view of an application, built server-side by
+ * `toApplicantView()` (`applicant-view.ts`), which whitelists fields onto a
+ * fresh object precisely so nothing officer-scoped (an evaluation stage, an
+ * officer's name) ever reaches this payload. Re-verified 2026-09-15 by
+ * reading that function directly rather than assuming a shape.
+ */
+export interface ApplicationSummary {
+  id: string;
+  referenceNumber: string;
+  serviceDomain: string;
+  permitType: string;
+  applicationAction: string;
+  businessId: string | null;
+  businessName: string | null;
+  location: string | null;
+  lifecycleStatus: string;
+  /** The coarse, citizen-facing status — computed server-side. Prefer this over deriving one locally from lifecycleStatus. */
+  applicantStatus: string;
+  requiresApplicantAction: boolean;
+  dateSubmitted: string | null;
+  updatedAt: string;
+  openInstructionCount: number;
+  /** The applicant's own answers, as filed. */
+  form: Record<string, unknown>;
+  /** Absent — not present as a key at all — when the LGU's charter has no pledge for this permit type. */
+  classification?: string;
+  pledge?: {
+    pledgedWorkingDays: number;
+    dueDate: string | null;
+    approximate: boolean;
+    suspended: boolean;
+    suspendedSince: string | null;
+  };
+  payment: {
+    status: 'Not Yet Available' | 'Pending Verification' | 'Paid' | 'Overdue';
+    /** Absent — not present, not null — until an officer has issued one. No key means no amount to render, not zero. */
+    orderOfPayment?: {
+      number: string;
+      assessedAt: string;
+      dueDate: string | null;
+      feeScheduleVersion: string;
+      fees: {
+        filing: number;
+        processing: number;
+        architectural: number;
+        structural: number;
+        electrical: number;
+        others: number;
+      };
+      totalCentavos: number;
+    };
+  };
+}
+
+/**
+ * `GET /limits` — `@Public()`, no token needed: an upload screen has to
+ * validate a file before the citizen has signed in to send it.
+ */
+export interface LimitsResponse {
+  upload: {
+    /** The largest whole REQUEST the server will read. Over this is a bare 413, not a problem document. */
+    maxRequestBytes: number;
+    /** The largest FILE that fits once base64 + envelope overhead is accounted for — the number a client actually needs. */
+    maxFileBytes: number;
+    encoding: 'base64-in-json';
+  };
+}
+
+/**
+ * `POST /documents` — upload not yet attached to an application (or
+ * attached directly, if `applicationId`/`requirementCode` are given).
+ */
+export interface UploadDocumentRequest {
+  fileName: string;
+  label: string;
+  applicationId?: string | null;
+  requirementCode?: string | null;
+  contentBase64: string;
+}
+
+export interface UploadDocumentResult {
+  documentId: string;
+  status: string;
+  removedMetadata: string[];
+}
+
+/**
+ * `POST /businesses` and `GET /businesses` — matches `businessShape` in
+ * `businesses.controller.ts` exactly, `.strict()` on the server.
+ * `registrationNumber`/`dateRegistered` are REQUIRED here — unlike the old
+ * local-only mock, the server does not generate these itself.
+ */
+export interface SubmitBusinessRequest {
+  name: string;
+  category: 'Retail' | 'Food Service' | 'Services' | 'Manufacturing' | 'Construction' | 'Transport' | 'Agriculture' | 'Other';
+  street: string;
+  barangay: string;
+  city: string;
+  province: string;
+  registrationNumber: string;
+  /** YYYY-MM-DD. */
+  dateRegistered: string;
+}
+
+export interface BusinessSummary extends SubmitBusinessRequest {
+  id: string;
+  status: string;
+}
+
+/** `GET /businesses` — `{ data }`, not a bare array. */
+export interface BusinessListResponse {
+  data: BusinessSummary[];
+}
+
+/**
+ * `GET /notifications` — matches the wire shape built by
+ * `NotificationsController.feed()` exactly (it does its own field-by-field
+ * translation from the domain, so this is the contract, not an internal
+ * shape leaking through).
+ */
+export interface NotificationEntry {
+  id: string;
+  type: string;
+  category: 'applicationUpdates' | 'payments' | 'permitStatus' | 'documentReminders' | 'appointments' | 'account';
+  applicationId: string | null;
+  title: string;
+  body: string;
+  deepLink: string | null;
+  createdAt: string;
+  readAt: string | null;
+  resolvedAt: string | null;
+  requiresAction: boolean;
+}
+
+export interface NotificationFeedResponse {
+  data: NotificationEntry[];
+  nextCursor: string | null;
+  unresolvedCount: number;
+}
+
+/** `POST /me/export` — RA 10173 §18 data portability. Same request replayed while queued, not a new one. */
+export interface ExportRequestResult {
+  requestId: string;
+  requestedAt: string;
+}
+
+/** `GET /me/export/{requestId}` — polled, not pushed: no notification catalog entry exists for this yet. */
+export interface ExportStatusResult {
+  requestId: string;
+  status: string;
+  requestedAt: string;
+  completedAt: string | null;
+  expiresAt: string | null;
+  byteSize: number | null;
+  sha256: string | null;
+  failureDetail: string | null;
+}
+
+/** `GET /me/export/{requestId}/content` — a short-lived signed URL, not the bytes. */
+export interface ExportContentResult {
+  url: string;
+}
+
+/** `DELETE /me` — RA 10173 §16(e) right to erasure. */
+export interface ErasureReceipt {
+  acceptedAt: string;
+  erasedCategories: string[];
+  retainedCategories: { category: string; basis: string; until: string | null }[];
+}
+
+/**
+ * `POST /applications/{id}/payments` — submit proof of payment against an
+ * already-issued Order of Payment. Matches `paymentShape` in
+ * `applicant-write.controller.ts` exactly.
+ */
+export interface SubmitPaymentRequest {
+  referenceNumber: string;
+  method: 'Bank Transfer' | 'Onsite';
+  /** YYYY-MM-DD. */
+  paidOn: string;
+  amountCentavos: number;
+  /** A real, already-uploaded document id (see `UploadDocumentResult`) — the bank-transfer receipt, if any. */
+  proofDocumentId?: string | null;
+}
+
+export interface SubmitPaymentResult {
+  paymentId: string;
+  /** True when this was a retried Idempotency-Key, not a new submission. */
+  replayed: boolean;
+  /** Whether this payment settles the balance in full. */
+  settles: boolean;
+}
+
+/**
+ * `POST /applications` — matches `submissionShape` in
+ * `applicant-write.controller.ts` exactly, `.strict()` on the server: a
+ * field not listed here is refused 400, not silently dropped.
+ */
+export interface SubmitApplicationRequest {
+  permitType: string;
+  applicationAction: 'New' | 'Renewal' | 'Amendment';
+  /** The permit this renews/amends, as printed on the applicant's copy. Required for Renewal/Amendment. */
+  renewsPermitNumber?: string | null;
+  /** A real business UUID. Null until businesses are wired for real (connection plan Stage 8). */
+  businessId?: string | null;
+  location?: string | null;
+  /** Real, already-uploaded document ids. Empty until document upload is wired (Stage 6). */
+  documentIds?: string[];
+  form?: Record<string, unknown>;
+}
+
+/** `GET /applications` — `{ data, nextCursor }`, not a bare array (unlike documents/timeline). */
+export interface ApplicationListResponse {
+  data: ApplicationSummary[];
+  nextCursor: string | null;
+}
+
+/** `GET /applications/{id}/timeline` — a bare array, applicant's own vocabulary (no `fromStatus`, no officer/office). */
+export interface TimelineEntryResponse {
+  status: string;
+  occurredAt: string;
+  remarks: string | null;
+}
+
+/** `GET /applications/{id}/requirements` — the checklist snapshot taken at filing, not the live catalogue. */
+export interface RequirementsChecklistResponse {
+  requirements: ReadonlyArray<{
+    code: string;
+    label: string;
+    description: string;
+    required: boolean;
+    documentIds: string[];
+    status: 'provided' | 'not-provided';
+  }>;
+  unattributedDocuments: number;
+  attributionComplete: boolean;
+}
+
 export interface ResubmitResult {
   /** The NEW document. */
   documentId: string;

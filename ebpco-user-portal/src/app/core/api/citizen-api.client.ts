@@ -5,9 +5,27 @@ import { API_BASE_URL, ApiNotConfiguredError, RESUBMIT_MAX_FILE_BYTES } from './
 import { problemFrom } from './problem';
 import {
   ApplicationDocumentResponse,
+  ApplicationListResponse,
+  ApplicationSummary,
+  BusinessListResponse,
+  BusinessSummary,
+  ErasureReceipt,
+  ExportContentResult,
+  ExportRequestResult,
+  ExportStatusResult,
+  LimitsResponse,
+  NotificationFeedResponse,
   PermitResponse,
+  RequirementsChecklistResponse,
   ResubmitRequest,
   ResubmitResult,
+  SubmitApplicationRequest,
+  SubmitBusinessRequest,
+  SubmitPaymentRequest,
+  SubmitPaymentResult,
+  TimelineEntryResponse,
+  UploadDocumentRequest,
+  UploadDocumentResult,
 } from './citizen-api.models';
 import { MeResponse, ProfileRectification, RectificationResult } from './citizen-profile';
 
@@ -26,9 +44,18 @@ export class CitizenApiClient {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);
 
-  /** True when a base URL has been configured. False in this build. */
+  /**
+   * True when a base URL has been configured.
+   *
+   * `=== null`, not a truthiness check: '' is a real, configured value
+   * meaning same-origin (see api-config.ts), and `!!''` is false in
+   * JavaScript. A truthiness check here silently treated every same-origin
+   * deployment as unconfigured — caught wiring this client to a live proxy
+   * for the first time, where every call fell into the "unconfigured" branch
+   * despite config.js having set EBPCO_API_BASE_URL = ''.
+   */
   get configured(): boolean {
-    return !!this.baseUrl;
+    return this.baseUrl !== null;
   }
 
   /**
@@ -40,6 +67,42 @@ export class CitizenApiClient {
    */
   getPermit(applicationId: string): Observable<PermitResponse> {
     return this.get<PermitResponse>(`/applications/${encodeURIComponent(applicationId)}/permit`);
+  }
+
+  /**
+   * `GET /applications` — the citizen's own applications, newest-updated
+   * first, server-scoped by the token (never a parameter this client could
+   * get wrong). `{ data, nextCursor }`, not a bare array — `nextCursor` is
+   * always null today (the server has no cursor paging yet, only `limit`).
+   */
+  listApplications(limit?: number): Observable<ApplicationListResponse> {
+    const query = limit === undefined ? '' : `?limit=${encodeURIComponent(String(limit))}`;
+    return this.get<ApplicationListResponse>(`/applications${query}`);
+  }
+
+  /**
+   * `GET /applications/{id}` — one application. 404 for "not yours" and for
+   * "does not exist" alike, same reasoning as `getPermit`.
+   */
+  getApplication(applicationId: string): Observable<ApplicationSummary> {
+    return this.get<ApplicationSummary>(`/applications/${encodeURIComponent(applicationId)}`);
+  }
+
+  /**
+   * `GET /applications/{id}/timeline` — a bare array, the application's own
+   * history in the applicant's vocabulary (no internal office/from-status).
+   */
+  getTimeline(applicationId: string): Observable<TimelineEntryResponse[]> {
+    return this.get<TimelineEntryResponse[]>(`/applications/${encodeURIComponent(applicationId)}/timeline`);
+  }
+
+  /**
+   * `GET /applications/{id}/requirements` — the checklist snapshot taken at
+   * FILING, not the live catalogue: a filed application cannot become
+   * non-compliant because the LGU later changed what it asks for.
+   */
+  getRequirements(applicationId: string): Observable<RequirementsChecklistResponse> {
+    return this.get<RequirementsChecklistResponse>(`/applications/${encodeURIComponent(applicationId)}/requirements`);
   }
 
   /**
@@ -68,7 +131,7 @@ export class CitizenApiClient {
    * email field on this screen.
    */
   patchMe(patch: ProfileRectification): Observable<RectificationResult> {
-    if (!this.baseUrl) return throwError(() => new ApiNotConfiguredError());
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http
       .patch<RectificationResult>(`${this.baseUrl}/me`, patch)
       .pipe(catchError((e) => throwError(() => this.toApiError(e))));
@@ -104,7 +167,7 @@ export class CitizenApiClient {
     body: ResubmitRequest,
     idempotencyKey: string,
   ): Observable<ResubmitResult> {
-    if (!this.baseUrl) return throwError(() => new ApiNotConfiguredError());
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     const url =
       `${this.baseUrl}/applications/${encodeURIComponent(applicationId)}` +
       `/documents/${encodeURIComponent(documentId)}/resubmit`;
@@ -113,9 +176,165 @@ export class CitizenApiClient {
       .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 
+  /**
+   * `POST /applications` — file a new application.
+   *
+   * `Idempotency-Key` is REQUIRED (same reasoning as `resubmitDocument`):
+   * taken as an argument, never generated here, so a retry replays the same
+   * filing instead of creating a second one. Returns the filed application in
+   * the same shape `GET /applications/{id}` would — the server's own
+   * `submit()` reads it back through the applicant projection rather than
+   * building a partial response, so this client does not have to either.
+   */
+  fileApplication(body: SubmitApplicationRequest, idempotencyKey: string): Observable<ApplicationSummary> {
+    return this.post<ApplicationSummary>('/applications', body, idempotencyKey);
+  }
+
+  /**
+   * `POST /applications/{id}/payments` — submit proof of payment against an
+   * already-issued Order of Payment. `no-order-of-payment` (422) and
+   * `already settled`-type refusals (409) are surfaced via the server's own
+   * `detail`, not guessed here.
+   */
+  submitPayment(
+    applicationId: string,
+    body: SubmitPaymentRequest,
+    idempotencyKey: string,
+  ): Observable<SubmitPaymentResult> {
+    return this.post<SubmitPaymentResult>(
+      `/applications/${encodeURIComponent(applicationId)}/payments`,
+      body,
+      idempotencyKey,
+    );
+  }
+
+  /**
+   * `POST /applications/{id}/cancel` — withdraw an application.
+   *
+   * Only accepted before an Order of Payment exists (E-4) — the server
+   * enforces this, not this client; a refusal here surfaces the server's own
+   * explanation (`ApiError.citizenMessage`) rather than a client-guessed one.
+   */
+  cancelApplication(
+    applicationId: string,
+    body: { reason?: string },
+    idempotencyKey: string,
+  ): Observable<{ status: string; version: number }> {
+    return this.post<{ status: string; version: number }>(
+      `/applications/${encodeURIComponent(applicationId)}/cancel`,
+      body,
+      idempotencyKey,
+    );
+  }
+
+  /**
+   * `GET /limits` — public, no bearer token attached even when signed in
+   * (see `citizen-auth.interceptor.ts`; harmless either way, since this
+   * route ignores auth entirely). The real, live ceiling — see
+   * `UploadLimitsService`, which is what actually calls this.
+   */
+  getLimits(): Observable<LimitsResponse> {
+    return this.get<LimitsResponse>('/limits');
+  }
+
+  /**
+   * `POST /documents` — upload a file, optionally attached to an
+   * application/requirement directly. No Idempotency-Key: unlike the
+   * applicant-write routes, this one is not in `applicant-write.controller
+   * .ts` and does not require one.
+   */
+  uploadDocument(body: UploadDocumentRequest): Observable<UploadDocumentResult> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<UploadDocumentResult>(`${this.baseUrl}/documents`, body)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /**
+   * `POST /me/export` — RA 10173 §18. 202, not the file: an export reads
+   * everything the applicant has, which is why this returns a request id to
+   * poll rather than blocking on it. Pressing the button twice returns the
+   * SAME request while one is queued, not a second one.
+   */
+  requestExport(): Observable<ExportRequestResult> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<ExportRequestResult>(`${this.baseUrl}/me/export`, {})
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `GET /me/export/{requestId}` — where a request has got to. Polled by the caller, not pushed. */
+  getExportStatus(requestId: string): Observable<ExportStatusResult> {
+    return this.get<ExportStatusResult>(`/me/export/${encodeURIComponent(requestId)}`);
+  }
+
+  /** `GET /me/export/{requestId}/content` — a short-lived signed URL, minted fresh on each call. */
+  getExportContent(requestId: string): Observable<ExportContentResult> {
+    return this.get<ExportContentResult>(`/me/export/${encodeURIComponent(requestId)}/content`);
+  }
+
+  /**
+   * `DELETE /me` — RA 10173 §16(e). Not idempotency-keyed: erasing an
+   * already-erased account returns the same receipt, so a replay cannot
+   * cause a second erasure.
+   */
+  eraseAccount(): Observable<ErasureReceipt> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .delete<ErasureReceipt>(`${this.baseUrl}/me`)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /**
+   * `GET /businesses` — the citizen's own businesses, `{ data }` not a bare
+   * array (matching the applications list's own envelope shape).
+   */
+  listBusinesses(): Observable<BusinessListResponse> {
+    return this.get<BusinessListResponse>('/businesses');
+  }
+
+  /**
+   * `POST /businesses` — register a business. No Idempotency-Key: not in
+   * `applicant-write.controller.ts`, and there is genuinely no route to
+   * change or remove one once created (C-5, write-once) — see
+   * `business.store.ts`'s own doc comment on why an Edit action must not be
+   * offered once this is wired for real.
+   */
+  registerBusiness(body: SubmitBusinessRequest): Observable<BusinessSummary> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<BusinessSummary>(`${this.baseUrl}/businesses`, body)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `GET /notifications` — the citizen's own feed, newest first. */
+  getNotifications(limit?: number): Observable<NotificationFeedResponse> {
+    const query = limit === undefined ? '' : `?limit=${encodeURIComponent(String(limit))}`;
+    return this.get<NotificationFeedResponse>(`/notifications${query}`);
+  }
+
+  /**
+   * `POST /notifications/{id}/read` — no Idempotency-Key: marking an
+   * already-read notification read again is naturally idempotent, nothing
+   * to replay-protect.
+   */
+  markNotificationRead(notificationId: string): Observable<{ read: boolean }> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<{ read: boolean }>(`${this.baseUrl}/notifications/${encodeURIComponent(notificationId)}/read`, {})
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
   private get<T>(path: string): Observable<T> {
-    if (!this.baseUrl) return throwError(() => new ApiNotConfiguredError());
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http.get<T>(`${this.baseUrl}${path}`).pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  private post<T>(path: string, body: unknown, idempotencyKey: string): Observable<T> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<T>(`${this.baseUrl}${path}`, body, { headers: { 'Idempotency-Key': idempotencyKey } })
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 
   private toApiError(e: unknown) {

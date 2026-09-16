@@ -1,4 +1,5 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../session/auth.service';
 import { NotificationStore } from './notification.store';
 import { ApplicationRecord, StatusTimelineEntry, actionReferenceIsComplete } from '../domain/application.model';
@@ -15,6 +16,9 @@ import { PaymentMethod, PaymentTransaction } from '../domain/payment.model';
 import { GENERIC_APPLICATION_DOCUMENTS, requirementsFor } from '../domain/requirements-catalog';
 import { nextId, todayIso } from '../utils/ids';
 import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
+import { CitizenApiClient, newIdempotencyKey } from '../api/citizen-api.client';
+import { ApplicationSummary, SubmitApplicationRequest, SubmitPaymentRequest } from '../api/citizen-api.models';
+import { ApiError } from '../api/problem';
 
 export interface CreateApplicationInput {
   businessId: string;
@@ -26,6 +30,65 @@ export interface CreateApplicationInput {
 }
 
 let appSeq = 3000;
+
+/**
+ * `ApplicationSummary` (the server's real wire shape, `GET /applications`)
+ * → `ApplicationRecord` (this portal's local domain type), so the many
+ * existing call sites that read `myApplications()` keep working unchanged.
+ *
+ * NOT a faithful superset — it can't be. Five fields on `ApplicationRecord`
+ * have no server equivalent for an applicant, and that is by design on the
+ * server's side, not a gap this mapping papers over:
+ *
+ * - `evaluationStage`/`evaluationResult` are staff-internal working state.
+ *   `applicant-view.ts`'s own doc comment calls this out explicitly:
+ *   "Officer-scope. Never reaches an applicant payload." Defaulted to
+ *   'Initial'/'Pending' below ONLY because the TypeScript field is
+ *   non-optional — nothing in this portal reads these two fields off a
+ *   REAL (as opposed to demo-seeded) application today, and anything that
+ *   starts doing so must go back to the real signal that does exist,
+ *   `applicantStatus` (already on `ApplicationSummary`, already computed
+ *   server-side), not trust these placeholders.
+ * - `permitReleaseStatus`/`permitNumber`/`issuedDate`/`expiryDate` DO have
+ *   real server answers, just not on this endpoint — they live on
+ *   `GET /applications/{id}/permit`, a separate call by design (`the detail
+ *   is read on every list refresh, and the permit is read once, at the
+ *   end`). Null/'Not Ready' here, not fetched eagerly for every row in a
+ *   list.
+ *
+ * `assessedAmountCentavos` and `paymentStatus`, by contrast, ARE faithful:
+ * the server's `payment.status` vocabulary is a subset of this portal's
+ * `PaymentStatus` type, and `orderOfPayment.totalCentavos` is the real
+ * assessed amount, not a placeholder.
+ */
+function fromServerSummary(row: ApplicationSummary, applicantId: string): ApplicationRecord {
+  return {
+    id: row.id,
+    applicationNumber: row.referenceNumber,
+    businessId: row.businessId ?? '',
+    businessName: row.businessName ?? '',
+    applicantId,
+    permitType: row.permitType as PublishedPermitType,
+    applicationAction: row.applicationAction as ApplicationAction,
+    relatedPermitNumber: null,
+    dateSubmitted: row.dateSubmitted,
+    lifecycleStatus: row.lifecycleStatus as ApplicationLifecycleStatus,
+    // See doc comment above — no server field exists for these two.
+    evaluationStage: 'Initial',
+    evaluationResult: 'Pending',
+    paymentStatus: row.payment.status,
+    permitReleaseStatus: 'Not Ready',
+    assessedAmountCentavos: row.payment.orderOfPayment?.totalCentavos ?? null,
+    permitNumber: null,
+    issuedDate: null,
+    expiryDate: null,
+  };
+}
+
+function describeApplicationError(error: unknown): string {
+  if (error instanceof ApiError) return error.citizenMessage;
+  return 'We could not reach the Municipality’s system. Check your connection and try again.';
+}
 
 function prefixFor(permitType: PublishedPermitType): string {
   if (permitType === 'Business Permit') return 'E-BPCO';
@@ -47,11 +110,52 @@ export class ApplicationStore {
   private readonly timelineByApp = signal<Record<string, StatusTimelineEntry[]>>({});
   private readonly permitsByApp = signal<Record<string, GeneratedPermit>>({});
 
+  private readonly api = inject(CitizenApiClient);
+
+  /**
+   * The citizen's REAL applications, fetched from `GET /applications`.
+   *
+   * `null` means "not fetched yet" (or the API isn't configured, e.g. in a
+   * unit test) — distinct from `[]`, which means "fetched, genuinely none
+   * yet". `myApplications` below prefers this the moment it is non-null,
+   * over the local demo seed in `applications`.
+   */
+  private readonly realApplications = signal<ApplicationRecord[] | null>(null);
+
   constructor(
     private readonly auth: AuthService,
     private readonly notifications: NotificationStore,
   ) {
     this.seed();
+
+    // Refetches whenever sign-in state changes — covers both a fresh login
+    // and a session restored on reload (Stage 3's AuthService.restore()).
+    // Guarded by `api.configured` so this never fires a real request in a
+    // unit test, where API_BASE_URL is never set unless a spec opts in.
+    effect(() => {
+      if (this.auth.isAuthenticated() && this.api.configured) {
+        void this.refreshMine();
+      } else {
+        this.realApplications.set(null);
+      }
+    });
+  }
+
+  /**
+   * Fetches the citizen's real applications and replaces `realApplications`.
+   *
+   * A failure leaves whatever was there before rather than blanking the
+   * list — a transient network error should not make a citizen's own
+   * applications appear to vanish while they are looking at them.
+   */
+  async refreshMine(): Promise<void> {
+    try {
+      const response = await firstValueFrom(this.api.listApplications());
+      const applicantId = this.auth.currentUser()?.id ?? '';
+      this.realApplications.set(response.data.map((row) => fromServerSummary(row, applicantId)));
+    } catch {
+      // See doc comment above.
+    }
   }
 
   private seed(): void {
@@ -203,7 +307,15 @@ export class ApplicationStore {
     });
   }
 
+  /**
+   * The citizen's own applications — real once fetched, the local demo seed
+   * until then or if no backend is configured. See `realApplications`'s doc
+   * comment for why `null` (not fetched) and `[]` (fetched, none) are kept
+   * distinct rather than treated the same.
+   */
   readonly myApplications = computed(() => {
+    const real = this.realApplications();
+    if (real !== null) return real;
     const uid = this.auth.currentUser()?.id;
     if (!uid) return [];
     return [...this.applications()]
@@ -211,8 +323,37 @@ export class ApplicationStore {
       .sort((a, b) => ((a.dateSubmitted ?? '') < (b.dateSubmitted ?? '') ? 1 : -1));
   });
 
+  /**
+   * Checks `realApplications` (once fetched) FIRST, then the local demo
+   * signal — never through `myApplications()`, which is filtered to the
+   * SIGNED-IN citizen's own applications. This method is not: `verify-permit
+   * .page.ts` calls it for an anonymous visitor scanning a QR code on
+   * someone else's permit, and filtering by the current signer's id here
+   * would break public verification entirely. The ownership check already
+   * happened server-side, when this citizen's OWN applications were fetched
+   * into `realApplications` — this just looks a real id up in what has
+   * already been loaded, the same trust boundary the old code had (a bare
+   * search of the local signal, no ownership filter).
+   */
   applicationById(id: string): ApplicationRecord | undefined {
+    const real = this.realApplications();
+    const foundReal = real?.find((a) => a.id === id);
+    if (foundReal) return foundReal;
     return this.applications().find((a) => a.id === id);
+  }
+
+  /**
+   * True when this id came from the real backend (`realApplications`), not
+   * the local in-memory demo list. `application-details.page.ts` uses this
+   * to hide `advanceForDemo`'s "Simulate Office Update" affordance for a
+   * real application — that button's own label ("No backend exists yet")
+   * would be a lie for one, and `advanceForDemo` writes into the local demo
+   * signals (`applications`, `timelineByApp`, ...) keyed by this same id,
+   * which would otherwise inject fake timeline/permit data alongside the
+   * real fetched data for a genuinely filed application.
+   */
+  isReal(id: string): boolean {
+    return this.realApplications()?.some((a) => a.id === id) ?? false;
   }
 
   documentsFor(applicationId: string): ApplicationDocument[] {
@@ -371,6 +512,77 @@ export class ApplicationStore {
     };
     this.applications.update((list) => [record, ...list]);
     return record;
+  }
+
+  /**
+   * `POST /applications` for real — files a genuine application with the
+   * backend. Returns the real, server-assigned id on success so the caller
+   * can navigate straight to it (found via `applicationById`, which checks
+   * `realApplications` first).
+   *
+   * `documentIds` must be REAL, already-uploaded document ids (from
+   * `CitizenApiClient.uploadDocument`) — not local library or wizard-only
+   * ids. `application-wizard.page.ts` is the only caller today and tracks
+   * exactly this: a document only earns an entry once its own real
+   * `POST /documents` has completed, never merely because the citizen
+   * attached it in the UI. A reused document (from a previous permit, or
+   * from the library before real upload existed) has no real id to give and
+   * is correctly left out — the caller is responsible for telling the
+   * citizen that honestly, not this method.
+   */
+  async fileReal(
+    request: SubmitApplicationRequest,
+  ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+    try {
+      const summary = await firstValueFrom(
+        this.api.fileApplication(request, newIdempotencyKey()),
+      );
+      await this.refreshMine();
+      return { ok: true, id: summary.id };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
+  }
+
+  /**
+   * `POST /applications/{id}/cancel` for real. Only accepted before an
+   * Order of Payment exists (E-4) — refused server-side, not guessed here;
+   * the refusal message is the server's own explanation.
+   */
+  async cancelReal(
+    applicationId: string,
+    reason?: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(
+        this.api.cancelApplication(applicationId, reason ? { reason } : {}, newIdempotencyKey()),
+      );
+      await this.refreshMine();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
+  }
+
+  /**
+   * `POST /applications/{id}/payments` for real. `amountCentavos` must be
+   * the real Order of Payment's `totalCentavos` — this method does not
+   * default or compute it, since inventing a number to pay is the one
+   * mistake this screen cannot afford to make silently.
+   */
+  async submitPaymentReal(
+    applicationId: string,
+    body: SubmitPaymentRequest,
+  ): Promise<{ ok: true; settles: boolean } | { ok: false; error: string }> {
+    try {
+      const result = await firstValueFrom(
+        this.api.submitPayment(applicationId, body, newIdempotencyKey()),
+      );
+      await this.refreshMine();
+      return { ok: true, settles: result.settles };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
   }
 
   /**

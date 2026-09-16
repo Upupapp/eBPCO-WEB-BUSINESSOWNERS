@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
 import { TERMS_CONDITIONS_TEXT, PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -8,8 +8,11 @@ import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { CitizenProfile, buildRectification, rectificationProblem } from '../../core/api/citizen-profile';
 import { ApiError } from '../../core/api/problem';
+import { ErasureReceipt, ExportStatusResult } from '../../core/api/citizen-api.models';
+import { firstValueFrom } from 'rxjs';
+import { formatDateTime } from '../../core/utils/ids';
 
-type Tab = 'profile' | 'password' | 'notifications' | 'legal';
+type Tab = 'profile' | 'password' | 'notifications' | 'privacy' | 'legal';
 
 @Component({
   selector: 'app-profile',
@@ -20,10 +23,12 @@ type Tab = 'profile' | 'password' | 'notifications' | 'legal';
 export class ProfilePage {
   protected readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
-  private readonly api = inject(CitizenApiClient);
+  protected readonly api = inject(CitizenApiClient);
+  private readonly router = inject(Router);
 
   /** Named on screen because the office has no other way to learn a new address. */
   protected readonly engineer = MUNICIPAL_ENGINEER;
+  protected readonly formatDateTime = formatDateTime;
 
   readonly tab = signal<Tab>('profile');
   readonly passwordError = signal<string | null>(null);
@@ -132,6 +137,15 @@ export class ProfilePage {
   protected readonly saveError = signal<string | null>(null);
 
   saveProfile(): void {
+    // Captured BEFORE the local optimistic update below, and deliberately
+    // not merged into one step: `updateProfile()` mutates the signal
+    // `heldProfile()` reads, so computing the diff afterward compared the
+    // new values against themselves and always found nothing to send. Real
+    // once `canReachTheOffice()` could ever be true — invisible before,
+    // because until this connection work landed it never was. Caught live,
+    // the first time a real PATCH was expected and none went out.
+    const before = this.heldProfile();
+
     this.auth.updateProfile({
       firstName: this.firstName,
       middleName: this.middleName || null,
@@ -150,7 +164,7 @@ export class ProfilePage {
     // field goes as null rather than being omitted: absent leaves a field
     // alone, null clears it. A citizen who typed a middle name by mistake must
     // be able to remove it.
-    const patch = buildRectification(this.heldProfile(), {
+    const patch = buildRectification(before, {
       firstName: this.firstName, middleName: this.middleName, lastName: this.lastName,
       mobileNumber: this.mobileNumber, street: this.street, barangay: this.barangay,
       city: this.city, province: this.province, postalCode: this.postalCode,
@@ -217,13 +231,90 @@ export class ProfilePage {
       this.passwordError.set('New passwords do not match.');
       return;
     }
-    const result = this.auth.changePassword(this.currentPassword, this.newPassword);
-    if (!result.ok) {
-      this.passwordError.set(result.error);
+    const result = this.auth.changePassword();
+    this.passwordError.set(result.error);
+  }
+
+  // ── RA 10173 §18 — data portability ─────────────────────────────────────
+
+  protected readonly exportRequestId = signal<string | null>(null);
+  protected readonly exportStatus = signal<ExportStatusResult | null>(null);
+  protected readonly exportDownloadUrl = signal<string | null>(null);
+  protected readonly exportBusy = signal(false);
+  protected readonly exportError = signal<string | null>(null);
+
+  protected async requestExport(): Promise<void> {
+    this.exportBusy.set(true);
+    this.exportError.set(null);
+    try {
+      const result = await firstValueFrom(this.api.requestExport());
+      this.exportRequestId.set(result.requestId);
+      await this.checkExportStatus();
+    } catch (error) {
+      this.exportError.set(error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Please try again.');
+    } finally {
+      this.exportBusy.set(false);
+    }
+  }
+
+  /**
+   * A manual "Check Status" button, not an auto-polling loop.
+   *
+   * `scheduler disabled by configuration` in this dev environment means the
+   * background job that turns a queued request into a ready file may never
+   * run here at all — a polling loop would spin forever with nothing to
+   * show for it. A citizen pressing a real button, in production, against a
+   * real scheduler, is the honest interaction this maps to.
+   */
+  protected async checkExportStatus(): Promise<void> {
+    const id = this.exportRequestId();
+    if (!id) return;
+    this.exportBusy.set(true);
+    try {
+      const status = await firstValueFrom(this.api.getExportStatus(id));
+      this.exportStatus.set(status);
+      if (status.status === 'ready') {
+        const content = await firstValueFrom(this.api.getExportContent(id));
+        this.exportDownloadUrl.set(content.url);
+      }
+    } catch (error) {
+      this.exportError.set(error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Please try again.');
+    } finally {
+      this.exportBusy.set(false);
+    }
+  }
+
+  // ── RA 10173 §16(e) — right to erasure ──────────────────────────────────
+
+  /** Plain field, not a signal — bound with [(ngModel)], same convention as firstName/lastName/etc. above. */
+  deleteConfirmText = '';
+  protected readonly deleteBusy = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
+  protected readonly deleteReceipt = signal<ErasureReceipt | null>(null);
+
+  protected async eraseAccount(): Promise<void> {
+    // Typed confirmation, not a single click: this is the one action on this
+    // whole page that cannot be undone by saving something different
+    // afterward.
+    if (this.deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
+      this.deleteError.set('Type DELETE (in capital letters) to confirm.');
       return;
     }
-    this.passwordError.set(null);
-    this.currentPassword = this.newPassword = this.confirmPassword = '';
-    this.toast.success('Password updated.');
+    this.deleteBusy.set(true);
+    this.deleteError.set(null);
+    try {
+      const receipt = await firstValueFrom(this.api.eraseAccount());
+      this.deleteReceipt.set(receipt);
+      this.toast.success('Your account has been erased, as far as the law allows.');
+      // Nothing left to sign in as — the identity row itself is gone, not
+      // merely deactivated. Sign out locally and leave; there is no page
+      // left on this portal that a request with this token could reach.
+      await this.auth.logout();
+      this.router.navigate(['/landing']);
+    } catch (error) {
+      this.deleteError.set(error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Please try again.');
+    } finally {
+      this.deleteBusy.set(false);
+    }
   }
 }

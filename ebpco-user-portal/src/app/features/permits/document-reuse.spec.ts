@@ -1,10 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationWizardPage } from './application-wizard.page';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { AuthService } from '../../core/session/auth.service';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
 
 /**
  * A citizen may reuse a document already on file — and only one that has bytes.
@@ -29,9 +33,16 @@ describe('Reusing a document already on file', () => {
     id: 'req-1', label: 'Survey Plan', required: true,
   };
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     library = TestBed.inject(DocumentLibraryStore);
     store = TestBed.inject(ApplicationStore);
     page = TestBed.createComponent(ApplicationWizardPage).componentInstance;

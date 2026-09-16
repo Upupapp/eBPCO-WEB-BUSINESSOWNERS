@@ -15,7 +15,7 @@ type Filter = 'All' | 'Unread';
           <h1>Notifications</h1>
           <div class="subtitle">{{ store.unreadCount() }} unread</div>
         </div>
-        <button class="btn btn-secondary" (click)="store.markAllRead()">Mark all as read</button>
+        <button class="btn btn-secondary" (click)="markAllRead()">Mark all as read</button>
       </div>
 
       <div style="display:flex; gap:8px; margin-bottom:16px;">
@@ -28,7 +28,7 @@ type Filter = 'All' | 'Unread';
       } @else {
         <div class="card" style="padding:0;">
           @for (n of filtered(); track n.id) {
-            <div style="padding:14px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; gap:12px; cursor:pointer;" (click)="store.markRead(n.id)">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; gap:12px; cursor:pointer;" (click)="markRead(n.id)">
               <div>
                 <div style="font-weight:600;" [class.muted]="n.isRead">{{ n.title }}</div>
                 <div class="small muted">{{ n.message }}</div>
@@ -51,5 +51,21 @@ export class NotificationsPage {
 
   filtered() {
     return this.filter() === 'Unread' ? this.store.all().filter((n) => !n.isRead) : this.store.all();
+  }
+
+  markRead(id: string): void {
+    if (this.store.usingReal()) {
+      void this.store.markReadReal(id);
+      return;
+    }
+    this.store.markRead(id);
+  }
+
+  markAllRead(): void {
+    if (this.store.usingReal()) {
+      void this.store.markAllReadReal();
+      return;
+    }
+    this.store.markAllRead();
   }
 }

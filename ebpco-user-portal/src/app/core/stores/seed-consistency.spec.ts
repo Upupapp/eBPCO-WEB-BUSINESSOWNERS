@@ -1,9 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ApplicationStore } from './application.store';
 import { AuthService } from '../session/auth.service';
 import { LIFECYCLE_SEQUENCE } from '../domain/status.model';
 import { requirementsFor } from '../domain/requirements-catalog';
+import { CitizenIdentityApi } from '../api/citizen-identity.api';
+import { FakeCitizenIdentityApi } from '../testing/fake-citizen-identity-api';
 
 /**
  * The seed must not assert an outcome its own data cannot support.
@@ -21,9 +25,16 @@ import { requirementsFor } from '../domain/requirements-catalog';
 describe('Seeded applications are internally consistent', () => {
   let store: ApplicationStore;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
-    TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
     store = TestBed.inject(ApplicationStore);
   });
   afterEach(() => TestBed.resetTestingModule());

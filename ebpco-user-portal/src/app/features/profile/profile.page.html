@@ -46,6 +46,7 @@
           <button class="btn btn-sm" [class.btn-primary]="tab() === 'profile'" [class.btn-secondary]="tab() !== 'profile'" (click)="tab.set('profile')">Edit Profile</button>
           <button class="btn btn-sm" [class.btn-primary]="tab() === 'password'" [class.btn-secondary]="tab() !== 'password'" (click)="tab.set('password')">Change Password</button>
           <button class="btn btn-sm" [class.btn-primary]="tab() === 'notifications'" [class.btn-secondary]="tab() !== 'notifications'" (click)="tab.set('notifications')">Notification Preferences</button>
+          <button class="btn btn-sm" [class.btn-primary]="tab() === 'privacy'" [class.btn-secondary]="tab() !== 'privacy'" (click)="tab.set('privacy')">Your Data</button>
           <button class="btn btn-sm" [class.btn-primary]="tab() === 'legal'" [class.btn-secondary]="tab() !== 'legal'" (click)="tab.set('legal')">Legal</button>
         </div>
 
@@ -156,6 +157,75 @@
               looked functional and configured nothing.
             -->
             <button class="btn btn-primary" (click)="savePreferences()">Save Preferences</button>
+          </div>
+        }
+
+        @if (tab() === 'privacy') {
+          <div class="card">
+            <h4>Export Your Data</h4>
+            <p class="small muted">
+              Request a copy of everything the Municipality holds about you — your profile,
+              applications, documents, payments, and notifications. This is your right under the
+              Data Privacy Act (RA 10173, §18).
+            </p>
+            @if (!api.configured) {
+              <div class="hint">Not available in this build — the Municipality's system is not connected yet.</div>
+            } @else {
+              @if (!exportRequestId()) {
+                <button class="btn btn-primary" [disabled]="exportBusy()" (click)="requestExport()">
+                  {{ exportBusy() ? 'Requesting…' : 'Request My Data' }}
+                </button>
+              } @else {
+                <div class="card" style="background:var(--secondary-50);">
+                  <p class="small" style="margin:0 0 8px;">
+                    Request status: <strong>{{ exportStatus()?.status ?? 'checking…' }}</strong>
+                  </p>
+                  @if (exportDownloadUrl(); as url) {
+                    <a [href]="url" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Download My Data</a>
+                  } @else {
+                    <button class="btn btn-secondary btn-sm" [disabled]="exportBusy()" (click)="checkExportStatus()">
+                      {{ exportBusy() ? 'Checking…' : 'Check Status' }}
+                    </button>
+                    <p class="small muted" style="margin-top:8px;">
+                      This can take a while to produce. Come back and check status again later —
+                      nothing here refreshes on its own.
+                    </p>
+                  }
+                </div>
+              }
+              @if (exportError(); as err) { <div class="field error" style="margin-top:10px;">{{ err }}</div> }
+            }
+
+            <hr class="divider" />
+
+            <h4 style="color:var(--danger-text);">Delete Your Account</h4>
+            <p class="small muted">
+              This permanently erases your account and profile, as far as the law allows — some
+              records (like a filed permit application) must be kept for a legal retention period
+              even after your account is deleted (RA 10173, §16(e)). <strong>This cannot be undone.</strong>
+            </p>
+            @if (!api.configured) {
+              <div class="hint">Not available in this build — the Municipality's system is not connected yet.</div>
+            } @else if (deleteReceipt(); as receipt) {
+              <div class="card" style="background:var(--secondary-50);">
+                <p class="small" style="margin:0 0 8px;"><strong>Account erased</strong> — {{ formatDateTime(receipt.acceptedAt) }}</p>
+                <p class="small muted" style="margin:0 0 4px;">Erased: {{ receipt.erasedCategories.join(', ') }}</p>
+                @if (receipt.retainedCategories.length > 0) {
+                  <p class="small muted" style="margin:0;">
+                    Retained (legally required): {{ receipt.retainedCategories.map(r => r.category).join(', ') }}
+                  </p>
+                }
+              </div>
+            } @else {
+              <div class="field field-narrow">
+                <label for="profile-delete-confirm-14">Type DELETE to confirm</label>
+                <input id="profile-delete-confirm-14" class="input" [(ngModel)]="deleteConfirmText" />
+              </div>
+              @if (deleteError(); as err) { <div class="field error">{{ err }}</div> }
+              <button class="btn btn-danger" [disabled]="deleteBusy()" (click)="eraseAccount()">
+                {{ deleteBusy() ? 'Deleting…' : 'Permanently Delete My Account' }}
+              </button>
+            }
           </div>
         }
 

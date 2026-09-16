@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { DocumentResubmissionService, FileTooLargeError, toBase64 } from './document-resubmission.service';
-import { API_BASE_URL, RESUBMIT_MAX_FILE_BYTES } from './api-config';
+import { API_BASE_URL } from './api-config';
+import { UploadLimitsService } from './upload-limits.service';
 import { CONTRACT_SAMPLES } from './contract-samples.fixture';
 
 const BASE = 'https://api.example.gov.ph';
@@ -52,7 +53,11 @@ describe('DocumentResubmission — refusing before the wire', () => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(),
                   { provide: API_BASE_URL, useValue: BASE },
-                  { provide: RESUBMIT_MAX_FILE_BYTES, useValue: 1000 }],
+                  // The real limit now comes from UploadLimitsService (a live
+                  // signal fed by GET /limits), not a static injection token
+                  // — stub the service itself rather than a token it no
+                  // longer reads.
+                  { provide: UploadLimitsService, useValue: { maxFileBytes: () => 1000 } }],
     });
   });
   afterEach(() => TestBed.resetTestingModule());

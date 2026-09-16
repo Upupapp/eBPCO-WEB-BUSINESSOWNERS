@@ -14,7 +14,7 @@ import { PermitRelease } from '../../core/api/citizen-api.models';
 import { DocumentResubmissionService } from '../../core/api/document-resubmission.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { toContractShape } from './demo-document.adapter';
-import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
+import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/api/citizen-api.models';
 
 @Component({
   selector: 'app-application-details',
@@ -46,9 +46,19 @@ import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
           </div>
           <p class="small" style="color:var(--gray-700);">{{ store.nextStepText(a.lifecycleStatus) }}</p>
 
-          @if (!isTerminal(a.lifecycleStatus)) {
+          @if (!isTerminal(a.lifecycleStatus) && !store.isReal(a.id)) {
             <button class="btn btn-secondary btn-sm" (click)="advance(a.id)">Demo: Simulate Office Update</button>
             <span class="small muted" style="margin-left:8px;">No backend exists yet — this simulates the reviewing office advancing your application.</span>
+          }
+          @if (canCancel(a)) {
+            <div style="margin-top:10px;">
+              <button class="btn btn-danger btn-sm" [disabled]="cancelling()" (click)="cancel(a.id)">
+                {{ cancelling() ? 'Withdrawing…' : 'Withdraw Application' }}
+              </button>
+              <span class="small muted" style="margin-left:8px;">
+                Allowed only before an Order of Payment has been issued.
+              </span>
+            </div>
           }
         </div>
 
@@ -117,7 +127,7 @@ import { ApplicationDocumentResponse } from '../../core/api/citizen-api.models';
 
         <div class="card">
           <div class="card-title">Status Timeline</div>
-          @for (t of timeline(); track t.timestamp) {
+          @for (t of timelineEntries(); track t.timestamp) {
             <div style="display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-light);">
               <div style="width:120px;" class="small muted">{{ formatDateTime(t.timestamp) }}</div>
               <div style="font-weight:600;">{{ t.status }}</div>
@@ -160,6 +170,43 @@ export class ApplicationDetailsPage {
   }
 
   /**
+   * Real documents, from `GET /applications/{id}/documents` — already built
+   * (`CitizenApiClient.listDocuments`) since before this connection work
+   * began, just never called from here. `null` means "not fetched" (or the
+   * id belongs to a local demo application, which 404s harmlessly against
+   * the real backend and is left to fall back to `docs()`); `contractDocs()`
+   * below prefers this the moment it is non-null, the same "real once
+   * fetched" pattern `ApplicationStore.myApplications` uses.
+   */
+  private readonly realDocuments = signal<ApplicationDocumentResponse[] | null>(null);
+
+  /**
+   * Real history, from `GET /applications/{id}/timeline` — same "fetch once,
+   * prefer if present" shape as `realDocuments` above. Added alongside the
+   * `advanceForDemo` gating fix: before this, a real application's Status
+   * Timeline silently showed nothing (the page only ever read the local demo
+   * `timelineByApp` map), which was mistakeable for "the office hasn't acted
+   * yet" rather than "this view was never wired to the real endpoint."
+   */
+  private readonly realTimeline = signal<TimelineEntryResponse[] | null>(null);
+
+  constructor() {
+    if (this.api.configured) {
+      this.api.listDocuments(this.id()).subscribe({
+        next: (docs) => this.realDocuments.set(docs),
+        // A local demo application id 404s against the real backend — expected,
+        // not an error worth surfacing. Leaves realDocuments null, so
+        // contractDocs() falls back to the local demo data below.
+        error: () => {},
+      });
+      this.api.getTimeline(this.id()).subscribe({
+        next: (entries) => this.realTimeline.set(entries),
+        error: () => {},
+      });
+    }
+  }
+
+  /**
    * The contract's `release`, adapted from this build's `permitReleaseStatus`.
    *
    * Null when no permit exists — matching the server, where null means nobody
@@ -174,6 +221,8 @@ export class ApplicationDetailsPage {
 
   /** The office's shape, so the documents view is written once against what the server sends. */
   protected contractDocs(): ApplicationDocumentResponse[] {
+    const real = this.realDocuments();
+    if (real !== null) return real;
     return this.docs().map(toContractShape);
   }
 
@@ -246,6 +295,13 @@ export class ApplicationDetailsPage {
     return this.store.timelineFor(this.id());
   }
 
+  /** Real timeline once fetched (mapped to the template's shape); local demo timeline otherwise. */
+  protected timelineEntries(): { status: string; timestamp: string; remarks: string | null }[] {
+    const real = this.realTimeline();
+    if (real !== null) return real.map((t) => ({ status: t.status, timestamp: t.occurredAt, remarks: t.remarks }));
+    return this.timeline();
+  }
+
   isTerminal(status: Parameters<typeof isTerminalStatus>[0]): boolean {
     return isTerminalStatus(status);
   }
@@ -260,5 +316,33 @@ export class ApplicationDetailsPage {
     this.store.advanceForDemo(id);
     const updated = this.store.applicationById(id);
     if (updated) this.toast.success(`Status updated: ${applicantStatusOf(updated.lifecycleStatus)}.`);
+  }
+
+  /**
+   * Withdrawal is real-backend only — there was never a local/demo cancel
+   * path to preserve. `assessedAmountCentavos === null` is the local proxy
+   * for "no Order of Payment yet" (E-4): once an OOP exists the server
+   * refuses withdrawal itself, but showing the button up to that point and
+   * hiding it after matches what the citizen can actually still do without
+   * needing a round trip just to find out.
+   */
+  protected canCancel(a: { assessedAmountCentavos: number | null; lifecycleStatus: Parameters<typeof isTerminalStatus>[0] }): boolean {
+    return this.api.configured && a.assessedAmountCentavos === null && !isTerminalStatus(a.lifecycleStatus);
+  }
+
+  protected readonly cancelling = signal(false);
+
+  async cancel(id: string): Promise<void> {
+    this.cancelling.set(true);
+    try {
+      const result = await this.store.cancelReal(id);
+      if (!result.ok) {
+        this.toast.error(result.error);
+        return;
+      }
+      this.toast.success('Application withdrawn.');
+    } finally {
+      this.cancelling.set(false);
+    }
   }
 }
