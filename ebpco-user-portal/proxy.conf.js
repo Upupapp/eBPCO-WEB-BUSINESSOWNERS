@@ -1,18 +1,22 @@
 // Development only. `ng serve` forwards the API paths to a local instance so
-// the portal is SAME-ORIGIN against it, which is the shape production will
-// have too: EBPCO_API_BASE_URL stays '' and the production host proxies
-// these same paths to the API host (see the Admin Portal's netlify.toml
-// for the equivalent pattern already in production use).
+// the portal is SAME-ORIGIN against it during development, which sidesteps
+// two things a dev session does not need to deal with: a real cross-origin
+// round trip, and remembering to run the local API with CORS origins that
+// include whatever port `ng serve` happens to be on.
+//
+// Production does NOT use this same shape, deliberately. It sets
+// EBPCO_API_BASE_URL to the API's real absolute URL (written into
+// public/config.js at build time by write-runtime-config.mjs — see
+// netlify.toml) and calls it CROSS-ORIGIN, allowed by the API's own CORS
+// policy for exactly this portal's real deployed origin (`security.ts`,
+// backend repo, reusing USER_PORTAL_BASE_URL as the allowlist). A same-origin
+// gateway remains possible in production too, but is a separate deployment
+// choice, not what this file's own approach is doing.
 //
 // Deliberately NOT done by setting EBPCO_API_BASE_URL to localhost in
 // public/config.js. That file ships: a localhost value committed there would
 // point the deployed portal at the citizen's own machine, where nothing
 // answers, and the failure would look exactly like the API being down.
-//
-// Same-origin also means no CORS is needed. The API does not call
-// enableCors, so a cross-origin browser request is blocked before it
-// reaches the server, and the portal reports 'The request failed' --
-// indistinguishable from the state it is in with no API at all.
 //
 // ── Why this is .js, not .json, unlike the Admin Portal's proxy.conf.json ──
 //
