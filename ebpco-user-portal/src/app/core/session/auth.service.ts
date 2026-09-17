@@ -50,19 +50,18 @@ export interface RegisterSecurityInfo {
  * both call sites were updated to `await` these methods, which is the one
  * unavoidable ripple from going from a Map to HTTP.
  *
- * ── A genuine gap this file does NOT paper over ──────────────────────────
+ * ── One remaining gap: dateOfBirth/sex/civilStatus/nationality are not
+ * correctable after registration ──────────────────────────────────────────
  *
- * `POST /auth/register` accepts exactly five fields — firstName, lastName,
- * email, mobileNumber, password (`.strict()`, see auth.controller.ts) — and
- * `PATCH /me` accepts firstName/middleName/lastName/mobileNumber/street/
- * barangay/city/province/postalCode. Neither has a field for dateOfBirth,
- * sex, civilStatus or nationality — the register screen still collects them
- * (age-gating 18+ depends on dateOfBirth), but nothing sends them anywhere.
- * `meResponseToAccount` below always returns null/'' for these four fields,
- * on every account, because the server has no column for them to come back
- * from. This is a real, unclosed gap in the backend's applicant model, not
- * an oversight in this wiring — flag it if it matters for a screen, do not
- * invent a server field to fix it here.
+ * Migration 038 gave `POST /auth/register` four more optional fields —
+ * dateOfBirth, sex, civilStatus, nationality — alongside the original five
+ * (`.strict()`, see auth.controller.ts), and `GET`/`PATCH /me` both return
+ * them now. So registration genuinely stores and returns these four; what
+ * is still missing is a way to CORRECT one after the fact — `PATCH /me`'s
+ * schema only accepts firstName/middleName/lastName/mobileNumber/street/
+ * barangay/city/province/postalCode. `buildRectification` in
+ * `citizen-profile.ts` does not offer these four for editing for that
+ * reason, not an oversight — flag it if a screen needs to correct one.
  *
  * `CitizenTokenStore` is injected directly only for `restore()`'s fast
  * path — every write to it still happens inside `CitizenIdentityApi`
@@ -128,12 +127,17 @@ export class AuthService {
         email: contact.email,
         mobileNumber: contact.mobileNumber,
         password: security.password,
+        dateOfBirth: personal.dateOfBirth,
+        sex: personal.sex,
+        civilStatus: personal.civilStatus,
+        nationality: personal.nationality,
       });
       // The server does not return an id (202, no body) and does not say
       // whether the address was already registered — identical either way,
       // by design (enumeration). middleName/street/barangay/city/province/
-      // postalCode were collected on this form and are NOT sent: no field
-      // exists for them at registration (see class doc).
+      // postalCode were also collected on this form and are still NOT sent:
+      // no field exists for THOSE at registration (see class doc) — only
+      // dateOfBirth/sex/civilStatus/nationality gained one, in migration 038.
       return { ok: true };
     } catch (error) {
       // A weak/breached/repetitive password comes back as a 400 with a field
@@ -200,6 +204,17 @@ export class AuthService {
   async restore(): Promise<void> {
     if (!this.tokens.hasSession() || this._profile() !== null) return;
     try {
+      // Spends the refresh token first, when one is stored, rather than
+      // trusting whatever access token survived the reload: the access
+      // token is real but short-lived (15 minutes server-side), and a tab
+      // left open past that window is the ordinary case, not an edge one —
+      // going straight to `/me` on an expired access token 401s and reads
+      // exactly like a session that never existed, even though a valid
+      // refresh token was sitting right there in localStorage. Caught live:
+      // reloading a real, still-signed-in citizen session after normal
+      // browsing sent them to /login.
+      const refreshToken = this.tokens.refreshToken();
+      if (refreshToken !== null) await this.identity.refresh(refreshToken);
       const me = await this.identity.me();
       if (me.kind === 'applicant') this._profile.set(meResponseToAccount(me));
     } catch {
@@ -273,13 +288,14 @@ function meResponseToAccount(me: MeResponse): UserAccount {
     firstName: me.firstName ?? '',
     middleName: me.middleName,
     lastName: me.lastName ?? '',
-    // No server field exists for any of these four (see class doc on
-    // AuthService) — null/empty here is not "not recorded", it is "this
-    // account has never been asked", which is a real, standing gap.
-    dateOfBirth: null,
-    sex: null,
-    civilStatus: null,
-    nationality: '',
+    // Migration 038 (see class doc on AuthService). Null genuinely means NOT
+    // RECORDED here, the same as the address fields below — not "never asked".
+    dateOfBirth: me.dateOfBirth,
+    // The server's check constraint is the real guarantee behind this cast —
+    // same reasoning as `postgres-account.repository.ts`'s own cast on read.
+    sex: me.sex as Sex | null,
+    civilStatus: me.civilStatus as CivilStatus | null,
+    nationality: me.nationality ?? '',
     email: me.email,
     mobileNumber: me.mobileNumber ?? '',
     landlineNumber: null,

@@ -139,29 +139,17 @@
       </a>
     </div>
     <!--
-      F-14: the demo disclosure belongs HERE, in the shell, not on individual
-      screens. It previously appeared on three screens and only in their
-      "we couldn't find that" branch — so a citizen saw it after their data was
-      already gone, never before they spent an hour on the application wizard.
-      A disclosure that arrives only on failure is a consolation, not a warning.
-      Guarded by app-shell.component.spec.ts.
-
-      Updated once account sign-up/sign-in were wired to the real backend
-      (eBPCOBackend): "the whole build is a demonstration" stopped being true
-      the day `POST /auth/register` started really creating a row. Claiming
-      otherwise here would now be the false statement F-14 was written to
-      prevent, just about a different fact. What is still genuinely true —
-      applications, documents, payments and businesses are not connected —
-      is what the notice says now; it will keep narrowing, one connected
-      area at a time, as the rest of the connection plan lands.
+      F-14's demo disclosure lived here, warning that applications/documents/
+      payments/businesses were not connected to a real backend. Removed, not
+      merely re-narrowed: every one of those is now real (Hardening Pass,
+      Part 3c) — the banner's own comment trail anticipated this moment
+      ("it will keep narrowing, one connected area at a time"). Keeping any
+      version of it would now be actively counterproductive: its final line
+      told a citizen NOT to file a real application here, which is exactly
+      backwards once filing here genuinely reaches the Municipality.
+      app-shell.component.spec.ts asserts it is gone, not that it says the
+      right thing.
     -->
-    <div class="ds-demo-banner" role="status">
-      <strong>Account sign-up and sign-in are real.</strong>
-      Your account is genuinely created and stored by the Municipality of Castilla. Everything else —
-      applications, documents, payments and businesses — is still a demonstration and is kept in your
-      browser only, erased when you close or refresh the page. Do not file a real permit application
-      here — contact the Office of the Municipal Engineer on {{ engineerMobile }}.
-    </div>
 
     <router-outlet />
   </div>

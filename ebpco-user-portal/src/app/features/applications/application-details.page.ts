@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
+import { ApplicationLifecycleStatus, LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -70,7 +70,7 @@ import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/a
                 <tr><td class="muted">Permit Number</td><td><strong>{{ p.permitNumber }}</strong></td></tr>
                 <tr><td class="muted">Issued</td><td>{{ formatDate(p.issuedDate) }}</td></tr>
                 <tr><td class="muted">Expiry</td><td>{{ p.expiryDate ? formatDate(p.expiryDate) : 'No fixed expiry' }}</td></tr>
-                <tr><td class="muted">Approving Office</td><td>{{ p.approvingOffice }}</td></tr>
+                <tr><td class="muted">Approving Office</td><td>{{ p.approvingOffice ?? 'Not on file' }}</td></tr>
               </tbody>
             </table>
             <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
@@ -130,7 +130,12 @@ import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/a
           @for (t of timelineEntries(); track t.timestamp) {
             <div style="display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-light);">
               <div style="width:120px;" class="small muted">{{ formatDateTime(t.timestamp) }}</div>
-              <div style="font-weight:600;">{{ t.status }}</div>
+              <div>
+                <div style="font-weight:600;">{{ t.status }}</div>
+                @if (t.remarks) {
+                  <div class="small muted" style="margin-top:2px;">{{ t.remarks }}</div>
+                }
+              </div>
             </div>
           }
         </div>
@@ -199,24 +204,22 @@ export class ApplicationDetailsPage {
         // contractDocs() falls back to the local demo data below.
         error: () => {},
       });
-      this.api.getTimeline(this.id()).subscribe({
-        next: (entries) => this.realTimeline.set(entries),
-        error: () => {},
-      });
+      this.refreshTimeline();
+      this.store.fetchPermit(this.id());
     }
   }
 
-  /**
-   * The contract's `release`, adapted from this build's `permitReleaseStatus`.
-   *
-   * Null when no permit exists — matching the server, where null means nobody
-   * has arranged collection. `method` and `releasedAt` are null because this
-   * build does not record them; the component renders neither as a claim.
-   */
+  /** Re-fetches `realTimeline` after a real write on this application (e.g. `cancel()`) — otherwise the Status Timeline kept showing its pre-write history until the next full page reload. */
+  private refreshTimeline(): void {
+    this.api.getTimeline(this.id()).subscribe({
+      next: (entries) => this.realTimeline.set(entries),
+      error: () => {},
+    });
+  }
+
+  /** The real `release` once fetched; the local-demo construction otherwise. See `ApplicationStore.releaseFor`. */
   protected release(): PermitRelease | null {
-    const app = this.app();
-    if (!app || !this.permit()) return null;
-    return { status: app.permitReleaseStatus, method: null, releasedAt: null };
+    return this.store.releaseFor(this.id());
   }
 
   /** The office's shape, so the documents view is written once against what the server sends. */
@@ -319,15 +322,30 @@ export class ApplicationDetailsPage {
   }
 
   /**
-   * Withdrawal is real-backend only — there was never a local/demo cancel
-   * path to preserve. `assessedAmountCentavos === null` is the local proxy
-   * for "no Order of Payment yet" (E-4): once an OOP exists the server
-   * refuses withdrawal itself, but showing the button up to that point and
-   * hiding it after matches what the citizen can actually still do without
-   * needing a round trip just to find out.
+   * The real lifecycle table (`lifecycle.ts`) only ever grants the
+   * APPLICANT actor a `-> Cancelled` transition from four statuses: Draft,
+   * Submitted, Received, and Revision Required. `Document Verification` and
+   * `Under Evaluation` both precede an Order of Payment too (so the old
+   * `assessedAmountCentavos === null` check alone let the button show for
+   * them) but have no applicant-cancel transition at all — the server
+   * refuses with a 409 every time, previously with nothing but a toast the
+   * citizen could easily miss to explain why. Listing the real four
+   * statuses here — instead of inferring eligibility from unrelated fields
+   * — means the button simply isn't offered where it could never work.
    */
-  protected canCancel(a: { assessedAmountCentavos: number | null; lifecycleStatus: Parameters<typeof isTerminalStatus>[0] }): boolean {
-    return this.api.configured && a.assessedAmountCentavos === null && !isTerminalStatus(a.lifecycleStatus);
+  private static readonly APPLICANT_CANCELLABLE_STATUSES: ReadonlySet<ApplicationLifecycleStatus> = new Set([
+    'Draft',
+    'Submitted',
+    'Received',
+    'Revision Required',
+  ]);
+
+  protected canCancel(a: { assessedAmountCentavos: number | null; lifecycleStatus: ApplicationLifecycleStatus }): boolean {
+    return (
+      this.api.configured &&
+      a.assessedAmountCentavos === null &&
+      ApplicationDetailsPage.APPLICANT_CANCELLABLE_STATUSES.has(a.lifecycleStatus)
+    );
   }
 
   protected readonly cancelling = signal(false);
@@ -340,6 +358,7 @@ export class ApplicationDetailsPage {
         this.toast.error(result.error);
         return;
       }
+      this.refreshTimeline();
       this.toast.success('Application withdrawn.');
     } finally {
       this.cancelling.set(false);

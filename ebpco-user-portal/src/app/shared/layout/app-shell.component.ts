@@ -5,7 +5,6 @@ import { AuthService } from '../../core/session/auth.service';
 import { NotificationStore } from '../../core/stores/notification.store';
 import { ToastHostComponent } from '../ui/toast-host.component';
 import { fullName } from '../../core/domain/user.model';
-import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
@@ -18,7 +17,6 @@ export class AppShellComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly notifications = inject(NotificationStore);
-  protected readonly engineerMobile = MUNICIPAL_ENGINEER.mobile;
 
   /** Off-canvas drawer state. Only meaningful below 1024px; above it the CSS
    *  ignores this entirely and the sidebar is always visible. */

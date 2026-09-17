@@ -16,9 +16,11 @@ import { ApplicationStore } from '../../core/stores/application.store';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { DocumentHistoryEntry } from '../../core/api/citizen-api.models';
 import { UploadLimitsService } from '../../core/api/upload-limits.service';
 import { toBase64 } from '../../core/api/document-resubmission.service';
 import { ApiError } from '../../core/api/problem';
+import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -80,7 +82,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
  */
 @Component({
   selector: 'app-application-wizard',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective],
   template: `
     <div class="page" style="max-width:760px;">
       <div class="page-header">
@@ -103,7 +105,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
       @if (step() === 1) {
         <div class="card">
           <div class="field">
-            <label for="application-wizard-business-1">Business*</label>
+            <label for="application-wizard-business-1">Business<span class="required">*</span></label>
             <select id="application-wizard-business-1" class="input" [(ngModel)]="businessId">
               <option [ngValue]="null" disabled>Select a business</option>
               @for (b of businesses.myBusinesses(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
@@ -113,7 +115,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
             }
           </div>
           <div class="field">
-            <label for="application-wizard-application-type-2">Application Type*</label>
+            <label for="application-wizard-application-type-2">Application Type<span class="required">*</span></label>
             <select id="application-wizard-application-type-2" class="input" [(ngModel)]="applicationAction">
               <option value="New">New Permit</option>
               <option value="Renewal">Renewal</option>
@@ -122,7 +124,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           </div>
           @if (needsExistingPermit()) {
             <div class="field">
-              <label for="application-wizard-related-permit">{{ existingPermitPrompt(applicationAction) }}*</label>
+              <label for="application-wizard-related-permit">{{ existingPermitPrompt(applicationAction) }}<span class="required">*</span></label>
               @if (renewablePermits().length > 0) {
                 <select id="application-wizard-related-permit" class="input" [(ngModel)]="relatedPermitNumber">
                   <option [ngValue]="null" disabled>Select a permit</option>
@@ -153,10 +155,10 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
       @if (step() === 2) {
         <div class="card">
           <div class="card-title">Project / Application Details</div>
-          <div class="field"><label for="application-wizard-project-business-address-3">Project / Business Address*</label><input id="application-wizard-project-business-address-3" class="input" [(ngModel)]="projectAddress" placeholder="Street, Barangay, City" /></div>
-          <div class="field"><label for="application-wizard-scope-of-work-4">Scope of Work / Purpose*</label><textarea id="application-wizard-scope-of-work-4" class="input" rows="3" [(ngModel)]="scopeOfWork" placeholder="Briefly describe the work or purpose of this application"></textarea></div>
+          <div class="field"><label for="application-wizard-project-business-address-3">Project / Business Address<span class="required">*</span></label><input id="application-wizard-project-business-address-3" class="input" [(ngModel)]="projectAddress" placeholder="Street, Barangay, City" /></div>
+          <div class="field"><label for="application-wizard-scope-of-work-4">Scope of Work / Purpose<span class="required">*</span></label><textarea id="application-wizard-scope-of-work-4" class="input" rows="3" [(ngModel)]="scopeOfWork" placeholder="Briefly describe the work or purpose of this application"></textarea></div>
           <div class="form-row">
-            <div class="field"><label for="application-wizard-professional-in-charge-5">Professional in Charge (if any)</label><input id="application-wizard-professional-in-charge-5" class="input" [(ngModel)]="professionalName" placeholder="Engineer / Architect name" /></div>
+            <div class="field"><label for="application-wizard-professional-in-charge-5">Professional in Charge (if any)</label><input id="application-wizard-professional-in-charge-5" class="input" [(ngModel)]="professionalName" placeholder="Engineer / Architect name" appCapitalizeName /></div>
             <div class="field"><label for="application-wizard-prc-license-no-6">PRC License No.</label><input id="application-wizard-prc-license-no-6" class="input" [(ngModel)]="prcNumber" /></div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
@@ -324,17 +326,19 @@ export class ApplicationWizardPage {
   readonly submitting = signal(false);
 
   /**
-   * Real, server-assigned document ids for this wizard's FRESH uploads,
-   * keyed by requirement id — populated as each file finishes a real
-   * `POST /documents` (see `onFileSelected`). A reused document (from the
-   * library, or from a previous permit) never gets an entry here: the
-   * library itself is not wired to real storage yet, so there is no real id
-   * to send for it. `submitReal()` reads this map, not `attached`, to build
-   * `documentIds` — the two are allowed to disagree, and when they do, the
-   * citizen is told so rather than it being papered over.
+   * Real, server-assigned document ids for this wizard's uploads, keyed by
+   * requirement id — populated as each file finishes a real `POST
+   * /documents`, whether it was freshly picked (`onFileSelected`) or reused
+   * from the real library (`reuseExisting`, which re-uploads the reused
+   * document's own bytes — there is no "attach by reference" route).
+   * `submitReal()` reads this map, not `attached`, to build `documentIds` —
+   * the two are allowed to disagree, and when they do, the citizen is told
+   * so rather than it being papered over.
    */
   protected readonly uploadedDocumentIds = signal<Record<string, string>>({});
   protected readonly uploadingRequirementId = signal<string | null>(null);
+
+  protected readonly realDocuments = signal<DocumentHistoryEntry[]>([]);
 
   readonly step = signal<Step>(1);
   readonly error = signal<string | null>(null);
@@ -427,6 +431,12 @@ export class ApplicationWizardPage {
       this.isGeneric = true;
       this.documents = this.applicationStore.requiredDocumentsFor('generic');
     }
+    if (this.api.configured) {
+      this.api.getMyDocuments().subscribe({
+        next: (docs) => this.realDocuments.set(docs),
+        error: () => {},
+      });
+    }
   }
 
   reviewingOffice(): string {
@@ -494,6 +504,19 @@ export class ApplicationWizardPage {
     try {
       const contentBase64 = await toBase64(file);
       const result = await firstValueFrom(
+        // NOT `requirementCode: d.id`. This portal's requirements-catalog ids
+        // (e.g. 'land-title') and the Admin Portal's own published checklist
+        // codes (e.g. 'fencing-permit-land-title', generated when staff save
+        // a checklist through Permit Release > Permit Types) are DIFFERENT,
+        // incompatible id schemes with no shared source of truth — confirmed
+        // live: publishing a checklist there and sending this portal's own
+        // id back for a submission gets a real, honest server refusal
+        // ("This permit type has no requirement called ..."). Sending a code
+        // that never matches would turn every real submission into a hard
+        // failure the moment any office publishes its checklist, which is
+        // worse than the status quo (documents attributed to no requirement,
+        // as before). Reconciling the two catalogs' id schemes is real,
+        // separate work — not attempted here.
         this.api.uploadDocument({ fileName: file.name, label: d.label, contentBase64 }),
       );
       this.uploadedDocumentIds.update((map) => ({ ...map, [d.id]: result.documentId }));
@@ -511,37 +534,77 @@ export class ApplicationWizardPage {
   /**
    * Documents already on file that can actually be reused.
    *
-   * Filtered on `file !== null`, and that filter is the point. The library also
+   * Real path: `GET /documents/me` (broadened — see `citizen-api.client.ts`),
+   * every document this citizen has ever uploaded, attached or not. Used to
+   * be sourced from `DocumentLibraryStore` filtered on `file !== null` —
+   * which worked only within the tab that did the upload (a `File` object
+   * cannot survive a reload), so a document from an earlier session, or a
+   * PREVIOUS permit, could never actually be reused. Real documents have no
+   * in-browser `File` until `reuseExisting` fetches one — see there.
+   *
+   * Demo path unchanged: filtered on `file !== null` because the library also
    * holds seeded example rows that never had bytes behind them, and attaching
-   * one would put a filename on the application with no document under it —
-   * recreating precisely the defect that cost the mobile app its entire
-   * document history. A name in the list is not a document.
+   * one would put a filename on the application with no document under it.
    */
   protected readonly formatDate = formatDate;
 
   protected readonly reusable = computed(() =>
-    this.documentLibrary.myDocuments().filter((d) => d.file !== null),
+    this.api.configured
+      ? this.realDocuments()
+      : this.documentLibrary.myDocuments().filter((d) => d.file !== null),
   );
 
   /**
    * Attach a document the citizen already uploaded.
    *
-   * The wizard wrote to the document library and never once read it back, so
-   * every document a citizen had ever uploaded was listed under My Documents
-   * and could never be used again. A renewal made that plain: the same
-   * twenty-two files, uploaded a second time, all already on file.
+   * Real path: there is no "attach by reference" route — `POST /documents`
+   * always creates a new row from fresh bytes — so reuse means fetching the
+   * existing document's real content via its signed URL
+   * (`GET /documents/{id}/content`, the same route the office's own download
+   * link redeems) and re-uploading those bytes against this application.
+   * This doubles server-side storage per reuse but needs no new backend
+   * surface, and is what makes `uploadedDocumentIds` end up with a real id
+   * for a reused document exactly the same way a fresh pick does.
+   *
+   * Demo path unchanged: the wizard wrote to the local library and never
+   * once read it back, so every document a citizen had ever uploaded was
+   * listed under My Documents and could never be used again.
    */
-  protected async reuseExisting(d: RequirementDocument, saved: SavedDocument | null): Promise<void> {
-    if (!saved?.file) return;
+  protected async reuseExisting(
+    d: RequirementDocument, item: DocumentHistoryEntry | SavedDocument | null,
+  ): Promise<void> {
+    if (!item) return;
+
+    if (this.api.configured) {
+      const real = item as DocumentHistoryEntry;
+      this.uploadingRequirementId.set(d.id);
+      try {
+        const { url } = await firstValueFrom(this.api.getDocumentContent(real.id));
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`fetch failed: ${response.status}`);
+        const blob = await response.blob();
+        const file = new File([blob], real.fileName, { type: blob.type || real.contentType });
+        this.attached = {
+          ...this.attached,
+          [d.id]: { kind: 'upload', file, fileName: real.fileName, fileType: fileTypeFromName(real.fileName) },
+        };
+        this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
+        await this.uploadReal(d, file);
+      } catch {
+        this.error.set(`Could not reuse "${real.fileName}". Try again, or upload a new file.`);
+      } finally {
+        this.uploadingRequirementId.set(null);
+      }
+      return;
+    }
+
+    const saved = item as SavedDocument;
+    if (!saved.file) return;
     this.attached = {
       ...this.attached,
       [d.id]: { kind: 'upload', file: saved.file, fileName: saved.fileName, fileType: saved.fileType },
     };
-    // A real File IS available here (see SavedDocument's own file-not-null
-    // filter on `reusable()`), so this is not the "reused" pointer case
-    // above — it can go out for real the same way a fresh pick can.
     this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
-    if (this.api.configured) await this.uploadReal(d, saved.file);
   }
 
   removeAttachment(d: RequirementDocument): void {
@@ -634,11 +697,16 @@ export class ApplicationWizardPage {
   /**
    * Files for real, against `POST /applications`.
    *
-   * `businessId` goes out as null. Businesses are not wired to the backend
-   * yet (connection plan Stage 8) — the ids selected above are local-demo
-   * ids, not real UUIDs, and the server's schema requires a real UUID or
-   * nothing at all. Sending the demo id would be refused 400; sending
-   * nothing is honest about what this build can actually attest to today.
+   * `businessId` goes out as `this.businessId` — a real server UUID.
+   * Businesses ARE wired to the backend now (`BusinessStore.myBusinesses()`
+   * reads from `GET /businesses` the moment a citizen is signed in against a
+   * configured API), so the dropdown at step 1 already offers only real
+   * businesses with real ids by the time this runs; sending it was refused
+   * only back when that dropdown could still be showing local-demo ids. A
+   * business linked at filing is how staff's own Businesses page ever
+   * learns which applications belong to it — sending null here silently
+   * broke that join for every real filing, even one made against a real,
+   * just-registered business.
    *
    * `documentIds` carries exactly the requirements whose upload actually
    * completed (`uploadedDocumentIds` — real server ids, not merely
@@ -661,7 +729,7 @@ export class ApplicationWizardPage {
         permitType: this.isGeneric ? 'Business Permit' : this.permitType!,
         applicationAction: this.applicationAction,
         renewsPermitNumber: this.relatedPermitNumber,
-        businessId: null,
+        businessId: this.businessId,
         location: this.projectAddress,
         documentIds: Object.values(ids),
         form: {

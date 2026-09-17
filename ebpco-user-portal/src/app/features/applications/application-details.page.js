@@ -1,0 +1,322 @@
+import { __decorate } from "tslib";
+import { Component, inject, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ApplicationStore } from '../../core/stores/application.store';
+import { StatusPillComponent } from '../../shared/ui/status-pill.component';
+import { LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
+import { pesos } from '../../core/domain/assessment.model';
+import { formatDate, formatDateTime } from '../../core/utils/ids';
+import { ToastService } from '../../shared/ui/toast.service';
+import { ApplicationDocumentsComponent } from './application-documents.component';
+import { PermitReleaseComponent } from './permit-release.component';
+import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
+import { DocumentResubmissionService } from '../../core/api/document-resubmission.service';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { toContractShape } from './demo-document.adapter';
+let ApplicationDetailsPage = class ApplicationDetailsPage {
+    route = inject(ActivatedRoute);
+    store = inject(ApplicationStore);
+    toast = inject(ToastService);
+    resubmission = inject(DocumentResubmissionService);
+    api = inject(CitizenApiClient);
+    applicantStatusOf = applicantStatusOf;
+    formatDate = formatDate;
+    formatDateTime = formatDateTime;
+    pesos = pesos;
+    id() {
+        return this.route.snapshot.paramMap.get('id');
+    }
+    app() {
+        return this.store.applicationById(this.id());
+    }
+    docs() {
+        return this.store.documentsFor(this.id());
+    }
+    /**
+     * Real documents, from `GET /applications/{id}/documents` — already built
+     * (`CitizenApiClient.listDocuments`) since before this connection work
+     * began, just never called from here. `null` means "not fetched" (or the
+     * id belongs to a local demo application, which 404s harmlessly against
+     * the real backend and is left to fall back to `docs()`); `contractDocs()`
+     * below prefers this the moment it is non-null, the same "real once
+     * fetched" pattern `ApplicationStore.myApplications` uses.
+     */
+    realDocuments = signal(null);
+    /**
+     * Real history, from `GET /applications/{id}/timeline` — same "fetch once,
+     * prefer if present" shape as `realDocuments` above. Added alongside the
+     * `advanceForDemo` gating fix: before this, a real application's Status
+     * Timeline silently showed nothing (the page only ever read the local demo
+     * `timelineByApp` map), which was mistakeable for "the office hasn't acted
+     * yet" rather than "this view was never wired to the real endpoint."
+     */
+    realTimeline = signal(null);
+    constructor() {
+        if (this.api.configured) {
+            this.api.listDocuments(this.id()).subscribe({
+                next: (docs) => this.realDocuments.set(docs),
+                // A local demo application id 404s against the real backend — expected,
+                // not an error worth surfacing. Leaves realDocuments null, so
+                // contractDocs() falls back to the local demo data below.
+                error: () => { },
+            });
+            this.api.getTimeline(this.id()).subscribe({
+                next: (entries) => this.realTimeline.set(entries),
+                error: () => { },
+            });
+            this.store.fetchPermit(this.id());
+        }
+    }
+    /** The real `release` once fetched; the local-demo construction otherwise. See `ApplicationStore.releaseFor`. */
+    release() {
+        return this.store.releaseFor(this.id());
+    }
+    /** The office's shape, so the documents view is written once against what the server sends. */
+    contractDocs() {
+        const real = this.realDocuments();
+        if (real !== null)
+            return real;
+        return this.docs().map(toContractShape);
+    }
+    /**
+     * Replace a rejected document.
+     *
+     * The size is checked BEFORE the file is read, so a citizen with a 5MB scan
+     * is told immediately rather than after their phone has encoded it. The
+     * idempotency key is owned by the service: stable if they retry the same
+     * file, new if they pick a different one — the server treats the file as part
+     * of the key's fingerprint and 409s a mismatch.
+     */
+    /** DOC-003. The document currently open for inspection, or null. */
+    previewing = signal(null);
+    /**
+     * Resolve the contract shape back to the file this build kept.
+     *
+     * The server's document response describes a document; it does not contain
+     * one. Matching on id rather than filename because two requirements can
+     * legitimately hold files of the same name.
+     */
+    onPreview(doc) {
+        this.previewing.set(this.docs().find((d) => d.id === doc.id) ?? null);
+    }
+    onReplace(doc) {
+        if (!this.api.configured) {
+            this.toast.show(`Replacing "${doc.label}" is not available in this build — the Municipality's system is not connected yet.`);
+            return;
+        }
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,.jpg,.jpeg,.png';
+        input.onchange = () => {
+            const file = input.files?.[0];
+            if (!file)
+                return;
+            if (this.resubmission.tooLarge(file)) {
+                this.toast.error(this.resubmission.explain(new Error('')) || 'That file is too large.');
+                return;
+            }
+            this.resubmission.resubmit(this.id(), doc.id, doc.label, file).subscribe({
+                next: (result) => {
+                    // Metadata stripped from the file is reported, never silently
+                    // dropped: a site photograph carries its coordinates and the
+                    // applicant is entitled to know the LGU removed them.
+                    const stripped = result.removedMetadata.length
+                        ? ` ${result.removedMetadata.join(', ')} was removed from the file.`
+                        : '';
+                    this.toast.success(`Replacement sent for "${doc.label}".${stripped}`);
+                },
+                error: (e) => this.toast.error(this.resubmission.explain(e)),
+            });
+        };
+        input.click();
+    }
+    assessment() {
+        return this.store.assessmentFor(this.id());
+    }
+    permit() {
+        return this.store.permitFor(this.id());
+    }
+    timeline() {
+        return this.store.timelineFor(this.id());
+    }
+    /** Real timeline once fetched (mapped to the template's shape); local demo timeline otherwise. */
+    timelineEntries() {
+        const real = this.realTimeline();
+        if (real !== null)
+            return real.map((t) => ({ status: t.status, timestamp: t.occurredAt, remarks: t.remarks }));
+        return this.timeline();
+    }
+    isTerminal(status) {
+        return isTerminalStatus(status);
+    }
+    progressPct(status) {
+        const idx = LIFECYCLE_SEQUENCE.indexOf(status);
+        if (idx < 0)
+            return 100;
+        return Math.round((idx / (LIFECYCLE_SEQUENCE.length - 1)) * 100);
+    }
+    advance(id) {
+        this.store.advanceForDemo(id);
+        const updated = this.store.applicationById(id);
+        if (updated)
+            this.toast.success(`Status updated: ${applicantStatusOf(updated.lifecycleStatus)}.`);
+    }
+    /**
+     * Withdrawal is real-backend only — there was never a local/demo cancel
+     * path to preserve. `assessedAmountCentavos === null` is the local proxy
+     * for "no Order of Payment yet" (E-4): once an OOP exists the server
+     * refuses withdrawal itself, but showing the button up to that point and
+     * hiding it after matches what the citizen can actually still do without
+     * needing a round trip just to find out.
+     */
+    canCancel(a) {
+        return this.api.configured && a.assessedAmountCentavos === null && !isTerminalStatus(a.lifecycleStatus);
+    }
+    cancelling = signal(false);
+    async cancel(id) {
+        this.cancelling.set(true);
+        try {
+            const result = await this.store.cancelReal(id);
+            if (!result.ok) {
+                this.toast.error(result.error);
+                return;
+            }
+            this.toast.success('Application withdrawn.');
+        }
+        finally {
+            this.cancelling.set(false);
+        }
+    }
+};
+ApplicationDetailsPage = __decorate([
+    Component({
+        selector: 'app-application-details',
+        imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent, PermitReleaseComponent, DocumentPreviewComponent],
+        template: `
+    @if (app(); as a) {
+      <div class="page">
+        <div class="page-header">
+          <div>
+            <h1>{{ a.permitType }}</h1>
+            <div class="subtitle">{{ a.applicationNumber }} · {{ a.businessName }} · {{ a.applicationAction }}</div>
+            @if (a.relatedPermitNumber) {
+              <div class="small muted">
+                {{ a.applicationAction === 'Renewal' ? 'Renewing' : 'Amending' }} permit
+                <strong>{{ a.relatedPermitNumber }}</strong>
+              </div>
+            }
+          </div>
+          <app-status-pill [label]="applicantStatusOf(a.lifecycleStatus)" />
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong>Progress</strong>
+            <span class="small muted">{{ progressPct(a.lifecycleStatus) }}%</span>
+          </div>
+          <div style="height:8px; background:var(--gray-100); border-radius:99px; overflow:hidden; margin-bottom:12px;">
+            <div style="height:100%; background:var(--primary-500);" [style.width.%]="progressPct(a.lifecycleStatus)"></div>
+          </div>
+          <p class="small" style="color:var(--gray-700);">{{ store.nextStepText(a.lifecycleStatus) }}</p>
+
+          @if (!isTerminal(a.lifecycleStatus) && !store.isReal(a.id)) {
+            <button class="btn btn-secondary btn-sm" (click)="advance(a.id)">Demo: Simulate Office Update</button>
+            <span class="small muted" style="margin-left:8px;">No backend exists yet — this simulates the reviewing office advancing your application.</span>
+          }
+          @if (canCancel(a)) {
+            <div style="margin-top:10px;">
+              <button class="btn btn-danger btn-sm" [disabled]="cancelling()" (click)="cancel(a.id)">
+                {{ cancelling() ? 'Withdrawing…' : 'Withdraw Application' }}
+              </button>
+              <span class="small muted" style="margin-left:8px;">
+                Allowed only before an Order of Payment has been issued.
+              </span>
+            </div>
+          }
+        </div>
+
+        @if (permit(); as p) {
+          <div class="card" style="background:var(--success-100); border:none;">
+            <strong style="color:var(--success-text)">Your permit has been issued</strong>
+            <table class="table" style="margin-top:8px;">
+              <tbody>
+                <tr><td class="muted">Permit Number</td><td><strong>{{ p.permitNumber }}</strong></td></tr>
+                <tr><td class="muted">Issued</td><td>{{ formatDate(p.issuedDate) }}</td></tr>
+                <tr><td class="muted">Expiry</td><td>{{ p.expiryDate ? formatDate(p.expiryDate) : 'No fixed expiry' }}</td></tr>
+                <tr><td class="muted">Approving Office</td><td>{{ p.approvingOffice ?? 'Not on file' }}</td></tr>
+              </tbody>
+            </table>
+            <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+              <a class="btn btn-primary btn-sm" [routerLink]="['/applications', a.id, 'permit']">Preview Permit</a>
+            </div>
+          </div>
+        }
+
+        @if (assessment(); as asmt) {
+          <div class="card">
+            <div class="card-title">Assessment (Order of Payment)</div>
+            <table class="table">
+              <thead><tr><th>Fee</th><th>Amount</th></tr></thead>
+              <tbody>
+                @for (line of asmt.lineItems; track line.code) {
+                  <tr><td>{{ line.name }}</td><td>{{ line.amountCentavos !== null ? pesos(line.amountCentavos) : 'Pending' }}</td></tr>
+                }
+              </tbody>
+            </table>
+            <hr class="divider" />
+            <div style="display:flex; justify-content:space-between;"><strong>Total</strong><strong>{{ pesos(asmt.totalCentavos) }}</strong></div>
+            <div style="display:flex; justify-content:space-between;" class="small muted"><span>Balance</span><span>{{ pesos(asmt.balanceCentavos) }}</span></div>
+            @if (asmt.balanceCentavos > 0) {
+              <a class="btn btn-primary btn-sm" style="margin-top:10px;" [routerLink]="['/payments', a.id]">Pay Now</a>
+            }
+          </div>
+        }
+
+        <app-permit-release
+          [permitNumber]="permit()?.permitNumber ?? null"
+          [issuedDate]="permit() ? formatDate(permit()!.issuedDate) : null"
+          [release]="release()"
+        />
+
+        <div class="card">
+          <div class="card-title">Documents</div>
+          <app-application-documents
+            [documents]="contractDocs()"
+            (replace)="onReplace($event)"
+            (preview)="onPreview($event)"
+          />
+          @if (previewing(); as p) {
+            <app-document-preview
+              [file]="p.file"
+              [fileName]="p.fileName"
+              [fileType]="p.fileType"
+              [label]="p.label"
+              [seeded]="p.file === null"
+              (close)="previewing.set(null)"
+            />
+          }
+        
+        </div>
+
+        <div class="card">
+          <div class="card-title">Status Timeline</div>
+          @for (t of timelineEntries(); track t.timestamp) {
+            <div style="display:flex; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-light);">
+              <div style="width:120px;" class="small muted">{{ formatDateTime(t.timestamp) }}</div>
+              <div style="font-weight:600;">{{ t.status }}</div>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="page">
+        <div class="card empty-state">
+          <p>We couldn't find that application. This can happen after a page refresh, since this demo build keeps data in memory only (no backend yet — see the project README).</p>
+          <a routerLink="/applications" class="btn btn-primary">Back to My Applications</a>
+        </div>
+      </div>
+    }
+  `,
+    })
+], ApplicationDetailsPage);
+export { ApplicationDetailsPage };

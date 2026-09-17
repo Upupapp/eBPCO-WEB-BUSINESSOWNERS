@@ -53,11 +53,11 @@
         @if (tab() === 'profile') {
           <div class="card">
             <div class="form-row">
-              <div class="field"><label for="profile-first-name-1">First Name</label><input id="profile-first-name-1" class="input" [(ngModel)]="firstName" /></div>
-              <div class="field"><label for="profile-middle-name-2">Middle Name</label><input id="profile-middle-name-2" class="input" [(ngModel)]="middleName" /></div>
+              <div class="field"><label for="profile-first-name-1">First Name</label><input id="profile-first-name-1" class="input" [(ngModel)]="firstName" appCapitalizeName /></div>
+              <div class="field"><label for="profile-middle-name-2">Middle Name</label><input id="profile-middle-name-2" class="input" [(ngModel)]="middleName" appCapitalizeName /></div>
             </div>
             <div class="form-row">
-              <div class="field"><label for="profile-last-name-3">Last Name</label><input id="profile-last-name-3" class="input" [(ngModel)]="lastName" /></div>
+              <div class="field"><label for="profile-last-name-3">Last Name</label><input id="profile-last-name-3" class="input" [(ngModel)]="lastName" appCapitalizeName /></div>
               <div class="field"><label for="profile-email-read-only-4">Email <span class="small muted">(read-only)</span></label><input id="profile-email-read-only-4" class="input" [value]="u.email" disabled /></div>
             </div>
             <div class="form-row">

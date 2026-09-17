@@ -1,8 +1,10 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { BusinessStore } from '../../core/stores/business.store';
 import { AuthService } from '../../core/session/auth.service';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { PaymentHistoryEntry, ApplicationSummary } from '../../core/api/citizen-api.models';
 import { PaymentTransaction } from '../../core/domain/payment.model';
 import { requirementsFor } from '../../core/domain/requirements-catalog';
 import { agencyHeaderFor } from '../../core/domain/generated-document.helpers';
@@ -12,22 +14,50 @@ import { formatDate, formatDateTime } from '../../core/utils/ids';
 
 type WatermarkText = 'REJECTED' | 'PENDING VERIFICATION' | 'NOT VALID AS AN OFFICIAL RECEIPT' | null;
 
+/** The fields the template actually reads off a payment, real or demo alike — not the full `PaymentTransaction`, which the real path has no honest way to fill in completely (no `assessmentId`, no `proofFileName` on the wire). */
+interface ReceiptPayment {
+  id: string;
+  amountCentavos: number;
+  method: string;
+  agency: string;
+  transactionReference: string;
+  status: string;
+  submittedAt: string;
+  orNumber: string | null;
+  orDate: string | null;
+  /** Set only when this real submission was rejected. Always null on the demo path — the old mock had no durable rejection record either. */
+  rejectionReason: string | null;
+}
+
+/** What the "Amount" section needs — a subset of the old local `Assessment`, real or demo. */
+interface ReceiptAmount {
+  lineItems: ReadonlyArray<{ code: string; name: string; amountCentavos: number | null }>;
+  balanceCentavos: number;
+}
+
+const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['payment']['orderOfPayment']>['fees']; name: string }> = [
+  { code: 'filing', name: 'Filing Fee' },
+  { code: 'processing', name: 'Processing Fee' },
+  { code: 'architectural', name: 'Architectural Fee' },
+  { code: 'structural', name: 'Structural Fee' },
+  { code: 'electrical', name: 'Electrical Fee' },
+  { code: 'others', name: 'Other Fees' },
+];
+
 /**
  * The applicant's own generated receipt for a submitted payment — mirrors
- * permit-document.page.ts's approach (real data from this portal's own
- * stores, an honest watermark gate, restrained printable layout), not a
- * redirect back to the application page.
+ * permit-document.page.ts's approach (real data, an honest watermark gate,
+ * restrained printable layout), not a redirect back to the application page.
  *
- * Per payment.model.ts, an OR number is entered only by the collecting
- * office's cashier once a payment is actually verified — but the ONLY way
- * `orNumber` ever gets set in this build is advanceForDemo()'s "Simulate
- * Office Update" button, never a real cashier (no backend exists to be
- * one). So an assigned `orNumber` here is exactly as untrustworthy as the
- * generated permit's `provenance: 'demo'` — permit-document.page.ts never
- * clears its own watermark for that case, and this page must not either.
- * `isOfficial` only decides which LABEL/heading fits the record's shape
- * (OR No. vs Reference No.); `watermarkText` alone decides visible trust,
- * and is non-null for every payment this build can produce.
+ * Real data now exists to gate on: `GET /applications/{id}/payments`
+ * (citizen-api.client.ts's `getPayments`) returns every real payment attempt,
+ * each carrying a real `officialReceiptNumber`/`verifiedAt` once a real
+ * cashier verifies it, and a real `rejectionReason` when one was rejected —
+ * so `isOfficial`/`watermarkText` can finally be earned by a real fact
+ * instead of never clearing at all. The local demo path (`orNumber` set only
+ * by "Simulate Office Update") is kept as the fallback for an unconfigured
+ * backend or a demo-only application id, and still never clears its own
+ * watermark, for the same reason it never did.
  */
 @Component({
   selector: 'app-payment-receipt',
@@ -148,18 +178,24 @@ type WatermarkText = 'REJECTED' | 'PENDING VERIFICATION' | 'NOT VALID AS AN OFFI
                   <dt>Status</dt>
                   <dd>{{ tx.status }}</dd>
                 </div>
+                @if (tx.rejectionReason) {
+                  <div>
+                    <dt>Reason</dt>
+                    <dd>{{ tx.rejectionReason }}</dd>
+                  </div>
+                }
               </dl>
             </section>
 
             <section class="doc-generated-section">
               <h2>Amount</h2>
-              @if (assessment(); as asmt) {
+              @if (amount(); as amt) {
                 <table class="doc-generated-table">
                   <thead>
                     <tr><th>Fee</th><th>Amount</th></tr>
                   </thead>
                   <tbody>
-                    @for (line of asmt.lineItems; track line.code) {
+                    @for (line of amt.lineItems; track line.code) {
                       <tr>
                         <td>{{ line.name }}</td>
                         <td>{{ line.amountCentavos !== null ? pesos(line.amountCentavos) : 'Pending' }}</td>
@@ -171,7 +207,7 @@ type WatermarkText = 'REJECTED' | 'PENDING VERIFICATION' | 'NOT VALID AS AN OFFI
                     </tr>
                     <tr>
                       <td>Remaining Balance</td>
-                      <td>{{ pesos(asmt.balanceCentavos) }}</td>
+                      <td>{{ pesos(amt.balanceCentavos) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -225,6 +261,7 @@ export class PaymentReceiptPage {
   private readonly store = inject(ApplicationStore);
   private readonly businessStore = inject(BusinessStore);
   private readonly auth = inject(AuthService);
+  private readonly api = inject(CitizenApiClient);
 
   protected readonly formatDate = formatDate;
   protected readonly formatDateTime = formatDateTime;
@@ -237,12 +274,62 @@ export class PaymentReceiptPage {
     minute: '2-digit',
   });
 
+  /**
+   * `realChecked` separates "confirmed — nothing real here" from "the
+   * request hasn't come back yet", same reasoning as `payment-flow.page.ts`'s
+   * `realChecked` for the Order of Payment. Both real calls are fired
+   * together; either can legitimately 404 on its own (an application with no
+   * Order of Payment yet has no payments either) without the other failing.
+   */
+  private readonly realChecked = signal(false);
+  private readonly realOrderOfPayment = signal<ApplicationSummary['payment']['orderOfPayment'] | null>(null);
+  private readonly realPayments = signal<PaymentHistoryEntry[]>([]);
+
+  constructor() {
+    if (this.api.configured) {
+      this.api.getApplication(this.id()).subscribe({
+        next: (summary) => {
+          this.realOrderOfPayment.set(summary.payment.orderOfPayment ?? null);
+          this.realChecked.set(true);
+        },
+        error: () => { this.realChecked.set(true); },
+      });
+      this.api.getPayments(this.id()).subscribe({
+        next: (payments) => this.realPayments.set(payments),
+        // A local demo application id 404s against the real backend, or a
+        // real one simply has none submitted yet — both leave this empty,
+        // which is what "no payment yet" already means below.
+        error: () => {},
+      });
+    }
+  }
+
   private id(): string {
     return this.route.snapshot.paramMap.get('applicationId')!;
   }
 
   protected readonly app = computed(() => this.store.applicationById(this.id()));
-  protected readonly assessment = computed(() => this.store.assessmentFor(this.id()));
+
+  protected readonly amount = computed<ReceiptAmount | undefined>(() => {
+    if (this.api.configured) {
+      if (!this.realChecked()) return undefined;
+      const real = this.realOrderOfPayment();
+      if (!real) return undefined;
+      return {
+        lineItems: FEE_LINES.map((line) => ({
+          code: line.code, name: line.name, amountCentavos: real.fees[line.code],
+        })),
+        // Pay-in-full, not instalments — the real backend has no partial-payment
+        // concept (PaymentService.checkSettles is a binary "does this amount
+        // clear the Order", never a running balance). Paid means zero owed;
+        // anything else means the whole total is still owed.
+        balanceCentavos: this.payment()?.status === 'Paid' ? 0 : real.totalCentavos,
+      };
+    }
+    const a = this.store.assessmentFor(this.id());
+    return a ? { lineItems: a.lineItems, balanceCentavos: a.balanceCentavos } : undefined;
+  });
+
   protected readonly applicantName = computed(() => {
     const u = this.auth.currentUser();
     return u ? fullName(u) : 'Not on file';
@@ -252,11 +339,51 @@ export class PaymentReceiptPage {
     return a ? this.businessStore.businessById(a.businessId) : undefined;
   });
 
-  /** The most recent payment transaction on file — this demo records one payment per assessment, so the latest is the one this receipt describes. */
-  protected readonly payment = computed<PaymentTransaction | undefined>(() => {
+  /**
+   * The most recent payment on file. Real data prefers the latest real
+   * submission (each is its own row server-side, oldest first — the last one
+   * is the current state of the world); the demo fallback keeps its old
+   * "one payment per assessment" assumption.
+   */
+  protected readonly payment = computed<ReceiptPayment | undefined>(() => {
+    if (this.api.configured) {
+      if (!this.realChecked()) return undefined;
+      const payments = this.realPayments();
+      const latest = payments[payments.length - 1];
+      if (!latest) return undefined;
+      return {
+        id: latest.id,
+        amountCentavos: latest.amountCentavos,
+        method: latest.method,
+        agency: 'OBO/LGU',
+        transactionReference: latest.referenceNumber,
+        status: latest.status,
+        submittedAt: latest.submittedAt,
+        orNumber: latest.officialReceiptNumber,
+        orDate: latest.verifiedAt,
+        rejectionReason: latest.rejectionReason,
+      };
+    }
+    const demo = this.demoPayment();
+    return demo && {
+      id: demo.id,
+      amountCentavos: demo.amountCentavos,
+      method: demo.method,
+      agency: demo.agency,
+      transactionReference: demo.transactionReference,
+      status: demo.status,
+      submittedAt: demo.submittedAt,
+      orNumber: demo.orNumber,
+      orDate: demo.orDate,
+      rejectionReason: demo.rejectionReason,
+    };
+  });
+
+  /** This demo records one payment per assessment, so the latest is the one this receipt describes. */
+  private demoPayment(): PaymentTransaction | undefined {
     const payments = this.store.paymentsFor(this.id());
     return payments[payments.length - 1];
-  });
+  }
 
   protected readonly isOfficial = computed(() => !!this.payment()?.orNumber);
 
@@ -269,31 +396,23 @@ export class PaymentReceiptPage {
 
   protected readonly watermarkText = computed<WatermarkText>(() => {
     const tx = this.payment();
-    // No payment is not a cleared receipt. This returned null — the same value
-    // that means "genuine, no watermark" — so `gateCleared` was true whenever
-    // the data was ABSENT. Dead today, because the document renders inside
-    // @if (payment(); as tx), but it is the same latent fail-open the
-    // verification page carried: one refactor from a receipt with no payment
-    // behind it claiming to be a system-generated Official Receipt issued by
-    // the Municipality.
-    //
     // Cleared must be EARNED, never inherited from missing data.
     if (!tx) return 'NOT VALID AS AN OFFICIAL RECEIPT';
-    if (tx.status === 'Rejected') return 'REJECTED';
-    if (!tx.orNumber) return 'PENDING VERIFICATION';
-    // An OR number here was assigned by the demo "Simulate Office Update"
-    // button, never a real cashier — no less demo than the generated
-    // permit's provenance: 'demo', which permit-document.page.ts always
-    // watermarks. This must too.
+    if (tx.rejectionReason) return 'REJECTED';
+    if (this.api.configured) {
+      // Real: a genuinely verified payment has a real OR number AND a real
+      // 'Paid' status, both set only by `POST /staff/payments/:id/verify`.
+      // This is the moment that was impossible before — no real cashier
+      // flow existed, so this branch could never be reached.
+      if (tx.status === 'Paid' && tx.orNumber) return null;
+      return 'PENDING VERIFICATION';
+    }
+    // Demo: an OR number here was assigned only by "Simulate Office Update",
+    // never a real cashier — no less demo than the generated permit's
+    // provenance: 'demo', which permit-document.page.ts always watermarks.
     return 'NOT VALID AS AN OFFICIAL RECEIPT';
   });
 
-  /**
-   * Clearing requires a positive answer, not the absence of a negative one.
-   * Today nothing can satisfy it: an OR number is only ever assigned by the
-   * demo advance, never a cashier, so `isOfficial()` is never trustworthy — the
-   * same reasoning as PermitProvenance on the generated permit.
-   */
   protected readonly gateCleared = computed(() => this.watermarkText() === null && !!this.payment());
 
   protected print(): void {

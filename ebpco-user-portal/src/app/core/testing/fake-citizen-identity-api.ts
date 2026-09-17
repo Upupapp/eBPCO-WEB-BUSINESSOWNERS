@@ -31,6 +31,10 @@ export class FakeCitizenIdentityApi {
     city: 'Castilla',
     province: 'Sorsogon',
     postalCode: '4712',
+    dateOfBirth: '1990-05-12',
+    sex: 'Male',
+    civilStatus: 'Married',
+    nationality: 'Filipino',
   };
 
   async signIn(email: string, password: string): Promise<MeResponse> {
@@ -46,5 +50,11 @@ export class FakeCitizenIdentityApi {
   async requestPasswordReset(): Promise<void> {}
   async resetPassword(): Promise<{ kind: 'done' }> {
     return { kind: 'done' };
+  }
+  async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    if (refreshToken !== 'fake-refresh-token') {
+      throw new ApiError(401, { title: 'That refresh token was not accepted' }, false);
+    }
+    return { accessToken: 'fake-access-token-refreshed', refreshToken: 'fake-refresh-token' };
   }
 }

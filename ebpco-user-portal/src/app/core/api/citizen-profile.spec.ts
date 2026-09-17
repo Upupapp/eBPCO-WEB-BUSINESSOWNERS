@@ -10,6 +10,7 @@ const held: CitizenProfile = {
   mobileNumber: '09171234567',
   street: 'Purok 3, Zone 2', barangay: 'Poblacion', city: 'Castilla',
   province: 'Sorsogon', postalCode: '4713',
+  dateOfBirth: '1990-05-12', sex: 'Male', civilStatus: 'Married', nationality: 'Filipino',
 };
 
 const form = (over: Record<string, string> = {}) => ({

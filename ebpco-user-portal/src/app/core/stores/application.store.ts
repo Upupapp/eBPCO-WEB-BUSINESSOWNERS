@@ -17,7 +17,7 @@ import { GENERIC_APPLICATION_DOCUMENTS, requirementsFor } from '../domain/requir
 import { nextId, todayIso } from '../utils/ids';
 import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
 import { CitizenApiClient, newIdempotencyKey } from '../api/citizen-api.client';
-import { ApplicationSummary, SubmitApplicationRequest, SubmitPaymentRequest } from '../api/citizen-api.models';
+import { ApplicationSummary, PermitRelease, PermitResponse, SubmitApplicationRequest, SubmitPaymentRequest } from '../api/citizen-api.models';
 import { ApiError } from '../api/problem';
 
 export interface CreateApplicationInput {
@@ -121,6 +121,18 @@ export class ApplicationStore {
    * over the local demo seed in `applications`.
    */
   private readonly realApplications = signal<ApplicationRecord[] | null>(null);
+
+  /**
+   * Raw `GET /applications/{id}/permit` responses, keyed by application id.
+   * Fetched on demand via `fetchPermit()` (both `application-details.page.ts`
+   * and `permit-document.page.ts` call it, since they're separate
+   * routes/components that don't share signals). A 404 — no permit issued
+   * yet — is a normal error on this endpoint (see `citizen-api.client.spec.ts`),
+   * so it's swallowed the same way `listDocuments`/`getTimeline` errors are
+   * swallowed elsewhere: the id simply never gets a key here, and every
+   * reader below falls through to the existing local-demo behavior.
+   */
+  private readonly realPermitResponses = signal<Record<string, PermitResponse>>({});
 
   constructor(
     private readonly auth: AuthService,
@@ -373,7 +385,58 @@ export class ApplicationStore {
   }
 
   permitFor(applicationId: string): GeneratedPermit | undefined {
+    const real = this.realPermitResponses()[applicationId];
+    if (real) {
+      return {
+        applicationId,
+        permitNumber: real.permitNumber,
+        // A successful response from this endpoint IS the issuance signal —
+        // the server does not return a row for a permit nobody issued.
+        provenance: 'issued',
+        conditions: real.conditions,
+        // Neither the endpoint nor the `generated_permits` table carries
+        // these — see `GeneratedPermit.standing`'s own doc comment ("NOTHING
+        // sets this today; it is the seam the backend fills") and
+        // `approvingOfficial`/`approvingOffice`'s. Honestly null, not guessed.
+        standing: null,
+        issuedDateValue: new Date(real.issuedDate),
+        issuedDate: real.issuedDate,
+        expiryDateValue: null,
+        expiryDate: null,
+        approvingOfficial: null,
+        approvingOffice: null,
+      };
+    }
     return this.permitsByApp()[applicationId];
+  }
+
+  /**
+   * Fetches the real permit for one application and caches the raw response.
+   * Safe to call for an id that turns out to have no real permit (yet, or
+   * ever, e.g. a local demo id) — the 404 is swallowed and `permitFor`/
+   * `releaseFor` simply keep using their existing local-demo fallback.
+   */
+  fetchPermit(applicationId: string): void {
+    if (!this.api.configured) return;
+    this.api.getPermit(applicationId).subscribe({
+      next: (p) => this.realPermitResponses.update((map) => ({ ...map, [applicationId]: p })),
+      error: () => {},
+    });
+  }
+
+  /**
+   * The real `release` sub-object once fetched — preserved without
+   * translation, meaningful `null` included (see `PermitResponse.release`'s
+   * own doc comment: "null is a fact to render... not a missing value").
+   * Falls back to the existing demo construction from
+   * `ApplicationRecord.permitReleaseStatus` otherwise.
+   */
+  releaseFor(applicationId: string): PermitRelease | null {
+    const real = this.realPermitResponses()[applicationId];
+    if (real) return real.release;
+    const app = this.applicationById(applicationId);
+    if (!app || !this.permitFor(applicationId)) return null;
+    return { status: app.permitReleaseStatus, method: null, releasedAt: null };
   }
 
   /**
@@ -738,7 +801,14 @@ export class ApplicationStore {
       issuedAt: todayIso(),
     };
     this.assessmentsByApp.update((map) => ({ ...map, [applicationId]: assessment }));
-    this.updateApplication(applicationId, { assessedAmountCentavos: total, paymentStatus: 'Pending Verification' });
+    // 'Not Yet Available', not 'Pending Verification' — matches the real
+    // backend's own paymentStatusOf() exactly: "assessed but unpaid, or not
+    // yet assessed" is the SAME status, told apart only by whether
+    // orderOfPayment is present. 'Pending Verification' is earned only once
+    // a payment is actually submitted (submitPayment(), below) — setting it
+    // here meant every freshly-assessed application already read as "a
+    // payment is awaiting verification" before the citizen had sent one.
+    this.updateApplication(applicationId, { assessedAmountCentavos: total, paymentStatus: 'Not Yet Available' });
     this.notifications.push(
       'Order of Payment issued',
       `An assessment of ${(total / 100).toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })} is ready for ${app.applicationNumber}.`,

@@ -9,8 +9,12 @@ const ALL = PRIVACY_POLICY_SECTIONS.flatMap((s) => [s.heading, ...s.paragraphs])
  */
 describe('Privacy notice (F-6: informed consent needs a real notice)', () => {
   it('leads with what this build actually does, not an assurance', () => {
-    expect(PRIVACY_POLICY_TEXT).toContain('demonstration build');
-    expect(PRIVACY_POLICY_TEXT).toContain('not transmitted');
+    // Applications/documents/payments/businesses became real (Hardening
+    // Pass, Part 3c) — the original "stays in your browser, not transmitted"
+    // disclosure was itself overtaken and became the false claim rule 1
+    // exists to prevent, the opposite direction from what it first fixed.
+    expect(PRIVACY_POLICY_TEXT).not.toContain('demonstration');
+    expect(PRIVACY_POLICY_TEXT).toContain('genuinely created, transmitted and stored');
   });
 
   it('names the personal information controller', () => {

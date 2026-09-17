@@ -53,7 +53,7 @@ type PublicStatus = PermitStanding | 'Expired' | 'Unverified';
             </div>
             <div style="display:flex; justify-content:space-between; gap:12px;">
               <dt class="small muted">Issuing Office</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ p.approvingOffice }}</dd>
+              <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ p.approvingOffice ?? 'Not on file' }}</dd>
             </div>
           </dl>
           @if (status() === 'Unverified') {

@@ -19,27 +19,27 @@ import { CitizenApiClient } from '../../core/api/citizen-api.client';
       </div>
 
       <div class="card">
-        <div class="field"><label for="register-business-business-name-1">Business Name*</label><input id="register-business-business-name-1" class="input" [(ngModel)]="name" /></div>
+        <div class="field"><label for="register-business-business-name-1">Business Name<span class="required">*</span></label><input id="register-business-business-name-1" class="input" [(ngModel)]="name" /></div>
         <div class="field">
-          <label for="register-business-business-category-2">Business Category*</label>
+          <label for="register-business-business-category-2">Business Category<span class="required">*</span></label>
           <select id="register-business-business-category-2" class="input" [(ngModel)]="category">
             @for (c of categories; track c) { <option [value]="c">{{ c }}</option> }
           </select>
         </div>
-        <div class="field"><label for="register-business-house-number-street-3">House Number / Street*</label><input id="register-business-house-number-street-3" class="input" [(ngModel)]="street" /></div>
+        <div class="field"><label for="register-business-house-number-street-3">House Number / Street<span class="required">*</span></label><input id="register-business-house-number-street-3" class="input" [(ngModel)]="street" /></div>
         <div class="form-row">
-          <div class="field"><label for="register-business-barangay-4">Barangay*</label><input id="register-business-barangay-4" class="input" [(ngModel)]="barangay" /></div>
-          <div class="field"><label for="register-business-city-municipality-5">City / Municipality*</label><input id="register-business-city-municipality-5" class="input" [(ngModel)]="city" /></div>
+          <div class="field"><label for="register-business-barangay-4">Barangay<span class="required">*</span></label><input id="register-business-barangay-4" class="input" [(ngModel)]="barangay" /></div>
+          <div class="field"><label for="register-business-city-municipality-5">City / Municipality<span class="required">*</span></label><input id="register-business-city-municipality-5" class="input" [(ngModel)]="city" /></div>
         </div>
-        <div class="field"><label for="register-business-province-6">Province*</label><input id="register-business-province-6" class="input" [(ngModel)]="province" /></div>
+        <div class="field"><label for="register-business-province-6">Province<span class="required">*</span></label><input id="register-business-province-6" class="input" [(ngModel)]="province" /></div>
         @if (api.configured) {
           <div class="form-row">
             <div class="field">
-              <label for="register-business-registration-number-7">DTI / SEC / CDA Registration No.*</label>
+              <label for="register-business-registration-number-7">DTI / SEC / CDA Registration No.<span class="required">*</span></label>
               <input id="register-business-registration-number-7" class="input" [(ngModel)]="registrationNumber" />
             </div>
             <div class="field">
-              <label for="register-business-date-registered-8">Date Registered*</label>
+              <label for="register-business-date-registered-8">Date Registered<span class="required">*</span></label>
               <input id="register-business-date-registered-8" class="input" type="date" [(ngModel)]="dateRegistered" />
             </div>
           </div>

@@ -34,31 +34,31 @@ import { ToastService } from '../../shared/ui/toast.service';
 
         <div class="card">
           <div class="field">
-            <label for="edit-business-name">Business Name*</label>
+            <label for="edit-business-name">Business Name<span class="required">*</span></label>
             <input id="edit-business-name" class="input" [(ngModel)]="name" />
           </div>
           <div class="field">
-            <label for="edit-business-category">Business Category*</label>
+            <label for="edit-business-category">Business Category<span class="required">*</span></label>
             <select id="edit-business-category" class="input" [(ngModel)]="category">
               @for (c of categories; track c) { <option [value]="c">{{ c }}</option> }
             </select>
           </div>
           <div class="field">
-            <label for="edit-business-street">House Number / Street*</label>
+            <label for="edit-business-street">House Number / Street<span class="required">*</span></label>
             <input id="edit-business-street" class="input" [(ngModel)]="street" />
           </div>
           <div class="form-row">
             <div class="field">
-              <label for="edit-business-barangay">Barangay*</label>
+              <label for="edit-business-barangay">Barangay<span class="required">*</span></label>
               <input id="edit-business-barangay" class="input" [(ngModel)]="barangay" />
             </div>
             <div class="field">
-              <label for="edit-business-city">City / Municipality*</label>
+              <label for="edit-business-city">City / Municipality<span class="required">*</span></label>
               <input id="edit-business-city" class="input" [(ngModel)]="city" />
             </div>
           </div>
           <div class="field">
-            <label for="edit-business-province">Province*</label>
+            <label for="edit-business-province">Province<span class="required">*</span></label>
             <input id="edit-business-province" class="input" [(ngModel)]="province" />
           </div>
 

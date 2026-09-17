@@ -5,6 +5,7 @@ import {
   MUNICIPAL_HALL_ADDRESS,
   PLANNING_AND_DEVELOPMENT,
 } from '../../core/domain/lgu-contact';
+import { PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
 
 interface Faq {
   q: string;
@@ -74,7 +75,7 @@ export class HelpSupportPage {
     { q: 'How long does processing take?', a: 'Processing time varies by permit type and depends on document completeness and evaluation by the reviewing office (OBO, Zoning, or BFP).' },
     { q: 'Can I edit my application after submission?', a: 'Once submitted, you cannot edit an application directly, but if the reviewing office marks it "Revision Required," you can resubmit the requested documents.' },
     { q: 'What payment methods are accepted?', a: 'Onsite payment at the Office of the Municipal Engineer. Bank transfer is not available yet — the Municipality has not published a deposit account, so do not transfer permit fees to any account you have not confirmed with the Municipality directly.' },
-    { q: 'Is my data secure?', a: 'This is a demonstration build: everything you enter stays in your browser and is never transmitted to the Municipality or anyone else. Your data is never shared with another citizen\'s account. See the Privacy Policy for what will be collected, and what the Municipality has not yet published.' },
+    { q: 'Is my data secure?', a: `${PRIVACY_POLICY_TEXT} Your data is never shared with another citizen's account. See the Privacy Policy for the full detail, including what the Municipality has not yet published.` },
   ];
 
   toggle(q: string): void {

@@ -9,6 +9,7 @@ import { AuthService } from '../../core/session/auth.service';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
 import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
+import { SavedDocument } from '../../core/domain/document.model';
 
 /**
  * A citizen may reuse a document already on file — and only one that has bytes.
@@ -55,7 +56,11 @@ describe('Reusing a document already on file', () => {
   it('offers ONLY documents that actually have bytes', () => {
     // Seeded rows exist with file: null. If any of them is offered, a citizen
     // can attach a name with nothing behind it.
-    for (const d of page['reusable']()) {
+    //
+    // Cast to SavedDocument: `reusable()` is real-or-demo (DocumentHistoryEntry
+    // | SavedDocument), and this test — no API_BASE_URL provided, so
+    // `api.configured` is false — always exercises the demo half.
+    for (const d of page['reusable']() as SavedDocument[]) {
       expect(d.file).not.toBeNull();
     }
   });

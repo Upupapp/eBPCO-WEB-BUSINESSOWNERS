@@ -14,7 +14,9 @@ import {
   ExportRequestResult,
   ExportStatusResult,
   LimitsResponse,
+  DocumentHistoryEntry,
   NotificationFeedResponse,
+  PaymentHistoryEntry,
   PermitResponse,
   RequirementsChecklistResponse,
   ResubmitRequest,
@@ -94,6 +96,36 @@ export class CitizenApiClient {
    */
   getTimeline(applicationId: string): Observable<TimelineEntryResponse[]> {
     return this.get<TimelineEntryResponse[]>(`/applications/${encodeURIComponent(applicationId)}/timeline`);
+  }
+
+  /**
+   * `GET /applications/{id}/payments` — every real payment this citizen has
+   * submitted against this application, oldest first. The direct answer to
+   * "did my payment go through" — the aggregate `payment.status` on
+   * `ApplicationSummary` has no per-attempt detail (OR number, who verified
+   * it, why one was rejected) and no way to show a rejection distinctly from
+   * "never submitted".
+   */
+  getPayments(applicationId: string): Observable<PaymentHistoryEntry[]> {
+    return this.get<PaymentHistoryEntry[]>(`/applications/${encodeURIComponent(applicationId)}/payments`);
+  }
+
+  /**
+   * `GET /documents/me` — every document this citizen has ever uploaded,
+   * attached or not (broadened; used to return only unattached ones).
+   */
+  getMyDocuments(): Observable<DocumentHistoryEntry[]> {
+    return this.get<DocumentHistoryEntry[]>('/documents/me');
+  }
+
+  /**
+   * `GET /documents/{id}/content` — a short-lived signed download URL, not
+   * the bytes. Reuse-from-library spends this to fetch what a document
+   * actually contains before re-uploading it against a new application:
+   * there is no "attach by reference" route, only "upload fresh bytes".
+   */
+  getDocumentContent(documentId: string): Observable<{ url: string }> {
+    return this.get<{ url: string }>(`/documents/${encodeURIComponent(documentId)}/content`);
   }
 
   /**

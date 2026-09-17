@@ -19,6 +19,16 @@ export interface CitizenProfile {
   city: string | null;
   province: string | null;
   postalCode: string | null;
+  /**
+   * Migration 038, collected at registration (not correctable via PATCH /me
+   * today — see `RegisterPersonalInfo` and `auth.service.ts`'s class doc).
+   * Present on both responses because the server's `rectify()` re-reads the
+   * whole profile and returns it as a strict superset of `GET /me`.
+   */
+  dateOfBirth: string | null;
+  sex: string | null;
+  civilStatus: string | null;
+  nationality: string | null;
 }
 
 /**

@@ -324,6 +324,59 @@ export interface TimelineEntryResponse {
   remarks: string | null;
 }
 
+/**
+ * `GET /applications/{id}/payments` — a bare array, every real payment
+ * attempt this citizen has submitted, oldest first. Each submission is its
+ * own row server-side (never updated in place), so a rejected attempt stays
+ * visible here alongside whatever was submitted after it.
+ */
+export interface PaymentHistoryEntry {
+  id: string;
+  referenceNumber: string;
+  method: 'Bank Transfer' | 'Onsite';
+  amountCentavos: number;
+  /** The real server vocabulary — no 'Rejected' value exists; a rejection resets this to 'Not Yet Available' and is told apart by `rejectionReason` below, not by status. */
+  status: 'Not Yet Available' | 'Pending Verification' | 'Paid' | 'Overdue' | 'Voided' | 'Reversed' | 'Refunded';
+  submittedAt: string;
+  verifiedAt: string | null;
+  officialReceiptNumber: string | null;
+  /** Set only when THIS submission was rejected. Null means it never was. */
+  rejectionReason: string | null;
+  rejectedAt: string | null;
+  /** Set only for a settled payment later Voided/Reversed/Refunded — a different, later kind of undo than a rejection. */
+  exceptionReason: string | null;
+  exceptionAt: string | null;
+}
+
+/**
+ * `GET /documents/me` — every document this citizen has ever uploaded,
+ * attached or not. Used to return only unattached documents; broadened so a
+ * document already doing duty on one application (`applicationId` set) is
+ * still visible and still reusable on another — filing one permit must not
+ * consume a citizen's only copy of a document.
+ */
+export interface DocumentHistoryEntry {
+  id: string;
+  label: string;
+  fileName: string;
+  contentType: string;
+  /** A STRING — the column is a bigint and JSON numbers lose precision. */
+  byteSize: string;
+  uploadedAt: string;
+  requirementCode: string | null;
+  /** Null means NO EXPIRY RECORDED, never "does not expire". */
+  expiresOn: string | null;
+  /** When the issuing office certified it — not when it was uploaded. Null means NOT RECORDED. */
+  certifiedOn: string | null;
+  scanCleared: boolean;
+  quarantined: boolean;
+  /** Null means unattached — freely reusable. Set means it is currently doing duty on a real filing (still reusable; just not idle). */
+  applicationId: string | null;
+  applicationReference: string | null;
+  /** Null for an unattached document — nothing has reviewed it because there is no application to review it against. */
+  reviewStatus: DocumentReviewStatus | null;
+}
+
 /** `GET /applications/{id}/requirements` — the checklist snapshot taken at filing, not the live catalogue. */
 export interface RequirementsChecklistResponse {
   requirements: ReadonlyArray<{

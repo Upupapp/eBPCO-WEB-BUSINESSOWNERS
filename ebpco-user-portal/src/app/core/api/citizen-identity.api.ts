@@ -28,6 +28,11 @@ export interface RegisterInput {
   email: string;
   mobileNumber: string;
   password: string;
+  /** Migration 038. Optional on the wire — omit rather than send '' for an unanswered one. */
+  dateOfBirth?: string;
+  sex?: string;
+  civilStatus?: string;
+  nationality?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -51,13 +56,11 @@ export class CitizenIdentityApi {
   /**
    * `POST /auth/register` — self-service applicant signup.
    *
-   * `.strict()` on the server: exactly these five fields, nothing more.
-   * Address, date of birth, sex, civil status and nationality are NOT
-   * collected here — the server has no field for them at registration, and
-   * sending them would be silently accepted and then refused for an unknown
-   * key. Whatever the sign-up screen collects beyond these five stays
-   * local-only until a real backend field exists for it (a genuine gap, not
-   * an oversight — see `auth.service.ts`).
+   * `.strict()` on the server: the five original fields plus the four
+   * migration-038 ones above, nothing more. Address (street/barangay/city/
+   * province/postalCode) is still NOT collected here — the server has no
+   * field for it at registration, only via `PATCH /me` — sending it would be
+   * silently accepted and then refused for an unknown key.
    *
    * Always resolves 202 for a well-formed request, identically whether or
    * not the email is already registered — the server does not say, on
@@ -70,6 +73,25 @@ export class CitizenIdentityApi {
 
   me(): Promise<MeResponse> {
     return this.get<MeResponse>('/me');
+  }
+
+  /**
+   * `POST /auth/token/refresh` — trades the stored refresh token for a new
+   * access/refresh pair.
+   *
+   * Not part of `citizen-auth.interceptor.ts`'s job (that interceptor's own
+   * doc comment explains why it deliberately never refreshes reactively on a
+   * 401 mid-request: queueing and replaying a write risks firing it twice).
+   * This exists for `AuthService.restore()` instead — called once, at app
+   * bootstrap, before any write is in flight, specifically so a citizen
+   * whose 15-minute access token has simply expired since their last visit
+   * is transparently signed back in rather than sent to `/login`, the same
+   * way a still-valid refresh token is supposed to work.
+   */
+  async refresh(refreshToken: string): Promise<TokenResponse> {
+    const issued = await this.post<TokenResponse>('/auth/token/refresh', { refreshToken });
+    this.tokens.set({ accessToken: issued.accessToken, refreshToken: issued.refreshToken ?? null });
+    return issued;
   }
 
   async signOut(): Promise<void> {

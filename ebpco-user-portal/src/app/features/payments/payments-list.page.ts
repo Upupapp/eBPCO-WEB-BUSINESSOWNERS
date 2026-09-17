@@ -1,16 +1,34 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
-import { Assessment, pesos } from '../../core/domain/assessment.model';
+import { pesos } from '../../core/domain/assessment.model';
+import { PaymentStatus } from '../../core/domain/status.model';
 
 interface PaymentRow {
   applicationId: string;
   applicationNumber: string;
-  assessment: Assessment;
-  label: string;
+  totalCentavos: number;
+  label: PaymentStatus;
   tone: 'green' | 'amber' | 'red';
   canPay: boolean;
 }
+
+/**
+ * Real data, unlike the demo store this page used to read (`assessmentFor`/
+ * `paymentsFor`, populated only by local seed data — a real payment
+ * submission never appeared here at all). `ApplicationStore.myApplications()`
+ * is already real once the backend is configured, and `paymentStatus`/
+ * `assessedAmountCentavos` on each row are ALREADY faithful to the server —
+ * see `fromServerSummary()`'s own doc comment in `application.store.ts` — so
+ * this needed no new API call, only reading fields that were already there.
+ */
+const TONE: Readonly<Record<PaymentStatus, 'green' | 'amber' | 'red'>> = {
+  'Paid': 'green',
+  'Not Yet Available': 'amber',
+  'Pending Verification': 'amber',
+  'Partially Paid': 'amber',
+  'Overdue': 'red',
+};
 
 @Component({
   selector: 'app-payments-list',
@@ -29,13 +47,12 @@ interface PaymentRow {
       } @else {
         <div class="card" style="padding:0;">
           <table class="table">
-            <thead><tr><th>Application</th><th>Total</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Application</th><th>Total</th><th>Status</th><th></th></tr></thead>
             <tbody>
               @for (row of rows(); track row.applicationId) {
                 <tr>
                   <td>{{ row.applicationNumber }}</td>
-                  <td>{{ pesos(row.assessment.totalCentavos) }}</td>
-                  <td>{{ pesos(row.assessment.balanceCentavos) }}</td>
+                  <td>{{ pesos(row.totalCentavos) }}</td>
                   <td>
                     <span class="badge" [class]="'badge-' + row.tone">{{ row.label }}</span>
                   </td>
@@ -59,50 +76,21 @@ export class PaymentsListPage {
   private readonly store = inject(ApplicationStore);
   protected readonly pesos = pesos;
 
-  /**
-   * A row's state, from the assessment AND the payments actually submitted.
-   *
-   * This used to be derived from `balanceCentavos > 0` alone, which was wrong in
-   * the one direction that costs a citizen money. A submitted payment sits at
-   * 'Pending Verification' and the balance correctly does NOT move until the
-   * Treasurer's cashier verifies it — so a citizen who had just paid was shown
-   * "Awaiting Payment" and a "Pay Now" button. The screen invited them to
-   * transfer the fee a second time.
-   *
-   * Balance answers "does the Municipality still expect money". It does not
-   * answer "has this citizen already sent it", and only the second question
-   * decides whether to offer Pay Now.
-   */
   rows(): PaymentRow[] {
     return this.store
       .myApplications()
-      .map((a) => {
-        const assessment = this.store.assessmentFor(a.id);
-        if (!assessment) return null;
-        const payments = this.store.paymentsFor(a.id);
-        const latest = payments[payments.length - 1];
-        const settled = assessment.balanceCentavos <= 0;
-        const pending = !settled && latest?.status === 'Pending Verification';
-        const rejected = !settled && latest?.status === 'Rejected';
-        return {
-          applicationId: a.id,
-          applicationNumber: a.applicationNumber,
-          assessment,
-          label: settled
-            ? 'Paid'
-            : pending
-              ? 'Awaiting Verification'
-              : rejected
-                ? 'Payment Rejected'
-                : 'Awaiting Payment',
-          tone: settled ? 'green' : rejected ? 'red' : 'amber',
-          // The only state that offers to take a payment is one where the
-          // citizen has not already made one that is still being looked at.
-          // A rejected payment DOES offer it again — that is the one case
-          // where paying a second time is what the office is asking for.
-          canPay: !settled && !pending,
-        } satisfies PaymentRow;
-      })
-      .filter((r): r is PaymentRow => r !== null);
+      .filter((a) => a.assessedAmountCentavos !== null)
+      .map((a): PaymentRow => ({
+        applicationId: a.id,
+        applicationNumber: a.applicationNumber,
+        totalCentavos: a.assessedAmountCentavos!,
+        label: a.paymentStatus,
+        tone: TONE[a.paymentStatus],
+        // The only state that offers to take a payment is one the Municipality
+        // is still owed for. 'Pending Verification' does not offer it again —
+        // a citizen who has already sent proof must not be invited to send it
+        // twice while an officer is still looking at the first one.
+        canPay: a.paymentStatus === 'Not Yet Available' || a.paymentStatus === 'Overdue',
+      }));
   }
 }

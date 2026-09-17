@@ -185,6 +185,15 @@ export interface GeneratedPermit {
   issuedDate: string;
   expiryDateValue: Date | null;
   expiryDate: string | null;
-  approvingOfficial: string;
-  approvingOffice: string;
+  /**
+   * `null` when the office has recorded a permit but not who approved it or
+   * which office — a real, current gap in the backend's `generated_permits`
+   * table, not a missing value from a slow client. Render it as a fact
+   * ("Not on file", matching this portal's existing convention for a field
+   * with no source — see `permit-document.page.ts`'s applicant address
+   * fields), never as "Pending", which would wrongly imply the
+   * office still intends to fill it in.
+   */
+  approvingOfficial: string | null;
+  approvingOffice: string | null;
 }

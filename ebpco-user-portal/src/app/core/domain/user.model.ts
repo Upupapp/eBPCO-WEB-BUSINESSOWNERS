@@ -18,7 +18,7 @@ export function unverifiedContact(): ContactVerification {
 export type ApplicantType = 'Individual' | 'Authorized Representative' | 'Corporate Officer';
 export type AccountStatus = 'verified' | 'pending' | 'suspended';
 export type CivilStatus = 'Single' | 'Married' | 'Widowed' | 'Separated' | 'Divorced';
-export type Sex = 'Male' | 'Female';
+export type Sex = 'Male' | 'Female' | 'Prefer not to say';
 
 export interface UserAccount {
   id: string;

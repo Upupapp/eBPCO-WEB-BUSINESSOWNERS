@@ -17,15 +17,22 @@ import { MUNICIPAL_ENGINEER, MUNICIPAL_HALL_ADDRESS } from './lgu-contact';
  * TWO RULES FOR EDITING THIS FILE.
  *
  * 1. Describe what the system ACTUALLY does today, not what it will do. The
- *    old text said data "is handled in accordance with the Philippine Data
- *    Privacy Act" — an assurance, not a disclosure. This build stores
- *    everything in browser memory and transmits nothing, which is both true
- *    and more reassuring than the assurance was.
+ *    original text said data "is handled in accordance with the Philippine
+ *    Data Privacy Act" — an assurance, not a disclosure, so it was replaced
+ *    with a concrete one. That disclosure was later overtaken the other
+ *    direction: applications, documents, payments and businesses are now
+ *    genuinely transmitted to and stored by the Municipality (Hardening
+ *    Pass, Part 3c) — the "everything stays in your browser" claim this file
+ *    made until then had itself become false, the opposite error from the
+ *    one rule 1 was written to prevent, and is corrected below for the same
+ *    reason.
  * 2. Never invent an LGU fact to fill a gap. Retention period, the Data
  *    Protection Officer's name and the list of recipient offices are the
  *    Municipality's to state. Where they are unknown, this notice SAYS they
  *    are not yet determined. A plausible-sounding "we keep your data for 5
- *    years" would be a fabrication with legal weight.
+ *    years" would be a fabrication with legal weight. This gap is real and
+ *    independent of whether data is being collected — fixing rule 1's
+ *    violation must not accidentally paper over rule 2's.
  */
 
 export const TERMS_CONDITIONS_TEXT =
@@ -38,15 +45,15 @@ export interface LegalSection {
 
 /** The headline a citizen needs before anything else — see rule 1 above. */
 export const PRIVACY_POLICY_TEXT =
-  'This is a demonstration build of eBPCO. Everything you enter stays in your browser\'s memory, is not transmitted to the Municipality or to anyone else, and is erased the moment you close or refresh the page.';
+  'Your account, applications, documents, payments and businesses are genuinely created, transmitted and stored by the Municipality of Castilla.';
 
 export const PRIVACY_POLICY_SECTIONS: readonly LegalSection[] = [
   {
-    heading: 'What this build does with your data today',
+    heading: 'What eBPCO does with your data today',
     paragraphs: [
       PRIVACY_POLICY_TEXT,
-      'Nothing you enter reaches the Municipality of Castilla. Do not use this build to file a real permit application, and do not upload a document you would not be willing to lose — files you attach are recorded by name only and their contents are never stored.',
-      'Because nothing is transmitted or retained, no permit can be issued or verified here either.',
+      'A document you attach is stored in full, not recorded by name only, and is retained for as long as your application or the resulting permit requires it. A permit that has genuinely been issued can be viewed on this portal and, once released, printed with its real permit number and conditions.',
+      'One part remains unconnected: looking up a permit by number from the public, no-login verification page does not yet check this Municipality\'s real records. That page says so on its own.',
     ],
   },
   {
@@ -81,7 +88,7 @@ export const PRIVACY_POLICY_SECTIONS: readonly LegalSection[] = [
     heading: 'Not yet determined',
     paragraphs: [
       'Three things this notice cannot yet tell you, because the Municipality has not published them and eBPCO will not invent them: how long your data will be retained, who the Municipality\'s Data Protection Officer is, and exactly which offices your application will be shared with during evaluation.',
-      'This section will be replaced with the Municipality\'s own answers before eBPCO handles any real application. Until then, no real data is being collected — see the first section.',
+      'This section will be replaced with the Municipality\'s own answers once they are published. Your data is being collected and retained in the meantime — see the first section — under the general basis stated above (performance of a public task, PD 1096 permit issuance), not withheld until these specifics arrive.',
     ],
   },
 ];

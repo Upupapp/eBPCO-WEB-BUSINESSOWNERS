@@ -7,9 +7,10 @@ import { AuthService } from '../../core/session/auth.service';
 import { requirementsFor } from '../../core/domain/requirements-catalog';
 import { agencyHeaderFor, documentTitleFor } from '../../core/domain/generated-document.helpers';
 import { fullName } from '../../core/domain/user.model';
-import { pesos } from '../../core/domain/assessment.model';
+import { Assessment, pesos } from '../../core/domain/assessment.model';
 import { formatDate } from '../../core/utils/ids';
 import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
 
 type WatermarkText = 'DRAFT' | 'FOR REVIEW' | 'NOT VALID AS AN OFFICIAL PERMIT' | null;
 
@@ -154,29 +155,44 @@ interface QrCell {
             <section class="doc-generated-section">
               <h2>Assessment / Payment</h2>
               @if (assessment(); as asmt) {
-                <table class="doc-generated-table">
-                  <thead>
-                    <tr><th>Fee</th><th>Authority</th><th>Amount</th></tr>
-                  </thead>
-                  <tbody>
-                    @for (line of asmt.lineItems; track line.code) {
+                @if (isReal(asmt); as real) {
+                  <table class="doc-generated-table">
+                    <tbody>
                       <tr>
-                        <td>{{ line.name }}</td>
-                        <td>{{ line.legalBasisTitle || line.authority }}</td>
-                        <td>{{ line.amountCentavos !== null ? pesos(line.amountCentavos) : 'Pending' }}</td>
+                        <td><strong>Total Amount Due</strong></td>
+                        <td><strong>{{ pesos(real.totalCentavos) }}</strong></td>
                       </tr>
-                    }
-                    <tr>
-                      <td colspan="2"><strong>Total Amount Due</strong></td>
-                      <td><strong>{{ pesos(asmt.totalCentavos) }}</strong></td>
-                    </tr>
-                    <tr>
-                      <td colspan="2">Outstanding Balance</td>
-                      <td>{{ pesos(asmt.balanceCentavos) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p class="doc-generated-note">Order of Payment No.: {{ asmt.opsNumber ?? 'Not yet issued (' + asmt.status + ')' }}</p>
+                      <tr>
+                        <td>Payment Status</td>
+                        <td>{{ real.paymentStatus }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                } @else if (isDemo(asmt); as demo) {
+                  <table class="doc-generated-table">
+                    <thead>
+                      <tr><th>Fee</th><th>Authority</th><th>Amount</th></tr>
+                    </thead>
+                    <tbody>
+                      @for (line of demo.lineItems; track line.code) {
+                        <tr>
+                          <td>{{ line.name }}</td>
+                          <td>{{ line.legalBasisTitle || line.authority }}</td>
+                          <td>{{ line.amountCentavos !== null ? pesos(line.amountCentavos) : 'Pending' }}</td>
+                        </tr>
+                      }
+                      <tr>
+                        <td colspan="2"><strong>Total Amount Due</strong></td>
+                        <td><strong>{{ pesos(demo.totalCentavos) }}</strong></td>
+                      </tr>
+                      <tr>
+                        <td colspan="2">Outstanding Balance</td>
+                        <td>{{ pesos(demo.balanceCentavos) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p class="doc-generated-note">Order of Payment No.: {{ demo.opsNumber ?? 'Not yet issued (' + demo.status + ')' }}</p>
+                }
               } @else {
                 <p class="doc-generated-note doc-generated-placeholder">No assessment has been issued yet for this application.</p>
               }
@@ -226,8 +242,8 @@ interface QrCell {
               <h2 style="text-align:left; border:none;">Approval</h2>
               <div class="sig-pending">Pending Authorized Signature</div>
               <div class="sig-line"></div>
-              <div class="sig-name">{{ permit()?.approvingOfficial ?? 'Pending' }}</div>
-              <div class="sig-position">{{ permit()?.approvingOffice ?? requirements()?.reviewingOffice ?? 'Pending' }}</div>
+              <div class="sig-name">{{ permit()?.approvingOfficial ?? 'Not on file' }}</div>
+              <div class="sig-position">{{ permit()?.approvingOffice ?? requirements()?.reviewingOffice ?? 'Not on file' }}</div>
             </section>
 
             <div class="doc-generated-qr">
@@ -280,6 +296,17 @@ export class PermitDocumentPage {
   private readonly store = inject(ApplicationStore);
   private readonly businessStore = inject(BusinessStore);
   private readonly auth = inject(AuthService);
+  private readonly api = inject(CitizenApiClient);
+
+  /**
+   * Separate route/component from `application-details.page.ts` — no shared
+   * signals, so this needs its own trigger for the real permit fetch.
+   * `permit` below picks it up automatically once `ApplicationStore.permitFor`
+   * has it, same "real once fetched" pattern used throughout this portal.
+   */
+  constructor() {
+    if (this.api.configured) this.store.fetchPermit(this.id());
+  }
 
   protected readonly formatDate = formatDate;
   protected readonly pesos = pesos;
@@ -306,7 +333,46 @@ export class PermitDocumentPage {
     return a ? this.businessStore.businessById(a.businessId) : undefined;
   });
   protected readonly permit = computed(() => this.store.permitFor(this.id()));
-  protected readonly assessment = computed(() => this.store.assessmentFor(this.id()));
+  private readonly demoAssessment = computed(() => this.store.assessmentFor(this.id()));
+  /**
+   * `assessedAmountCentavos`/`paymentStatus` on `app()` are already real for
+   * a real application (see `fromServerSummary()`'s own doc comment in
+   * `application.store.ts`) — this page just never read them, and instead
+   * unconditionally called `assessmentFor()`, the fully local/demo store
+   * `payment-flow.page.ts` and `payments-list.page.ts` both moved off of.
+   * The result: a real citizen who had genuinely paid a real, verified
+   * assessment saw this document's own "Assessment / Payment" section claim
+   * "No assessment has been issued yet" directly beneath a real permit
+   * number and real conditions — on the one document meant to be printed and
+   * kept as evidence of exactly that.
+   *
+   * The real summary endpoint carries only a total, not a line-item
+   * breakdown or an Order of Payment number, so a real assessment renders a
+   * plainer total/status line in the template below rather than fabricating
+   * the fuller demo shape's detail.
+   */
+  protected readonly assessment = computed(():
+    | { real: true; totalCentavos: number; paymentStatus: string }
+    | Assessment
+    | undefined => {
+    const a = this.app();
+    if (a?.assessedAmountCentavos != null) {
+      return { real: true, totalCentavos: a.assessedAmountCentavos, paymentStatus: a.paymentStatus };
+    }
+    return this.demoAssessment();
+  });
+  /** Narrows `assessment()`'s union for the template's `@if (...; as x)` guard — real branch. */
+  protected isReal(
+    asmt: { real: true; totalCentavos: number; paymentStatus: string } | Assessment,
+  ): { real: true; totalCentavos: number; paymentStatus: string } | undefined {
+    return 'real' in asmt ? asmt : undefined;
+  }
+  /** Narrows `assessment()`'s union for the template's `@if (...; as x)` guard — demo branch. */
+  protected isDemo(
+    asmt: { real: true; totalCentavos: number; paymentStatus: string } | Assessment,
+  ): Assessment | undefined {
+    return 'real' in asmt ? undefined : asmt;
+  }
   protected readonly requirements = computed(() => {
     const a = this.app();
     return a && a.permitType !== 'Business Permit' ? requirementsFor(a.permitType) : null;
@@ -349,7 +415,14 @@ export class PermitDocumentPage {
     if (!this.store.documentsResolvedFor(a.id)) {
       return { cleared: false, watermarkText: 'DRAFT' as WatermarkText };
     }
-    const asmt = this.assessment();
+    // Deliberately the untouched local-only signal, not the merged
+    // `assessment()` above: this branch only runs once a real `permit()` has
+    // already returned (and been handled above), so it exists purely to
+    // gate the LOCAL DEMO's own simulated payment state — mixing in the
+    // real shape here would either not type-check (it has no
+    // `balanceCentavos`/`status`) or, worse, silently change what this
+    // demo-only check means.
+    const asmt = this.demoAssessment();
     const paymentFinal = !!asmt && asmt.balanceCentavos <= 0 && asmt.status !== 'Voided';
     if (!paymentFinal) return { cleared: false, watermarkText: 'FOR REVIEW' as WatermarkText };
 

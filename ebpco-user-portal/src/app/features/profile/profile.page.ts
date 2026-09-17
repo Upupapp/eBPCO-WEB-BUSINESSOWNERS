@@ -11,12 +11,13 @@ import { ApiError } from '../../core/api/problem';
 import { ErasureReceipt, ExportStatusResult } from '../../core/api/citizen-api.models';
 import { firstValueFrom } from 'rxjs';
 import { formatDateTime } from '../../core/utils/ids';
+import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
 
 type Tab = 'profile' | 'password' | 'notifications' | 'privacy' | 'legal';
 
 @Component({
   selector: 'app-profile',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective],
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.scss',
 })
@@ -50,6 +51,8 @@ export class ProfilePage {
       firstName: u.firstName, middleName: u.middleName ?? null, lastName: u.lastName,
       mobileNumber: u.mobileNumber, street: u.street || null, barangay: u.barangay || null,
       city: u.city || null, province: u.province || null, postalCode: u.postalCode || null,
+      dateOfBirth: u.dateOfBirth, sex: u.sex, civilStatus: u.civilStatus,
+      nationality: u.nationality || null,
     };
   }
 
