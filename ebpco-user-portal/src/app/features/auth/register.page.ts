@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
 import { CivilStatus, Sex } from '../../core/domain/user.model';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
+import { NATIONALITIES, PH_PROVINCES } from '../../core/domain/ph-reference-data';
 
 type Step = 1 | 2 | 3;
 
@@ -56,7 +57,17 @@ type Step = 1 | 2 | 3;
                 <option value="Divorced">Divorced</option>
               </select>
             </div>
-            <div class="field"><label for="register-nationality-7">Nationality<span class="required">*</span></label><input id="register-nationality-7" class="input" [(ngModel)]="nationality" /></div>
+            <div class="field">
+              <label for="register-nationality-7">Nationality<span class="required">*</span></label>
+              <select id="register-nationality-7" class="input" [(ngModel)]="nationality">
+                @for (n of nationalities; track n) {
+                  <option [value]="n">{{ n }}</option>
+                }
+              </select>
+              @if (nationality === 'Other') {
+                <input class="input" style="margin-top:8px;" placeholder="Enter your nationality" [(ngModel)]="otherNationality" aria-label="Specify your nationality" />
+              }
+            </div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <button class="btn btn-primary btn-block" (click)="toStep2()">Continue</button>
@@ -64,15 +75,30 @@ type Step = 1 | 2 | 3;
 
         @if (step() === 2) {
           <div class="field"><label for="register-email-address-8">Email Address<span class="required">*</span></label><input id="register-email-address-8" class="input" type="email" [(ngModel)]="email" /></div>
-          <div class="field"><label for="register-mobile-number-9">Mobile Number<span class="required">*</span></label><input id="register-mobile-number-9" class="input" placeholder="09XXXXXXXXX" [(ngModel)]="mobileNumber" /></div>
+          <div class="field">
+            <label for="register-mobile-number-9">Mobile Number<span class="required">*</span></label>
+            <input id="register-mobile-number-9" class="input" type="tel" inputmode="numeric" maxlength="11"
+              placeholder="09XXXXXXXXX" [ngModel]="mobileNumber" (ngModelChange)="onMobileNumberInput($event)" />
+          </div>
           <div class="field"><label for="register-house-number-street-10">House Number / Street<span class="required">*</span></label><input id="register-house-number-street-10" class="input" [(ngModel)]="street" /></div>
           <div class="form-row">
             <div class="field"><label for="register-barangay-11">Barangay<span class="required">*</span></label><input id="register-barangay-11" class="input" [(ngModel)]="barangay" /></div>
             <div class="field"><label for="register-city-municipality-12">City / Municipality<span class="required">*</span></label><input id="register-city-municipality-12" class="input" [(ngModel)]="city" /></div>
           </div>
           <div class="form-row">
-            <div class="field"><label for="register-province-13">Province<span class="required">*</span></label><input id="register-province-13" class="input" [(ngModel)]="province" /></div>
-            <div class="field"><label for="register-postal-code-14">Postal Code<span class="required">*</span></label><input id="register-postal-code-14" class="input" maxlength="4" [(ngModel)]="postalCode" /></div>
+            <div class="field">
+              <label for="register-province-13">Province<span class="required">*</span></label>
+              <select id="register-province-13" class="input" [(ngModel)]="province">
+                @for (p of provinces; track p) {
+                  <option [value]="p">{{ p }}</option>
+                }
+              </select>
+            </div>
+            <div class="field">
+              <label for="register-postal-code-14">Postal Code<span class="required">*</span></label>
+              <input id="register-postal-code-14" class="input" type="text" inputmode="numeric" maxlength="4"
+                placeholder="0000" [ngModel]="postalCode" (ngModelChange)="onPostalCodeInput($event)" />
+            </div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
@@ -144,6 +170,9 @@ export class RegisterPage {
   readonly step = signal<Step>(1);
   readonly error = signal<string | null>(null);
 
+  readonly nationalities = NATIONALITIES;
+  readonly provinces = PH_PROVINCES;
+
   // Step 1
   firstName = '';
   middleName = '';
@@ -152,6 +181,8 @@ export class RegisterPage {
   sex: Sex | null = null;
   civilStatus: CivilStatus | null = null;
   nationality = 'Filipino';
+  /** Only sent when `nationality === 'Other'` — see the dropdown's own fallback field. */
+  otherNationality = '';
 
   // Step 2
   email = '';
@@ -159,8 +190,18 @@ export class RegisterPage {
   street = '';
   barangay = '';
   city = '';
-  province = '';
+  province = 'Sorsogon';
   postalCode = '';
+
+  /** Digits only, capped at 11 — matches the `09XXXXXXXXX` format this form actually accepts (see the regex check in `toStep3`). Sanitized on every keystroke rather than only on submit, same as a normal sign-up form's phone field. */
+  onMobileNumberInput(value: string): void {
+    this.mobileNumber = value.replace(/\D/g, '').slice(0, 11);
+  }
+
+  /** Digits only, capped at 4 — the PH postal-code format the server itself enforces (`postal_code ~ '^[0-9]{4}$'`, migration 036_applicant_address.sql). */
+  onPostalCodeInput(value: string): void {
+    this.postalCode = value.replace(/\D/g, '').slice(0, 4);
+  }
 
   // Step 3
   password = '';
@@ -178,6 +219,10 @@ export class RegisterPage {
     const age = this.ageFrom(this.dateOfBirth);
     if (age < 18) {
       this.error.set('You must be at least 18 years old to register.');
+      return;
+    }
+    if (this.nationality === 'Other' && !this.otherNationality.trim()) {
+      this.error.set('Please specify your nationality.');
       return;
     }
     this.error.set(null);
@@ -201,6 +246,10 @@ export class RegisterPage {
     }
     if (!/^09\d{9}$/.test(this.mobileNumber)) {
       this.error.set('Mobile number must be in the format 09XXXXXXXXX.');
+      return;
+    }
+    if (!/^\d{4}$/.test(this.postalCode)) {
+      this.error.set('Postal code must be exactly 4 digits.');
       return;
     }
     this.error.set(null);
@@ -238,7 +287,7 @@ export class RegisterPage {
           dateOfBirth: this.dateOfBirth,
           sex: this.sex!,
           civilStatus: this.civilStatus!,
-          nationality: this.nationality,
+          nationality: this.nationality === 'Other' ? this.otherNationality.trim() : this.nationality,
         },
         {
           email: this.email,

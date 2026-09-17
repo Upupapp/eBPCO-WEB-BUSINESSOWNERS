@@ -52,7 +52,13 @@ function bypassBrowserNavigations(req) {
   }
 }
 
-const API_TARGET = 'http://localhost:3000';
+// TARGET IS THE SHARED LINODE INSTANCE, NOT localhost. Owner decision: every
+// device running `ng serve` should see the same real, persistent database
+// (one Postgres on the Linode box), not its own empty local one. Point back
+// at http://localhost:3000 if you specifically need an isolated local API for
+// one-off testing. Swap to https://api.castilla-ebpco.online once that
+// domain's DNS/TLS is live -- the bare IP is a stand-in until then.
+const API_TARGET = 'http://139.162.51.165:3000';
 const COMMON = { target: API_TARGET, secure: false, changeOrigin: true };
 
 module.exports = {
