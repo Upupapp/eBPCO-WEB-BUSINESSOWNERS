@@ -12,7 +12,7 @@ import { fullName } from '../../core/domain/user.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
 
-type WatermarkText = 'REJECTED' | 'PENDING VERIFICATION' | 'NOT VALID AS AN OFFICIAL RECEIPT' | null;
+type WatermarkText = 'SAMPLE — NOT AN OFFICIAL RECEIPT';
 
 /** The fields the template actually reads off a payment, real or demo alike — not the full `PaymentTransaction`, which the real path has no honest way to fill in completely (no `assessmentId`, no `proofFileName` on the wire). */
 interface ReceiptPayment {
@@ -46,18 +46,18 @@ const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['pay
 
 /**
  * The applicant's own generated receipt for a submitted payment — mirrors
- * permit-document.page.ts's approach (real data, an honest watermark gate,
- * restrained printable layout), not a redirect back to the application page.
+ * permit-document.page.ts's approach (real data, restrained printable
+ * layout), not a redirect back to the application page.
  *
- * Real data now exists to gate on: `GET /applications/{id}/payments`
- * (citizen-api.client.ts's `getPayments`) returns every real payment attempt,
- * each carrying a real `officialReceiptNumber`/`verifiedAt` once a real
- * cashier verifies it, and a real `rejectionReason` when one was rejected —
- * so `isOfficial`/`watermarkText` can finally be earned by a real fact
- * instead of never clearing at all. The local demo path (`orNumber` set only
- * by "Simulate Office Update") is kept as the fallback for an unconfigured
- * backend or a demo-only application id, and still never clears its own
- * watermark, for the same reason it never did.
+ * The watermark is permanent, not a gate: an electronically reprinted
+ * receipt is never a substitute for the stamped paper original no matter
+ * how thoroughly the payment behind it has been verified, matching the
+ * Admin Portal's own always-on `receiptWatermarkText` (document-preview.ts).
+ * `gateCleared` is the fact that USED to double as "clear the watermark" —
+ * a genuinely verified, non-rejected payment with a real OR number — kept
+ * as its own check because the signature block and the footer's "this is
+ * a system-generated Official Receipt" line still need to know that, even
+ * though the watermark itself no longer does.
  */
 @Component({
   selector: 'app-payment-receipt',
@@ -74,9 +74,7 @@ const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['pay
 
         @if (payment(); as tx) {
           <article class="doc-generated-page">
-            @if (watermarkText()) {
-              <div class="doc-generated-watermark" aria-hidden="true">{{ watermarkText() }}</div>
-            }
+            <div class="doc-generated-watermark" aria-hidden="true">{{ watermarkText }}</div>
 
             <div class="doc-generated-header">
               <img src="logo.png" alt="" aria-hidden="true" />
@@ -394,26 +392,19 @@ export class PaymentReceiptPage {
     return agencyHeaderFor(reviewingOffice);
   });
 
-  protected readonly watermarkText = computed<WatermarkText>(() => {
-    const tx = this.payment();
-    // Cleared must be EARNED, never inherited from missing data.
-    if (!tx) return 'NOT VALID AS AN OFFICIAL RECEIPT';
-    if (tx.rejectionReason) return 'REJECTED';
-    if (this.api.configured) {
-      // Real: a genuinely verified payment has a real OR number AND a real
-      // 'Paid' status, both set only by `POST /staff/payments/:id/verify`.
-      // This is the moment that was impossible before — no real cashier
-      // flow existed, so this branch could never be reached.
-      if (tx.status === 'Paid' && tx.orNumber) return null;
-      return 'PENDING VERIFICATION';
-    }
-    // Demo: an OR number here was assigned only by "Simulate Office Update",
-    // never a real cashier — no less demo than the generated permit's
-    // provenance: 'demo', which permit-document.page.ts always watermarks.
-    return 'NOT VALID AS AN OFFICIAL RECEIPT';
-  });
+  protected readonly watermarkText: WatermarkText = 'SAMPLE — NOT AN OFFICIAL RECEIPT';
 
-  protected readonly gateCleared = computed(() => this.watermarkText() === null && !!this.payment());
+  /**
+   * Earned the same way `watermarkText` used to gate itself: a genuinely
+   * verified payment has a real OR number AND a real 'Paid' status, both
+   * set only by `POST /staff/payments/:id/verify` — never true on the demo
+   * path, where an OR number is assigned only by "Simulate Office Update",
+   * never a real cashier.
+   */
+  protected readonly gateCleared = computed(() => {
+    const tx = this.payment();
+    return this.api.configured && !!tx && tx.status === 'Paid' && !!tx.orNumber && !tx.rejectionReason;
+  });
 
   protected print(): void {
     window.print();

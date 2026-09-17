@@ -11,8 +11,9 @@ import { PermitReleaseComponent } from './permit-release.component';
 import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
 import { ApplicationDocument } from '../../core/domain/document.model';
 import { PermitRelease } from '../../core/api/citizen-api.models';
-import { DocumentResubmissionService } from '../../core/api/document-resubmission.service';
+import { DocumentResubmissionService, toBase64 } from '../../core/api/document-resubmission.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/api/citizen-api.models';
 
@@ -104,6 +105,39 @@ import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/a
           [issuedDate]="permit() ? formatDate(permit()!.issuedDate) : null"
           [release]="release()"
         />
+
+        @if (missingRequired().length > 0) {
+          <div class="card" style="border:1px solid var(--danger-200, #f5c2c7); background:var(--danger-50, #fff5f5);">
+            <div class="card-title">Missing Required Documents</div>
+            <p class="small muted" style="margin-top:-4px;">
+              The Municipality still needs these to continue reviewing your application.
+            </p>
+            <ul style="list-style:none; padding:0; margin:0;">
+              @for (req of missingRequired(); track req.id) {
+                <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-light);">
+                  <span>{{ req.label }}</span>
+                  <span>
+                    <input
+                      type="file"
+                      [attr.id]="'missing-doc-' + req.id"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      style="display:none;"
+                      [disabled]="uploadingMissingId() === req.id"
+                      (change)="attachMissing(req, $event)"
+                    />
+                    <label
+                      [attr.for]="'missing-doc-' + req.id"
+                      class="btn btn-primary btn-sm"
+                      style="cursor:pointer;"
+                    >
+                      {{ uploadingMissingId() === req.id ? 'Sending…' : 'Choose File' }}
+                    </label>
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
 
         <div class="card">
           <div class="card-title">Documents</div>
@@ -250,6 +284,75 @@ export class ApplicationDetailsPage {
    */
   protected onPreview(doc: ApplicationDocumentResponse): void {
     this.previewing.set(this.docs().find((d) => d.id === doc.id) ?? null);
+  }
+
+  /**
+   * Required documents this application's own real document list has no
+   * match for, by label — the same matching convention the Admin Portal's
+   * own checklist already uses ("Attach"'s real `requirementCode` and this
+   * portal's requirements-catalog ids are two different, incompatible
+   * schemes; label is the one thing both sides originate from the same
+   * source, so it is what actually matches a citizen's own upload).
+   *
+   * A document that exists but was Rejected/Revision Required is NOT
+   * missing — it already has its own "Replace this document" action above.
+   * This only covers a requirement nothing has ever been sent for.
+   */
+  protected readonly missingRequired = computed<RequirementDocument[]>(() => {
+    const a = this.app();
+    // 'Business Permit' is a PublishedPermitType with no requirements-catalog
+    // entry of its own (see permit.model.ts) — the same reason the wizard's
+    // own carry-over logic (application-wizard.page.ts) guards against it
+    // before ever calling `requiredDocumentsFor`.
+    if (!a || a.permitType === 'Business Permit') return [];
+    const required = this.store.requiredDocumentsFor(a.permitType).filter((d) => d.required);
+    const haveLabels = new Set(this.contractDocs().map((d) => d.label));
+    return required.filter((d) => !haveLabels.has(d.label));
+  });
+
+  protected readonly uploadingMissingId = signal<string | null>(null);
+
+  /**
+   * First-time attach for a requirement nothing has been sent for yet —
+   * `POST /documents` with THIS application's real id, now that the
+   * backend actually checks the applicant owns it (see
+   * `DocumentsController.upload`'s own ownership check). Deliberately not
+   * `requirementCode` — see the comment on `missingRequired` above.
+   */
+  protected async attachMissing(req: RequirementDocument, event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (this.resubmission.tooLarge(file)) {
+      this.toast.error(this.resubmission.explain(new Error('')) || 'That file is too large.');
+      input.value = '';
+      return;
+    }
+    this.uploadingMissingId.set(req.id);
+    try {
+      const contentBase64 = await toBase64(file);
+      this.api.uploadDocument({
+        fileName: file.name, label: req.label, applicationId: this.id(), contentBase64,
+      }).subscribe({
+        next: () => {
+          this.toast.success(`"${req.label}" sent.`);
+          this.api.listDocuments(this.id()).subscribe({
+            next: (docs) => this.realDocuments.set(docs),
+            error: () => {},
+          });
+        },
+        error: (e) => {
+          this.toast.error(this.resubmission.explain(e));
+          this.uploadingMissingId.set(null);
+        },
+        complete: () => this.uploadingMissingId.set(null),
+      });
+    } catch {
+      this.toast.error(`Could not send "${req.label}". Try again.`);
+      this.uploadingMissingId.set(null);
+    } finally {
+      input.value = '';
+    }
   }
 
   protected onReplace(doc: ApplicationDocumentResponse): void {
