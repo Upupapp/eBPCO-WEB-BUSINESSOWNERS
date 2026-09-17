@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -9,7 +10,7 @@ type Step = 1 | 2 | 3;
 
 @Component({
   selector: 'app-register',
-  imports: [FormsModule, RouterLink, CapitalizeNameDirective],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective, NgTemplateOutlet],
   template: `
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
       <div class="card auth-card anim-pop-in" style="width:100%; max-width:520px;">
@@ -83,10 +84,23 @@ type Step = 1 | 2 | 3;
         @if (step() === 3) {
           <div class="field">
             <label for="register-password-15">Password<span class="required">*</span></label>
-            <input id="register-password-15" class="input" type="password" [(ngModel)]="password" />
+            <div class="password-field">
+              <input id="register-password-15" class="input" [type]="showPassword() ? 'text' : 'password'" [(ngModel)]="password" />
+              <button type="button" class="password-toggle" (click)="showPassword.set(!showPassword())" [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">
+                <ng-container *ngTemplateOutlet="eyeIcon; context: { open: showPassword() }" />
+              </button>
+            </div>
             <div class="hint">At least 12 characters. A longer phrase is easier to remember and harder to guess than a short one with symbols in it.</div>
           </div>
-          <div class="field"><label for="register-confirm-password-16">Confirm Password<span class="required">*</span></label><input id="register-confirm-password-16" class="input" type="password" [(ngModel)]="confirmPassword" /></div>
+          <div class="field">
+            <label for="register-confirm-password-16">Confirm Password<span class="required">*</span></label>
+            <div class="password-field">
+              <input id="register-confirm-password-16" class="input" [type]="showConfirmPassword() ? 'text' : 'password'" [(ngModel)]="confirmPassword" />
+              <button type="button" class="password-toggle" (click)="showConfirmPassword.set(!showConfirmPassword())" [attr.aria-label]="showConfirmPassword() ? 'Hide password' : 'Show password'">
+                <ng-container *ngTemplateOutlet="eyeIcon; context: { open: showConfirmPassword() }" />
+              </button>
+            </div>
+          </div>
           <label class="checkbox-row" style="margin-bottom:8px;">
             <input type="checkbox" [(ngModel)]="acceptedTerms" /> I agree to the <a routerLink="/terms">Terms &amp; Conditions</a>
           </label>
@@ -106,6 +120,21 @@ type Step = 1 | 2 | 3;
         <div style="text-align:center;" class="small muted">Already have an account? <a routerLink="/login">Log In</a></div>
       </div>
     </div>
+
+    <ng-template #eyeIcon let-open="open">
+      @if (open) {
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" stroke="currentColor" stroke-width="1.6" />
+          <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      } @else {
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" stroke="currentColor" stroke-width="1.6" />
+          <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
+          <path d="m3 3 18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      }
+    </ng-template>
   `,
 })
 export class RegisterPage {
@@ -138,6 +167,8 @@ export class RegisterPage {
   confirmPassword = '';
   acceptedTerms = false;
   acceptedPrivacy = false;
+  readonly showPassword = signal(false);
+  readonly showConfirmPassword = signal(false);
 
   toStep2(): void {
     if (!this.firstName || !this.lastName || !this.dateOfBirth || !this.sex || !this.civilStatus || !this.nationality) {

@@ -1,4 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import {
   ApplicantType,
   CivilStatus,
@@ -71,8 +72,15 @@ export interface RegisterSecurityInfo {
 export class AuthService {
   private readonly identity = inject(CitizenIdentityApi);
   private readonly tokens = inject(CitizenTokenStore);
+  private readonly router = inject(Router);
 
   private readonly _profile = signal<UserAccount | null>(null);
+
+  // Proactive background refresh, matching the Admin Portal's
+  // `SessionService` — see `scheduleRefresh` below for why. Only an explicit
+  // "Log Out", or the refresh token itself finally being refused (30 days
+  // unused, or revoked), ends the session while a tab stays open.
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * `applicantType` has no server field either (see class doc). Kept as a
@@ -109,6 +117,7 @@ export class AuthService {
         return { ok: false, error: 'This is a staff account. Staff sign in through the Admin Portal.' };
       }
       this._profile.set(meResponseToAccount(me));
+      this.scheduleRefresh();
       return { ok: true };
     } catch (error) {
       return { ok: false, error: describeError(error) };
@@ -185,6 +194,7 @@ export class AuthService {
   dropSession(): void {
     this._profile.set(null);
     this._applicantTypeOverride.set(null);
+    this.clearRefreshTimer();
   }
 
   /**
@@ -216,11 +226,69 @@ export class AuthService {
       const refreshToken = this.tokens.refreshToken();
       if (refreshToken !== null) await this.identity.refresh(refreshToken);
       const me = await this.identity.me();
-      if (me.kind === 'applicant') this._profile.set(meResponseToAccount(me));
+      if (me.kind === 'applicant') {
+        this._profile.set(meResponseToAccount(me));
+        this.scheduleRefresh();
+      }
     } catch {
       // An expired or revoked token is not an error worth showing on load —
       // the guard sends the citizen to sign in, same as if they had never
       // had a session.
+    }
+  }
+
+  /**
+   * Arms the background refresh for whatever time is actually left on the
+   * access token, per `CitizenTokenStore.expiresInSeconds()`. Fires at 80%
+   * of the remaining life (capped to a 90-second-before-expiry floor) so it
+   * lands comfortably before the token dies even under a slow network, and
+   * reschedules itself from the fresh `expiresIn` each time it succeeds —
+   * so the session renews indefinitely while the tab stays open, the same
+   * as the Admin Portal's `SessionService.scheduleRefresh()`. Without this,
+   * an applicant filling in a long wizard hit the 15-minute access-token
+   * wall mid-task and was bounced to `/login` with the in-progress form
+   * lost — `restore()`'s one-time refresh at bootstrap only ever covered a
+   * reload, never a tab that had simply stayed open past that window.
+   *
+   * No refresh token, or no recorded expiry (an older stored session),
+   * means nothing to schedule; the existing reactive 401 handling in
+   * `citizen-auth.interceptor.ts` remains the fallback for that case.
+   */
+  private scheduleRefresh(): void {
+    this.clearRefreshTimer();
+    if (this.tokens.refreshToken() === null) return;
+    const remaining = this.tokens.expiresInSeconds();
+    if (remaining === null) return;
+    const buffer = Math.min(90, Math.floor(remaining * 0.2));
+    const delaySeconds = Math.max(5, remaining - buffer);
+    this.refreshTimer = setTimeout(() => void this.performRefresh(), delaySeconds * 1000);
+  }
+
+  private clearRefreshTimer(): void {
+    if (this.refreshTimer !== null) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+
+  /**
+   * The refresh timer's own callback. A failure here means the refresh token
+   * itself was refused — expired past its life, or revoked — a genuine end
+   * of session, not a bug, so it ends the session the same way
+   * `citizen-auth.interceptor.ts` does on a 401.
+   */
+  private async performRefresh(): Promise<void> {
+    try {
+      const refreshToken = this.tokens.refreshToken();
+      if (refreshToken === null) return;
+      await this.identity.refresh(refreshToken);
+      this.scheduleRefresh();
+    } catch {
+      this.tokens.clear();
+      this.dropSession();
+      if (!this.router.url.startsWith('/login')) {
+        void this.router.navigate(['/login'], { queryParams: { reason: 'session-expired' } });
+      }
     }
   }
 

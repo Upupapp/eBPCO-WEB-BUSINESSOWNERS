@@ -21,7 +21,23 @@ import { AuthService } from '../../core/session/auth.service';
         </div>
         <div class="field">
           <label for="login-password-2">Password</label>
-          <input id="login-password-2" class="input" type="password" [(ngModel)]="password" placeholder="••••••••" />
+          <div class="password-field">
+            <input id="login-password-2" class="input" [type]="showPassword() ? 'text' : 'password'" [(ngModel)]="password" placeholder="••••••••" />
+            <button type="button" class="password-toggle" (click)="showPassword.set(!showPassword())" [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">
+              @if (showPassword()) {
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" stroke="currentColor" stroke-width="1.6" />
+                  <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
+                </svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" stroke="currentColor" stroke-width="1.6" />
+                  <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
+                  <path d="m3 3 18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+              }
+            </button>
+          </div>
         </div>
 
         @if (error()) {
@@ -50,6 +66,7 @@ export class LoginPage {
   identifier = '';
   password = '';
   readonly error = signal<string | null>(null);
+  readonly showPassword = signal(false);
 
   readonly submitting = signal(false);
 

@@ -267,6 +267,28 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 3px var(--primary-100);
 }
 .input.invalid { border-color: var(--danger-500); }
+.password-field { position: relative; }
+.password-field .input { padding-right: 38px; }
+.password-field .password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.password-field .password-toggle:hover { color: var(--gray-700); }
+.password-field .password-toggle:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 1px; }
+.password-field .password-toggle svg { width: 18px; height: 18px; }
 .checkbox-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--gray-700); }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 
@@ -498,10 +520,10 @@ table.table tr:last-child td { border-bottom: none; }
   z-index: 5;
   overflow: hidden;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: clamp(2.2rem, 9vw, 4.5rem);
+  font-size: clamp(2.6rem, 10vw, 5.5rem);
   font-weight: 800;
   letter-spacing: 0.05em;
-  color: rgba(150, 20, 20, 0.14);
+  color: rgba(150, 20, 20, 0.18);
   text-transform: uppercase;
   text-align: center;
   transform: rotate(-30deg);

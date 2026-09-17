@@ -12,7 +12,7 @@ import { formatDate } from '../../core/utils/ids';
 import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 
-type WatermarkText = 'DRAFT' | 'FOR REVIEW' | 'NOT VALID AS AN OFFICIAL PERMIT' | null;
+type WatermarkText = 'SAMPLE — NOT AN OFFICIAL PERMIT';
 
 interface QrCell {
   x: number;
@@ -388,45 +388,20 @@ export class PermitDocumentPage {
     };
   });
 
+  // Owner decision: this system produces no real permits — there is no real
+  // LGU behind any of it — so every stage gets the SAME watermark rather
+  // than a "DRAFT" / "FOR REVIEW" progression that reads as if the document
+  // itself were becoming more real as it moves along.
+  //
+  // `cleared` still tracks whether this is a genuinely ISSUED permit record
+  // (it gates the QR code and the print button below) — the provenance check
+  // stays load-bearing for that, since the demo lifecycle advance can mint a
+  // permit row without a backend ever setting `issued` — but the watermark
+  // text itself no longer varies with it.
   private readonly gate = computed(() => {
-    const a = this.app();
-    if (!a) return { cleared: false, watermarkText: 'DRAFT' as WatermarkText };
-
-    // An ISSUED permit record is the authoritative "this is genuinely issued"
-    // signal — the office only ever creates one after its own review/payment
-    // gate already passed, so its mere existence outranks re-deriving those
-    // same preconditions here. (Re-checking them independently is also fragile
-    // against seed rows whose document checklist wasn't fully backfilled for a
-    // later lifecycle stage — trusting the permit record avoids that false
-    // negative.)
-    //
-    // The provenance check is load-bearing and must not be dropped. The mere
-    // EXISTENCE of a permit record is not evidence of issuance while the demo
-    // lifecycle advance can mint one: 'Demo: Simulate Office Update' on the
-    // Application Details screen walks any application to 'Permit Generated',
-    // so without this check any signed-in user could print an unwatermarked
-    // document carrying the Republic of the Philippines letterhead, the
-    // municipal seal and a verification QR. Nothing sets 'issued' until a
-    // backend does, so today every document is watermarked — by design.
-    const p = this.permit();
-    if (p?.provenance === 'issued') return { cleared: true, watermarkText: null as WatermarkText };
-    if (p) return { cleared: false, watermarkText: 'NOT VALID AS AN OFFICIAL PERMIT' as WatermarkText };
-
-    if (!this.store.documentsResolvedFor(a.id)) {
-      return { cleared: false, watermarkText: 'DRAFT' as WatermarkText };
-    }
-    // Deliberately the untouched local-only signal, not the merged
-    // `assessment()` above: this branch only runs once a real `permit()` has
-    // already returned (and been handled above), so it exists purely to
-    // gate the LOCAL DEMO's own simulated payment state — mixing in the
-    // real shape here would either not type-check (it has no
-    // `balanceCentavos`/`status`) or, worse, silently change what this
-    // demo-only check means.
-    const asmt = this.demoAssessment();
-    const paymentFinal = !!asmt && asmt.balanceCentavos <= 0 && asmt.status !== 'Voided';
-    if (!paymentFinal) return { cleared: false, watermarkText: 'FOR REVIEW' as WatermarkText };
-
-    return { cleared: false, watermarkText: 'NOT VALID AS AN OFFICIAL PERMIT' as WatermarkText };
+    const watermarkText: WatermarkText = 'SAMPLE — NOT AN OFFICIAL PERMIT';
+    const cleared = this.permit()?.provenance === 'issued';
+    return { cleared, watermarkText };
   });
 
   protected readonly watermarkText = computed(() => this.gate().watermarkText);

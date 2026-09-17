@@ -49,7 +49,11 @@ export class CitizenIdentityApi {
       email,
       password,
     });
-    this.tokens.set({ accessToken: issued.accessToken, refreshToken: issued.refreshToken ?? null });
+    this.tokens.set({
+      accessToken: issued.accessToken,
+      refreshToken: issued.refreshToken ?? null,
+      expiresIn: issued.expiresIn,
+    });
     return this.me();
   }
 
@@ -82,15 +86,26 @@ export class CitizenIdentityApi {
    * Not part of `citizen-auth.interceptor.ts`'s job (that interceptor's own
    * doc comment explains why it deliberately never refreshes reactively on a
    * 401 mid-request: queueing and replaying a write risks firing it twice).
-   * This exists for `AuthService.restore()` instead — called once, at app
-   * bootstrap, before any write is in flight, specifically so a citizen
-   * whose 15-minute access token has simply expired since their last visit
-   * is transparently signed back in rather than sent to `/login`, the same
-   * way a still-valid refresh token is supposed to work.
+   * Called two ways instead, same split as the Admin Portal's `IdentityApi
+   * .refresh()`: once from `AuthService.restore()` at app bootstrap, so a
+   * citizen whose 15-minute access token expired since their last visit is
+   * transparently signed back in rather than sent to `/login`; and
+   * proactively from `AuthService`'s own background timer while a session
+   * stays open, so an applicant filling in a long wizard never hits that
+   * 15-minute wall mid-task either.
+   *
+   * The server's refresh tokens are single-use and ROTATE on every call —
+   * the new one returned here must replace the stored one, which is why this
+   * always re-stores both tokens rather than just the access token. This
+   * must never be called twice concurrently with the same stored token.
    */
   async refresh(refreshToken: string): Promise<TokenResponse> {
     const issued = await this.post<TokenResponse>('/auth/token/refresh', { refreshToken });
-    this.tokens.set({ accessToken: issued.accessToken, refreshToken: issued.refreshToken ?? null });
+    this.tokens.set({
+      accessToken: issued.accessToken,
+      refreshToken: issued.refreshToken ?? null,
+      expiresIn: issued.expiresIn,
+    });
     return issued;
   }
 

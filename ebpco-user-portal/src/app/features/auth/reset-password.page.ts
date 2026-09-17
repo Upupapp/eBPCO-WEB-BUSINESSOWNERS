@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -15,7 +16,7 @@ import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
  */
 @Component({
   selector: 'app-reset-password',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, NgTemplateOutlet],
   template: `
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
       <div class="card auth-card anim-pop-in" style="width:100%; max-width:400px;">
@@ -37,12 +38,22 @@ import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
           <p class="muted small" style="margin-bottom:16px;">Choose a new password for your account.</p>
           <div class="field">
             <label for="reset-password-new-1">New Password</label>
-            <input id="reset-password-new-1" class="input" type="password" [(ngModel)]="password" />
+            <div class="password-field">
+              <input id="reset-password-new-1" class="input" [type]="showPassword() ? 'text' : 'password'" [(ngModel)]="password" />
+              <button type="button" class="password-toggle" (click)="showPassword.set(!showPassword())" [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">
+                <ng-container *ngTemplateOutlet="eyeIcon; context: { open: showPassword() }" />
+              </button>
+            </div>
             <div class="hint">At least 12 characters.</div>
           </div>
           <div class="field">
             <label for="reset-password-confirm-2">Confirm New Password</label>
-            <input id="reset-password-confirm-2" class="input" type="password" [(ngModel)]="confirmPassword" />
+            <div class="password-field">
+              <input id="reset-password-confirm-2" class="input" [type]="showConfirmPassword() ? 'text' : 'password'" [(ngModel)]="confirmPassword" />
+              <button type="button" class="password-toggle" (click)="showConfirmPassword.set(!showConfirmPassword())" [attr.aria-label]="showConfirmPassword() ? 'Hide password' : 'Show password'">
+                <ng-container *ngTemplateOutlet="eyeIcon; context: { open: showConfirmPassword() }" />
+              </button>
+            </div>
           </div>
           @if (formError()) { <div class="field error">{{ formError() }}</div> }
           <button class="btn btn-primary btn-block" [disabled]="submitting()" (click)="submit()">
@@ -54,6 +65,21 @@ import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
         </div>
       </div>
     </div>
+
+    <ng-template #eyeIcon let-open="open">
+      @if (open) {
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" stroke="currentColor" stroke-width="1.6" />
+          <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+      } @else {
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 12s3.6-7 9-7 9 7 9 7-3.6 7-9 7-9-7-9-7Z" stroke="currentColor" stroke-width="1.6" />
+          <circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="1.6" />
+          <path d="m3 3 18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      }
+    </ng-template>
   `,
 })
 export class ResetPasswordPage {
@@ -65,6 +91,8 @@ export class ResetPasswordPage {
 
   password = '';
   confirmPassword = '';
+  readonly showPassword = signal(false);
+  readonly showConfirmPassword = signal(false);
   readonly submitting = signal(false);
   readonly formError = signal('');
   readonly outcome = signal<'done' | 'invalid-link' | null>(null);
