@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BusinessStore } from '../../core/stores/business.store';
 import { BUSINESS_CATEGORIES, BusinessCategory } from '../../core/domain/business.model';
+import { CASTILLA_BARANGAYS } from '../../core/domain/ph-reference-data';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 
@@ -28,10 +29,26 @@ import { CitizenApiClient } from '../../core/api/citizen-api.client';
         </div>
         <div class="field"><label for="register-business-house-number-street-3">House Number / Street<span class="required">*</span></label><input id="register-business-house-number-street-3" class="input" [(ngModel)]="street" /></div>
         <div class="form-row">
-          <div class="field"><label for="register-business-barangay-4">Barangay<span class="required">*</span></label><input id="register-business-barangay-4" class="input" [(ngModel)]="barangay" /></div>
-          <div class="field"><label for="register-business-city-municipality-5">City / Municipality<span class="required">*</span></label><input id="register-business-city-municipality-5" class="input" [(ngModel)]="city" /></div>
+          <div class="field">
+            <label for="register-business-barangay-4">Barangay<span class="required">*</span></label>
+            <select id="register-business-barangay-4" class="input" [(ngModel)]="barangay">
+              <option value="" disabled>Select</option>
+              @for (b of barangays; track b) { <option [value]="b">{{ b }}</option> }
+            </select>
+          </div>
+          <div class="field">
+            <label for="register-business-city-municipality-5">City / Municipality<span class="required">*</span></label>
+            <select id="register-business-city-municipality-5" class="input" [(ngModel)]="city">
+              <option value="Castilla">Castilla</option>
+            </select>
+          </div>
         </div>
-        <div class="field"><label for="register-business-province-6">Province<span class="required">*</span></label><input id="register-business-province-6" class="input" [(ngModel)]="province" /></div>
+        <div class="field">
+          <label for="register-business-province-6">Province<span class="required">*</span></label>
+          <select id="register-business-province-6" class="input" [(ngModel)]="province">
+            <option value="Sorsogon">Sorsogon</option>
+          </select>
+        </div>
         @if (api.configured) {
           <div class="form-row">
             <div class="field">
@@ -64,6 +81,7 @@ export class RegisterBusinessPage {
   protected readonly api = inject(CitizenApiClient);
 
   readonly categories = BUSINESS_CATEGORIES;
+  readonly barangays = CASTILLA_BARANGAYS;
   readonly error = signal<string | null>(null);
   readonly submitting = signal(false);
 
@@ -71,8 +89,12 @@ export class RegisterBusinessPage {
   category: BusinessCategory = 'Retail';
   street = '';
   barangay = '';
-  city = '';
-  province = '';
+  /** eBPCO only serves businesses within this LGU, so both fields are locked
+   *  to it rather than left as free text — unlike the citizen's own personal
+   *  address (register.page.ts), which can legitimately be anywhere in the
+   *  Philippines, a business filed here must be located in Castilla, Sorsogon. */
+  city = 'Castilla';
+  province = 'Sorsogon';
   /** Required only for a real submission — see class doc and the server's `businessShape`. */
   registrationNumber = '';
   dateRegistered = '';

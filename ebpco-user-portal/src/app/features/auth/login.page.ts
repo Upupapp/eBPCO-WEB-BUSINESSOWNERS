@@ -45,7 +45,7 @@ import { AuthService } from '../../core/session/auth.service';
         }
 
         <button class="btn btn-primary btn-block" [disabled]="submitting()" (click)="submit()">
-          {{ submitting() ? 'Signing in…' : 'Log In' }}
+          {{ submitting() ? 'Signing in' : 'Log In' }}
         </button>
 
         <div style="text-align:center; margin-top:14px;">

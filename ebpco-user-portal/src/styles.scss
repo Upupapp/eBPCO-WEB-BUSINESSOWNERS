@@ -108,6 +108,19 @@ h6 { font-size: 13px; font-weight: 700; }
 p { margin: 0 0 8px; }
 a { color: var(--primary-600); text-decoration: none; }
 a:hover { text-decoration: underline; }
+// A same-page action (e.g. opening a modal) styled to read exactly like the
+// anchors above, for text a citizen would otherwise expect to be a link —
+// but a real navigating <a> there would discard in-progress form state.
+.link-button {
+  font: inherit;
+  color: var(--primary-600);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.link-button:hover { text-decoration: underline; }
 
 .page {
   max-width: 1080px;
@@ -289,6 +302,28 @@ a:hover { text-decoration: underline; }
 .password-field .password-toggle:hover { color: var(--gray-700); }
 .password-field .password-toggle:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 1px; }
 .password-field .password-toggle svg { width: 18px; height: 18px; }
+// Live requirements list under the password field — each item mirrors one
+// rule the server's own password-policy.ts actually enforces (register.page.ts
+// ports the same checks), so a green item here is a real guarantee, not a
+// decorative one.
+.password-checklist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.password-checklist li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--gray-500); }
+.password-checklist li.met { color: var(--gray-700); }
+.password-checklist .check-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  color: transparent;
+  background: var(--gray-200);
+  border: 1px solid var(--gray-300);
+}
+.password-checklist li.met .check-icon { background: var(--success-text); border-color: var(--success-text); color: #fff; }
 .checkbox-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--gray-700); }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 

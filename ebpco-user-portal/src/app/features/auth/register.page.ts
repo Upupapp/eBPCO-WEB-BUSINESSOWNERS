@@ -3,16 +3,21 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
+import { ToastService } from '../../shared/ui/toast.service';
 import { CivilStatus, Sex } from '../../core/domain/user.model';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
-import { NATIONALITIES, PH_PROVINCES } from '../../core/domain/ph-reference-data';
+import { CITIES, NATIONALITIES, PH_PROVINCES } from '../../core/domain/ph-reference-data';
+import { firstPasswordRejectionMessage, passwordChecks } from '../../core/domain/password-policy';
+import { ToastHostComponent } from '../../shared/ui/toast-host.component';
+import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
 
 type Step = 1 | 2 | 3;
 
 @Component({
   selector: 'app-register',
-  imports: [FormsModule, RouterLink, CapitalizeNameDirective, NgTemplateOutlet],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective, NgTemplateOutlet, ToastHostComponent, LegalModalComponent],
   template: `
+    <app-toast-host />
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
       <div class="card auth-card anim-pop-in" style="width:100%; max-width:520px;">
         <div style="text-align:center; margin-bottom:12px;">
@@ -83,7 +88,14 @@ type Step = 1 | 2 | 3;
           <div class="field"><label for="register-house-number-street-10">House Number / Street<span class="required">*</span></label><input id="register-house-number-street-10" class="input" [(ngModel)]="street" /></div>
           <div class="form-row">
             <div class="field"><label for="register-barangay-11">Barangay<span class="required">*</span></label><input id="register-barangay-11" class="input" [(ngModel)]="barangay" /></div>
-            <div class="field"><label for="register-city-municipality-12">City / Municipality<span class="required">*</span></label><input id="register-city-municipality-12" class="input" [(ngModel)]="city" /></div>
+            <div class="field">
+              <label for="register-city-municipality-12">City / Municipality<span class="required">*</span></label>
+              <select id="register-city-municipality-12" class="input" [(ngModel)]="city">
+                @for (c of cities; track c) {
+                  <option [value]="c">{{ c }}</option>
+                }
+              </select>
+            </div>
           </div>
           <div class="form-row">
             <div class="field">
@@ -116,7 +128,16 @@ type Step = 1 | 2 | 3;
                 <ng-container *ngTemplateOutlet="eyeIcon; context: { open: showPassword() }" />
               </button>
             </div>
-            <div class="hint">At least 12 characters. A longer phrase is easier to remember and harder to guess than a short one with symbols in it.</div>
+            <div class="hint">A longer phrase is easier to remember and harder to guess than a short one with symbols in it.</div>
+            <ul class="password-checklist" aria-label="Password requirements">
+              @for (check of passwordChecks; track check.label) {
+                <li [class.met]="check.passed">
+                  <span class="check-icon" aria-hidden="true">✓</span>
+                  {{ check.label }}
+                </li>
+              }
+            </ul>
+            <div class="hint">We also check it isn't a password already known from a real data breach — that part happens when you submit, not here in the browser.</div>
           </div>
           <div class="field">
             <label for="register-confirm-password-16">Confirm Password<span class="required">*</span></label>
@@ -128,10 +149,12 @@ type Step = 1 | 2 | 3;
             </div>
           </div>
           <label class="checkbox-row" style="margin-bottom:8px;">
-            <input type="checkbox" [(ngModel)]="acceptedTerms" /> I agree to the <a routerLink="/terms">Terms &amp; Conditions</a>
+            <input type="checkbox" [(ngModel)]="acceptedTerms" /> I agree to the
+            <button type="button" class="link-button" (click)="openLegalModal.set('terms')">Terms &amp; Conditions</button>
           </label>
           <label class="checkbox-row" style="margin-bottom:14px;">
-            <input type="checkbox" [(ngModel)]="acceptedPrivacy" /> I agree to the <a routerLink="/privacy">Privacy Policy</a>
+            <input type="checkbox" [(ngModel)]="acceptedPrivacy" /> I agree to the
+            <button type="button" class="link-button" (click)="openLegalModal.set('privacy')">Privacy Policy</button>
           </label>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
@@ -140,6 +163,10 @@ type Step = 1 | 2 | 3;
               {{ submitting() ? 'Creating account…' : 'Create Account' }}
             </button>
           </div>
+        }
+
+        @if (openLegalModal(); as doc) {
+          <app-legal-modal [document]="doc" (close)="openLegalModal.set(null)" />
         }
 
         <hr class="divider" />
@@ -166,12 +193,14 @@ type Step = 1 | 2 | 3;
 export class RegisterPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly toast = inject(ToastService);
 
   readonly step = signal<Step>(1);
   readonly error = signal<string | null>(null);
 
   readonly nationalities = NATIONALITIES;
   readonly provinces = PH_PROVINCES;
+  readonly cities = CITIES;
 
   // Step 1
   firstName = '';
@@ -189,7 +218,7 @@ export class RegisterPage {
   mobileNumber = '';
   street = '';
   barangay = '';
-  city = '';
+  city = 'Castilla';
   province = 'Sorsogon';
   postalCode = '';
 
@@ -210,6 +239,13 @@ export class RegisterPage {
   acceptedPrivacy = false;
   readonly showPassword = signal(false);
   readonly showConfirmPassword = signal(false);
+  readonly openLegalModal = signal<LegalDocument | null>(null);
+
+  /** The subset of the server's password policy a browser can actually evaluate live —
+   *  see `core/domain/password-policy.ts` for what's excluded and why (the breach screen). */
+  get passwordChecks(): { label: string; passed: boolean }[] {
+    return passwordChecks(this.password, { email: this.email, firstName: this.firstName, lastName: this.lastName });
+  }
 
   toStep2(): void {
     if (!this.firstName || !this.lastName || !this.dateOfBirth || !this.sex || !this.civilStatus || !this.nationality) {
@@ -239,9 +275,18 @@ export class RegisterPage {
     return age;
   }
 
+  /** Same shape the server itself enforces (`z.string().email()`, auth.controller.ts) — this
+   *  is a UX shortcut so a typo is caught on this step instead of after Step 3's password
+   *  fields, not the actual guarantee. The server re-validates regardless. */
+  private static readonly EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   toStep3(): void {
     if (!this.email || !this.mobileNumber || !this.street || !this.barangay || !this.city || !this.province || !this.postalCode) {
       this.error.set('Please complete all required fields.');
+      return;
+    }
+    if (!RegisterPage.EMAIL_PATTERN.test(this.email)) {
+      this.toast.error('Please enter a valid email address.');
       return;
     }
     if (!/^09\d{9}$/.test(this.mobileNumber)) {
@@ -259,14 +304,11 @@ export class RegisterPage {
   readonly submitting = signal(false);
 
   async submit(): Promise<void> {
-    // 12, matching the server's real policy (password-policy.ts,
-    // MIN_PASSWORD_LENGTH — NIST SP 800-63B length-over-composition, no
-    // letter/digit mix required). The server also screens for repetitive,
-    // sequential, context-specific and breached passwords; those cannot be
-    // replicated client-side, so a password that passes this check can still
-    // come back with a specific reason from the server.
-    if ([...this.password].length < 12) {
-      this.error.set('Password must be at least 12 characters.');
+    const passwordRejection = firstPasswordRejectionMessage(this.password, {
+      email: this.email, firstName: this.firstName, lastName: this.lastName,
+    });
+    if (passwordRejection) {
+      this.error.set(passwordRejection);
       return;
     }
     if (this.password !== this.confirmPassword) {

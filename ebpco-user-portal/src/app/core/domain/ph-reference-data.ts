@@ -1,28 +1,32 @@
 // Reference lists for the registration form's dropdowns.
 //
-// Nothing municipality-specific here: no authoritative source exists in
-// this codebase for Barangay-level or City/Municipality-level data (checked
-// both frontends and the backend — `postal_code`/`barangay`/`city` are all
-// plain free-text columns, no reference table), and inventing one would be
-// exactly the "plausible-looking invented figure" this codebase's other
-// reference data (e.g. the fee schedule) deliberately refuses to ship. This
-// file only holds the two lists that ARE small, stable, and truly universal
-// enough to hardcode without risking being wrong: nationalities and PH
-// provinces (PSGC). Barangay/City stay free text on the form.
+// No authoritative source exists in this codebase for Barangay-level data
+// nationwide (checked both frontends and the backend — `postal_code`/
+// `barangay`/`city` are all plain free-text columns, no reference table),
+// and inventing one would be exactly the "plausible-looking invented
+// figure" this codebase's other reference data (e.g. the fee schedule)
+// deliberately refuses to ship. City/Municipality is the exception: PSGC
+// (below) is a real, current, externally-sourced list, not an invented
+// one, so it's safe to hardcode. Barangay stays free text on the citizen's
+// own personal address (they could live anywhere in the Philippines), but
+// `CASTILLA_BARANGAYS` below is the exception to the exception: a business
+// filed with eBPCO must be located within Castilla specifically (see
+// `register-business.page.ts`), so PSGC's own 34-barangay list for that one
+// municipality is exactly the right size and specificity to hardcode too.
 
-/** "Filipino" first — the overwhelming majority of applicants, matching `nationality`'s existing default. "Other" last, paired with a free-text fallback in the UI rather than silently rejecting an uncommon answer. */
+/** Alphabetical, so "Filipino" sits at its own F position rather than being pulled out of order — the default shown on load is set separately, in `register.page.ts`'s `nationality` field, and doesn't depend on list order. "Other" stays last, paired with a free-text fallback in the UI rather than silently rejecting an uncommon answer. */
 export const NATIONALITIES: readonly string[] = [
-  'Filipino',
   'American',
   'Australian',
   'Bangladeshi',
-  'Bruneian',
   'British',
+  'Bruneian',
   'Burmese',
   'Cambodian',
   'Canadian',
   'Chinese',
   'Emirati',
+  'Filipino',
   'French',
   'German',
   'Indian',
@@ -51,10 +55,8 @@ export const NATIONALITIES: readonly string[] = [
   'Other',
 ];
 
-/** The 82 PH provinces (PSGC) plus Metro Manila (NCR is region-level, not a province, but every PH address form offers it here since a Metro Manila resident has no province of their own to pick). "Sorsogon" is this LGU's own province — the default, matching `province`'s existing initial value. */
+/** The 82 PH provinces (PSGC) plus Metro Manila (NCR is region-level, not a province, but every PH address form offers it here since a Metro Manila resident has no province of their own to pick), alphabetical so "Sorsogon" sits at its own S position rather than being pulled out of order — the default shown on load is set separately, in `register.page.ts`'s `province` field, and doesn't depend on list order. */
 export const PH_PROVINCES: readonly string[] = [
-  'Sorsogon',
-  'Metro Manila (NCR)',
   'Abra',
   'Agusan del Norte',
   'Agusan del Sur',
@@ -104,6 +106,7 @@ export const PH_PROVINCES: readonly string[] = [
   'Maguindanao del Sur',
   'Marinduque',
   'Masbate',
+  'Metro Manila (NCR)',
   'Misamis Occidental',
   'Misamis Oriental',
   'Mountain Province',
@@ -124,6 +127,7 @@ export const PH_PROVINCES: readonly string[] = [
   'Samar',
   'Sarangani',
   'Siquijor',
+  'Sorsogon',
   'South Cotabato',
   'Southern Leyte',
   'Sultan Kudarat',
@@ -136,4 +140,219 @@ export const PH_PROVINCES: readonly string[] = [
   'Zamboanga del Norte',
   'Zamboanga del Sur',
   'Zamboanga Sibugay',
+];
+
+/**
+ * Every chartered city in the Philippines (PSGC `type: "City"`), plus every municipality
+ * of Sorsogon specifically — this LGU's own province, where a citizen is far more likely
+ * to live outside a city proper than in any other province. A flat list rather than the
+ * cascading-by-province design tried earlier: four names are shared by two distinct real
+ * cities in different provinces (San Fernando: La Union/Pampanga; San Carlos: Pangasinan/
+ * Negros Occidental; Naga: Camarines Sur/Cebu; Talisay: Negros Occidental/Cebu) and a flat
+ * single-field dropdown can't disambiguate them — a known, accepted limitation of this
+ * shape, not a bug. Sourced from the current PSGC (psgc.cloud, mirroring the PSA's own
+ * publication) rather than hand-typed — a wrong or missing entry here would silently
+ * block a real applicant from registering, the same concern this file's other reference
+ * data (nationalities, provinces) is held to.
+ */
+export const CITIES: readonly string[] = [
+  'Barcelona',
+  'Batangas City',
+  'Bulan',
+  'Bulusan',
+  'Casiguran',
+  'Castilla',
+  'City of Alaminos',
+  'City of Angeles',
+  'City of Antipolo',
+  'City of Bacolod',
+  'City of Bacoor',
+  'City of Bago',
+  'City of Baguio',
+  'City of Bais',
+  'City of Balanga',
+  'City of Baliwag',
+  'City of Batac',
+  'City of Bayawan',
+  'City of Baybay',
+  'City of Bayugan',
+  'City of Biñan',
+  'City of Bislig',
+  'City of Bogo',
+  'City of Borongan',
+  'City of Butuan',
+  'City of Cabadbaran',
+  'City of Cabanatuan',
+  'City of Cabuyao',
+  'City of Cadiz',
+  'City of Cagayan De Oro',
+  'City of Calaca',
+  'City of Calamba',
+  'City of Calapan',
+  'City of Calbayog',
+  'City of Caloocan',
+  'City of Candon',
+  'City of Canlaon',
+  'City of Carcar',
+  'City of Catbalogan',
+  'City of Cauayan',
+  'City of Cavite',
+  'City of Cebu',
+  'City of Cotabato',
+  'City of Dagupan',
+  'City of Dapitan',
+  'City of Dasmariñas',
+  'City of Davao',
+  'City of Digos',
+  'City of Dipolog',
+  'City of Dumaguete',
+  'City of El Salvador',
+  'City of Escalante',
+  'City of Gapan',
+  'City of General Santos',
+  'City of General Trias',
+  'City of Gingoog',
+  'City of Guihulngan',
+  'City of Himamaylan',
+  'City of Ilagan',
+  'City of Iligan',
+  'City of Iloilo',
+  'City of Imus',
+  'City of Iriga',
+  'City of Isabela',
+  'City of Kabankalan',
+  'City of Kidapawan',
+  'City of Koronadal',
+  'City of La Carlota',
+  'City of Lamitan',
+  'City of Laoag',
+  'City of Lapu-Lapu',
+  'City of Las Piñas',
+  'City of Legazpi',
+  'City of Ligao',
+  'City of Lipa',
+  'City of Lucena',
+  'City of Maasin',
+  'City of Makati',
+  'City of Malabon',
+  'City of Malaybalay',
+  'City of Malolos',
+  'City of Mandaluyong',
+  'City of Mandaue',
+  'City of Manila',
+  'City of Marawi',
+  'City of Marikina',
+  'City of Masbate',
+  'City of Mati',
+  'City of Meycauayan',
+  'City of Muntinlupa',
+  'City of Naga',
+  'City of Navotas',
+  'City of Olongapo',
+  'City of Oroquieta',
+  'City of Ozamiz',
+  'City of Pagadian',
+  'City of Palayan',
+  'City of Panabo',
+  'City of Parañaque',
+  'City of Pasig',
+  'City of Passi',
+  'City of Puerto Princesa',
+  'City of Roxas',
+  'City of Sagay',
+  'City of San Carlos',
+  'City of San Fernando',
+  'City of San Jose Del Monte',
+  'City of San Juan',
+  'City of San Pablo',
+  'City of San Pedro',
+  'City of Santa Rosa',
+  'City of Santiago',
+  'City of Silay',
+  'City of Sipalay',
+  'City of Sorsogon',
+  'City of Sto. Tomas',
+  'City of Surigao',
+  'City of Tabaco',
+  'City of Tabuk',
+  'City of Tacloban',
+  'City of Tacurong',
+  'City of Tagaytay',
+  'City of Tagbilaran',
+  'City of Taguig',
+  'City of Tagum',
+  'City of Talisay',
+  'City of Tanauan',
+  'City of Tandag',
+  'City of Tangub',
+  'City of Tanjay',
+  'City of Tarlac',
+  'City of Tayabas',
+  'City of Toledo',
+  'City of Trece Martires',
+  'City of Urdaneta',
+  'City of Valencia',
+  'City of Valenzuela',
+  'City of Victorias',
+  'City of Vigan',
+  'City of Zamboanga',
+  'Danao City',
+  'Donsol',
+  'Gubat',
+  'Irosin',
+  'Island Garden City of Samal',
+  'Juban',
+  'Mabalacat City',
+  'Magallanes',
+  'Matnog',
+  'Ormoc City',
+  'Pasay City',
+  'Pilar',
+  'Prieto Diaz',
+  'Quezon City',
+  'San Jose City',
+  'Santa Magdalena',
+  'Science City of Muñoz',
+  'Tuguegarao City',
+];
+
+/** All 34 barangays of Castilla, Sorsogon (PSGC) — real and current, not invented, for the
+ *  same reason CITIES is. For `register-business.page.ts`'s Barangay dropdown, where a
+ *  business's location is locked to Castilla specifically (unlike a citizen's own personal
+ *  address, which stays free text since it can be anywhere). */
+export const CASTILLA_BARANGAYS: readonly string[] = [
+  'Amomonting',
+  'Bagalayag',
+  'Bagong Sirang',
+  'Bonga',
+  'Buenavista',
+  'Burabod',
+  'Caburacan',
+  'Canjela',
+  'Cogon',
+  'Cumadcad',
+  'Dangcalan',
+  'Dinapa',
+  'La Union',
+  'Libtong',
+  'Loreto',
+  'Macalaya',
+  'Maracabac',
+  'Mayon',
+  'Maypangi',
+  'Milagrosa',
+  'Miluya',
+  'Monte Carmelo',
+  'Oras',
+  'Pandan',
+  'Poblacion',
+  'Quirapi',
+  'Saclayan',
+  'Salvacion',
+  'San Isidro',
+  'San Rafael',
+  'San Roque',
+  'San Vicente',
+  'Sogoy',
+  'Tomalaytay',
 ];

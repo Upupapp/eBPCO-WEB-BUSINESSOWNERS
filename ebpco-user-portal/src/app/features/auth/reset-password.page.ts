@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { firstPasswordRejectionMessage, passwordChecks } from '../../core/domain/password-policy';
 
 /**
  * Where the emailed "set your password" link lands — connection-plan Stage
@@ -44,7 +45,15 @@ import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
                 <ng-container *ngTemplateOutlet="eyeIcon; context: { open: showPassword() }" />
               </button>
             </div>
-            <div class="hint">At least 12 characters.</div>
+            <ul class="password-checklist" aria-label="Password requirements">
+              @for (check of passwordChecks; track check.label) {
+                <li [class.met]="check.passed">
+                  <span class="check-icon" aria-hidden="true">✓</span>
+                  {{ check.label }}
+                </li>
+              }
+            </ul>
+            <div class="hint">We also check it isn't a password already known from a real data breach — that part happens when you submit, not here in the browser.</div>
           </div>
           <div class="field">
             <label for="reset-password-confirm-2">Confirm New Password</label>
@@ -97,6 +106,10 @@ export class ResetPasswordPage {
   readonly formError = signal('');
   readonly outcome = signal<'done' | 'invalid-link' | null>(null);
 
+  get passwordChecks(): { label: string; passed: boolean }[] {
+    return passwordChecks(this.password);
+  }
+
   async submit(): Promise<void> {
     if (this.submitting()) return;
     this.formError.set('');
@@ -105,10 +118,9 @@ export class ResetPasswordPage {
       this.formError.set('Please fill in both fields.');
       return;
     }
-    // The server's own floor (password-policy.ts's MIN_PASSWORD_LENGTH),
-    // matched here so it is caught before a round trip, not after one.
-    if ([...this.password].length < 12) {
-      this.formError.set('Use at least 12 characters.');
+    const rejection = firstPasswordRejectionMessage(this.password);
+    if (rejection) {
+      this.formError.set(rejection);
       return;
     }
     if (this.password !== this.confirmPassword) {
