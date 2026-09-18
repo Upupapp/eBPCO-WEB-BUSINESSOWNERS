@@ -10,8 +10,8 @@ import { RouterLink } from '@angular/router';
         <div class="badge badge-green anim-flip-in" style="margin-bottom:12px; animation-delay:0.15s;">Account Created</div>
         <h2>Welcome to eBPCO</h2>
         <p class="muted">
-          Your account has been created in this demonstration build. It exists in your browser only
-          and is gone when you close or refresh the page.
+          Your account has been created in this demonstration build. It exists in your browser 
+          and is saved when you close or refresh the page.
         </p>
         <!--
           F-16: this used to say "Please verify your email and mobile number from
