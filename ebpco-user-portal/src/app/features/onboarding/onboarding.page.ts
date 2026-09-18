@@ -22,8 +22,8 @@ export class OnboardingPage {
   readonly slides: OnboardingSlide[] = [
     {
       titleLine1: 'Apply for permits',
-      titleAccent: 'from your phone',
-      body: 'Submit new, renewal, and amendment permit applications through a simple mobile process.',
+      titleAccent: 'from your device',
+      body: 'Submit new, renewal, and amendment permit applications through a simple website process.',
     },
     {
       titleLine1: 'Submit and manage',
