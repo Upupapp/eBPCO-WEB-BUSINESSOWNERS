@@ -30,7 +30,7 @@
   flex-direction: column;
   background: #ffffff;
   border-right: 1px solid var(--ds-border);
-  padding: 26px 20px 20px;
+  padding: 34px 20px 20px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -96,7 +96,11 @@
   // whole point of this rule is to be visibly there, just quiet.
   height: 1px;
   background: #d8dbe2;
-  margin: 24px 0 20px;
+  // Was 24px/20px — nine times the 5px gap `.ds-nav` uses between every
+  // other pair of items, which is what made the space right after the
+  // logo read as a conspicuous gap rather than normal section breathing
+  // room.
+  margin: 25px 0 16px;
 }
 
 .ds-nav {
@@ -162,7 +166,11 @@
   border: none;
   height: 1px;
   background: var(--ds-border);
-  margin: auto 0 16px;
+  // Was `margin: auto 0 16px` — the auto top margin is a flex "push to
+  // bottom" trick, so on a tall window it opened a large, viewport-height-
+  // dependent gap above the divider/Log Out that grew or shrank as the
+  // window resized, instead of always sitting close to the nav list.
+  margin: 16px 0;
   width: 100%;
 }
 

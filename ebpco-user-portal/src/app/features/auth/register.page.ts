@@ -3,21 +3,18 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
-import { ToastService } from '../../shared/ui/toast.service';
 import { CivilStatus, Sex } from '../../core/domain/user.model';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
-import { CITIES, NATIONALITIES, PH_PROVINCES } from '../../core/domain/ph-reference-data';
+import { CASTILLA_BARANGAYS, NATIONALITIES } from '../../core/domain/ph-reference-data';
 import { firstPasswordRejectionMessage, passwordChecks } from '../../core/domain/password-policy';
-import { ToastHostComponent } from '../../shared/ui/toast-host.component';
 import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
 
 type Step = 1 | 2 | 3;
 
 @Component({
   selector: 'app-register',
-  imports: [FormsModule, RouterLink, CapitalizeNameDirective, NgTemplateOutlet, ToastHostComponent, LegalModalComponent],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective, NgTemplateOutlet, LegalModalComponent],
   template: `
-    <app-toast-host />
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;">
       <div class="card auth-card anim-pop-in" style="width:100%; max-width:520px;">
         <div style="text-align:center; margin-bottom:12px;">
@@ -79,21 +76,32 @@ type Step = 1 | 2 | 3;
         }
 
         @if (step() === 2) {
-          <div class="field"><label for="register-email-address-8">Email Address<span class="required">*</span></label><input id="register-email-address-8" class="input" type="email" [(ngModel)]="email" /></div>
+          <div class="field">
+            <label for="register-email-address-8">Email Address<span class="required">*</span></label>
+            <input id="register-email-address-8" class="input" type="email" [ngModel]="email" (ngModelChange)="onEmailInput($event)" />
+            @if (emailError()) { <div class="field error" style="margin-top:6px;">{{ emailError() }}</div> }
+          </div>
           <div class="field">
             <label for="register-mobile-number-9">Mobile Number<span class="required">*</span></label>
             <input id="register-mobile-number-9" class="input" type="tel" inputmode="numeric" maxlength="11"
               placeholder="09XXXXXXXXX" [ngModel]="mobileNumber" (ngModelChange)="onMobileNumberInput($event)" />
+            @if (mobileError()) { <div class="field error" style="margin-top:6px;">{{ mobileError() }}</div> }
           </div>
           <div class="field"><label for="register-house-number-street-10">House Number / Street<span class="required">*</span></label><input id="register-house-number-street-10" class="input" [(ngModel)]="street" /></div>
           <div class="form-row">
-            <div class="field"><label for="register-barangay-11">Barangay<span class="required">*</span></label><input id="register-barangay-11" class="input" [(ngModel)]="barangay" /></div>
+            <div class="field">
+              <label for="register-barangay-11">Barangay<span class="required">*</span></label>
+              <select id="register-barangay-11" class="input" [(ngModel)]="barangay">
+                <option value="" disabled>Select</option>
+                @for (b of barangays; track b) {
+                  <option [value]="b">{{ b }}</option>
+                }
+              </select>
+            </div>
             <div class="field">
               <label for="register-city-municipality-12">City / Municipality<span class="required">*</span></label>
               <select id="register-city-municipality-12" class="input" [(ngModel)]="city">
-                @for (c of cities; track c) {
-                  <option [value]="c">{{ c }}</option>
-                }
+                <option value="Castilla">Castilla</option>
               </select>
             </div>
           </div>
@@ -101,9 +109,7 @@ type Step = 1 | 2 | 3;
             <div class="field">
               <label for="register-province-13">Province<span class="required">*</span></label>
               <select id="register-province-13" class="input" [(ngModel)]="province">
-                @for (p of provinces; track p) {
-                  <option [value]="p">{{ p }}</option>
-                }
+                <option value="Sorsogon">Sorsogon</option>
               </select>
             </div>
             <div class="field">
@@ -193,14 +199,15 @@ type Step = 1 | 2 | 3;
 export class RegisterPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
-  private readonly toast = inject(ToastService);
 
   readonly step = signal<Step>(1);
   readonly error = signal<string | null>(null);
+  /** Field-level, shown directly under Email/Mobile Number rather than the shared step-level `error` banner or a floating toast — the same "typical warning" placement every other field-format check in this app already uses. */
+  readonly emailError = signal<string | null>(null);
+  readonly mobileError = signal<string | null>(null);
 
   readonly nationalities = NATIONALITIES;
-  readonly provinces = PH_PROVINCES;
-  readonly cities = CITIES;
+  readonly barangays = CASTILLA_BARANGAYS;
 
   // Step 1
   firstName = '';
@@ -220,11 +227,18 @@ export class RegisterPage {
   barangay = '';
   city = 'Castilla';
   province = 'Sorsogon';
-  postalCode = '';
+  /** Castilla, Sorsogon's own postal code — the correct default for virtually every citizen registering here, still editable for the rare address that genuinely differs. */
+  postalCode = '4713';
+
+  onEmailInput(value: string): void {
+    this.email = value;
+    this.emailError.set(null);
+  }
 
   /** Digits only, capped at 11 — matches the `09XXXXXXXXX` format this form actually accepts (see the regex check in `toStep3`). Sanitized on every keystroke rather than only on submit, same as a normal sign-up form's phone field. */
   onMobileNumberInput(value: string): void {
     this.mobileNumber = value.replace(/\D/g, '').slice(0, 11);
+    this.mobileError.set(null);
   }
 
   /** Digits only, capped at 4 — the PH postal-code format the server itself enforces (`postal_code ~ '^[0-9]{4}$'`, migration 036_applicant_address.sql). */
@@ -281,16 +295,18 @@ export class RegisterPage {
   private static readonly EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   toStep3(): void {
+    this.emailError.set(null);
+    this.mobileError.set(null);
     if (!this.email || !this.mobileNumber || !this.street || !this.barangay || !this.city || !this.province || !this.postalCode) {
       this.error.set('Please complete all required fields.');
       return;
     }
     if (!RegisterPage.EMAIL_PATTERN.test(this.email)) {
-      this.toast.error('Please enter a valid email address.');
+      this.emailError.set('Please enter a valid email address.');
       return;
     }
     if (!/^09\d{9}$/.test(this.mobileNumber)) {
-      this.error.set('Mobile number must be in the format 09XXXXXXXXX.');
+      this.mobileError.set('Mobile number must be in the format 09XXXXXXXXX.');
       return;
     }
     if (!/^\d{4}$/.test(this.postalCode)) {

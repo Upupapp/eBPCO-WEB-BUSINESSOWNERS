@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
@@ -177,7 +177,7 @@ import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/a
     } @else {
       <div class="page">
         <div class="card empty-state">
-          <p>We couldn't find that application. This can happen after a page refresh, since this demo build keeps data in memory only (no backend yet — see the project README).</p>
+          <p>We couldn't find that application. It may not belong to your account, or the link may be out of date.</p>
           <a routerLink="/applications" class="btn btn-primary">Back to My Applications</a>
         </div>
       </div>
@@ -241,6 +241,16 @@ export class ApplicationDetailsPage {
       this.refreshTimeline();
       this.store.fetchPermit(this.id());
     }
+    // Side-effecting on purpose (writes the store's real-checklist cache) —
+    // must live in an effect(), never inside `missingRequired` itself,
+    // which is a computed() and has to stay pure. Skips 'Business Permit'
+    // the same way `missingRequired` already does below.
+    effect(() => {
+      const permitType = this.app()?.permitType;
+      if (permitType && permitType !== 'Business Permit') {
+        this.store.ensureRequiredDocumentsLoaded(permitType);
+      }
+    });
   }
 
   /** Re-fetches `realTimeline` after a real write on this application (e.g. `cancel()`) — otherwise the Status Timeline kept showing its pre-write history until the next full page reload. */
@@ -288,11 +298,14 @@ export class ApplicationDetailsPage {
 
   /**
    * Required documents this application's own real document list has no
-   * match for, by label — the same matching convention the Admin Portal's
-   * own checklist already uses ("Attach"'s real `requirementCode` and this
-   * portal's requirements-catalog ids are two different, incompatible
-   * schemes; label is the one thing both sides originate from the same
-   * source, so it is what actually matches a citizen's own upload).
+   * match for, by label rather than id — `requiredDocumentsFor` now prefers
+   * the real, live checklist (`GET /requirements/{permitType}`, warmed by
+   * the `effect()` in the constructor above) the moment it loads, but a
+   * citizen's already-uploaded document was matched against whatever id
+   * scheme was live at UPLOAD time, which may have been the static
+   * fallback. Label is the one thing both id schemes originate from the
+   * same source for, so it's still what actually matches an upload here,
+   * same as before this fetch existed.
    *
    * A document that exists but was Rejected/Revision Required is NOT
    * missing — it already has its own "Replace this document" action above.
@@ -316,8 +329,10 @@ export class ApplicationDetailsPage {
    * First-time attach for a requirement nothing has been sent for yet —
    * `POST /documents` with THIS application's real id, now that the
    * backend actually checks the applicant owns it (see
-   * `DocumentsController.upload`'s own ownership check). Deliberately not
-   * `requirementCode` — see the comment on `missingRequired` above.
+   * `DocumentsController.upload`'s own ownership check). `requirementCode`
+   * is `req.id` only once the store's real checklist has actually loaded
+   * for this permit type — sending the static fallback's id as one is a
+   * real, honest server refusal (see `ApplicationStore.hasRealRequiredDocuments`).
    */
   protected async attachMissing(req: RequirementDocument, event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -331,8 +346,13 @@ export class ApplicationDetailsPage {
     this.uploadingMissingId.set(req.id);
     try {
       const contentBase64 = await toBase64(file);
+      const permitType = this.app()?.permitType;
+      const requirementCode =
+        permitType && permitType !== 'Business Permit' && this.store.hasRealRequiredDocuments(permitType)
+          ? req.id
+          : null;
       this.api.uploadDocument({
-        fileName: file.name, label: req.label, applicationId: this.id(), contentBase64,
+        fileName: file.name, label: req.label, applicationId: this.id(), requirementCode, contentBase64,
       }).subscribe({
         next: () => {
           this.toast.success(`"${req.label}" sent.`);

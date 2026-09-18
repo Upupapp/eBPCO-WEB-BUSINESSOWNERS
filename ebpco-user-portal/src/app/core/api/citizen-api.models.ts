@@ -391,6 +391,17 @@ export interface RequirementsChecklistResponse {
   attributionComplete: boolean;
 }
 
+/** `GET /requirements/{permitType}` — the live checklist, before an application even exists: what a permit type currently asks for, as the LGU has it configured right now (`requirements.controller.ts`'s "applicant's copy" route). */
+export interface PermitRequirementsResponse {
+  permitType: string;
+  documents: ReadonlyArray<{
+    code: string;
+    label: string;
+    description: string;
+    required: boolean;
+  }>;
+}
+
 export interface ResubmitResult {
   /** The NEW document. */
   documentId: string;

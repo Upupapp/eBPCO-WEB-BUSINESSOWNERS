@@ -17,6 +17,7 @@ import {
   DocumentHistoryEntry,
   NotificationFeedResponse,
   PaymentHistoryEntry,
+  PermitRequirementsResponse,
   PermitResponse,
   RequirementsChecklistResponse,
   ResubmitRequest,
@@ -135,6 +136,17 @@ export class CitizenApiClient {
    */
   getRequirements(applicationId: string): Observable<RequirementsChecklistResponse> {
     return this.get<RequirementsChecklistResponse>(`/applications/${encodeURIComponent(applicationId)}/requirements`);
+  }
+
+  /**
+   * `GET /requirements/{permitType}` — the live checklist BEFORE an
+   * application exists, so a document picked up in the wizard can carry a
+   * real `requirementCode` from the moment it's chosen, not just after
+   * filing. Same underlying catalogue the Admin Portal's own "Permit
+   * Release > Permit Types" editor publishes to.
+   */
+  getRequirementsForPermitType(permitType: string): Observable<PermitRequirementsResponse> {
+    return this.get<PermitRequirementsResponse>(`/requirements/${encodeURIComponent(permitType)}`);
   }
 
   /**

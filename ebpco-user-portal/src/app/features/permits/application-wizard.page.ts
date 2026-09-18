@@ -77,8 +77,11 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
  * flow AND all 19 domain-specific permit types (master command Section 7.4).
  * Rather than hand-building 19 near-identical multi-step wizards (as
  * ebpco-mobile does, ~9 files each), this single component reads its
- * document checklist from requirements-catalog.ts and adapts — same
- * document/feature coverage, far less duplicated code to maintain.
+ * document checklist from `GET /requirements/{permitType}` — the LGU's own
+ * live, staff-published catalogue, `loadRealDocuments` below — falling
+ * back to the static requirements-catalog.ts only where nothing has been
+ * published for that type yet. Same document/feature coverage either way,
+ * far less duplicated code to maintain than 19 separate wizards.
  */
 @Component({
   selector: 'app-application-wizard',
@@ -346,6 +349,56 @@ export class ApplicationWizardPage {
   isGeneric = true;
   permitType: PermitType | null = null;
   documents: RequirementDocument[] = [];
+  /**
+   * True once `documents` above holds the real, live checklist (from
+   * `GET /requirements/{permitType}`) rather than the static
+   * requirements-catalog.ts fallback — `uploadReal()` checks this before
+   * sending a document's `id` as `requirementCode`: a static-catalog id
+   * sent as one is a real, honest server refusal (see that method's own
+   * comment). Starts false on every (re)assignment of `documents` and
+   * flips true only inside `loadRealDocuments`'s own success callback.
+   */
+  usingRealRequirementCodes = false;
+
+  /**
+   * Upgrades `documents`/`usingRealRequirementCodes` in place once the
+   * real checklist answers — same "start with what's known locally, swap
+   * in the real thing the moment it arrives" shape as `realDocuments`
+   * above. Left quietly on the static catalog (no error surfaced) when
+   * the LGU hasn't published a checklist for this permit type yet, or the
+   * call fails: the static catalog is a genuine, disclosed fallback, not
+   * an error state.
+   */
+  private loadRealDocuments(permitType: PermitType | 'generic'): void {
+    const key = permitType === 'generic' ? 'Business Permit' : permitType;
+    this.api.getRequirementsForPermitType(key).subscribe({
+      next: (result) => {
+        if (result.documents.length === 0) return;
+        const previousDocs = this.documents;
+        const nextDocs: RequirementDocument[] = result.documents.map((d) => ({
+          id: d.code,
+          label: d.label,
+          required: d.required,
+          description: d.description || undefined,
+        }));
+        // Re-key anything already attached/reused under the static
+        // catalog's id, by label, so swapping in the real ids doesn't drop
+        // a file the citizen already picked. Both catalogs were seeded
+        // from the same source, so labels line up even where ids might
+        // not once a staff member republishes this permit type's checklist.
+        const reattached: Record<string, Slot> = {};
+        for (const [oldId, slot] of Object.entries(this.attached)) {
+          const oldDoc = previousDocs.find((d) => d.id === oldId);
+          const match = oldDoc ? nextDocs.find((d) => d.label === oldDoc.label) : undefined;
+          reattached[match ? match.id : oldId] = slot;
+        }
+        this.attached = reattached;
+        this.documents = nextDocs;
+        this.usingRealRequirementCodes = true;
+      },
+      error: () => {},
+    });
+  }
 
   businessId: string | null = null;
   applicationAction: ApplicationAction = 'New';
@@ -386,6 +439,8 @@ export class ApplicationWizardPage {
       this.isGeneric = false;
       this.permitType = source.permitType as PermitType;
       this.documents = this.applicationStore.requiredDocumentsFor(source.permitType);
+      this.usingRealRequirementCodes = false;
+      this.loadRealDocuments(source.permitType);
     }
 
     const previous = this.applicationStore.documentsFor(source.applicationId);
@@ -427,9 +482,11 @@ export class ApplicationWizardPage {
       this.isGeneric = false;
       this.permitType = typeParam;
       this.documents = this.applicationStore.requiredDocumentsFor(typeParam);
+      this.loadRealDocuments(typeParam);
     } else {
       this.isGeneric = true;
       this.documents = this.applicationStore.requiredDocumentsFor('generic');
+      this.loadRealDocuments('generic');
     }
     if (this.api.configured) {
       this.api.getMyDocuments().subscribe({
@@ -503,21 +560,17 @@ export class ApplicationWizardPage {
     this.uploadingRequirementId.set(d.id);
     try {
       const contentBase64 = await toBase64(file);
+      // `d.id` is only a real, server-recognised requirement code once
+      // `usingRealRequirementCodes` is true (see `loadRealDocuments`) — the
+      // static requirements-catalog.ts fallback's own ids (e.g. 'land-title')
+      // are NOT the same scheme a staff member's republished checklist can
+      // end up using, and sending one that doesn't match is a real, honest
+      // server refusal ("This permit type has no requirement called...").
+      // Omitted (not a guessed code) whenever the real checklist hasn't
+      // loaded yet, exactly as before this fetch existed.
+      const requirementCode = this.usingRealRequirementCodes ? d.id : null;
       const result = await firstValueFrom(
-        // NOT `requirementCode: d.id`. This portal's requirements-catalog ids
-        // (e.g. 'land-title') and the Admin Portal's own published checklist
-        // codes (e.g. 'fencing-permit-land-title', generated when staff save
-        // a checklist through Permit Release > Permit Types) are DIFFERENT,
-        // incompatible id schemes with no shared source of truth — confirmed
-        // live: publishing a checklist there and sending this portal's own
-        // id back for a submission gets a real, honest server refusal
-        // ("This permit type has no requirement called ..."). Sending a code
-        // that never matches would turn every real submission into a hard
-        // failure the moment any office publishes its checklist, which is
-        // worse than the status quo (documents attributed to no requirement,
-        // as before). Reconciling the two catalogs' id schemes is real,
-        // separate work — not attempted here.
-        this.api.uploadDocument({ fileName: file.name, label: d.label, contentBase64 }),
+        this.api.uploadDocument({ fileName: file.name, label: d.label, requirementCode, contentBase64 }),
       );
       this.uploadedDocumentIds.update((map) => ({ ...map, [d.id]: result.documentId }));
     } catch (error) {

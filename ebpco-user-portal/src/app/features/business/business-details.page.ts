@@ -55,7 +55,7 @@ import { formatDate } from '../../core/utils/ids';
     } @else {
       <div class="page">
         <div class="card empty-state">
-          <p>We couldn't find that business. This can happen after a page refresh, since this demo build keeps data in memory only (no backend yet — see the project README).</p>
+          <p>We couldn't find that business. It may not be registered under your account, or the link may be out of date.</p>
           <a routerLink="/businesses" class="btn btn-primary">Back to My Businesses</a>
         </div>
       </div>

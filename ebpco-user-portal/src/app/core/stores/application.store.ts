@@ -13,7 +13,7 @@ import {
 import { ApplicationDocument, DocumentStatus, SavedDocumentFileType } from '../domain/document.model';
 import { Assessment, AssessmentLineItem, ILLUSTRATIVE_FEE_BASIS } from '../domain/assessment.model';
 import { PaymentMethod, PaymentTransaction } from '../domain/payment.model';
-import { GENERIC_APPLICATION_DOCUMENTS, requirementsFor } from '../domain/requirements-catalog';
+import { GENERIC_APPLICATION_DOCUMENTS, RequirementDocument, requirementsFor } from '../domain/requirements-catalog';
 import { nextId, todayIso } from '../utils/ids';
 import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
 import { CitizenApiClient, newIdempotencyKey } from '../api/citizen-api.client';
@@ -538,7 +538,67 @@ export class ApplicationStore {
     return NEXT_STEP_TEXT[status];
   }
 
-  requiredDocumentsFor(permitType: PermitType | 'generic') {
+  /**
+   * Real per-permit-type checklists, from `GET /requirements/{permitType}`
+   * (the same catalogue the Admin Portal's own "Permit Release > Permit
+   * Types" editor publishes to) — keyed by permit type, `'generic'` mapped
+   * to `'Business Permit'` the way `requiredDocumentsFor` already did for
+   * the static catalog. A key absent from this map means "never asked for
+   * yet"; present-but-`null` means "asked, and the LGU has published
+   * nothing for it" (falls back to the static catalog, same as before).
+   */
+  private readonly realRequiredDocuments = signal<Record<string, RequirementDocument[] | null>>({});
+
+  private requirementsKeyFor(permitType: PermitType | 'generic'): string {
+    return permitType === 'generic' ? 'Business Permit' : permitType;
+  }
+
+  /**
+   * Kicks off the real fetch for `permitType` if it hasn't been asked for
+   * yet. Side-effecting (writes `realRequiredDocuments`) — call this from a
+   * constructor or `effect()`, never from inside a `computed()`;
+   * `requiredDocumentsFor` below stays a pure read for exactly that reason.
+   */
+  ensureRequiredDocumentsLoaded(permitType: PermitType | 'generic'): void {
+    const key = this.requirementsKeyFor(permitType);
+    if (key in this.realRequiredDocuments()) return;
+    this.api.getRequirementsForPermitType(key).subscribe({
+      next: (result) => {
+        const docs: RequirementDocument[] = result.documents.map((d) => ({
+          id: d.code,
+          label: d.label,
+          required: d.required,
+          description: d.description || undefined,
+        }));
+        this.realRequiredDocuments.update((m) => ({ ...m, [key]: docs.length > 0 ? docs : null }));
+      },
+      // A local demo permit type, or a deployment that can't answer this
+      // route yet, 404s harmlessly — left `null` so the static catalog
+      // below keeps standing in, same as everywhere else in this portal.
+      error: () => this.realRequiredDocuments.update((m) => ({ ...m, [key]: null })),
+    });
+  }
+
+  /**
+   * True once the real, live checklist for `permitType` has actually
+   * loaded (not merely requested) — check this before sending a
+   * document's `id` as `requirementCode`. A static-catalog id sent as one
+   * is a real, honest server refusal: the two id schemes only coincide
+   * because nothing has re-published this permit type's checklist since
+   * it was first seeded — see `requirements.controller.ts`.
+   */
+  hasRealRequiredDocuments(permitType: PermitType | 'generic'): boolean {
+    return !!this.realRequiredDocuments()[this.requirementsKeyFor(permitType)];
+  }
+
+  /**
+   * The live checklist once `ensureRequiredDocumentsLoaded` has resolved
+   * it, else the static catalog — never triggers the fetch itself (see
+   * that method's own doc comment on why this one must stay pure).
+   */
+  requiredDocumentsFor(permitType: PermitType | 'generic'): RequirementDocument[] {
+    const real = this.realRequiredDocuments()[this.requirementsKeyFor(permitType)];
+    if (real) return real;
     return permitType === 'generic' ? GENERIC_APPLICATION_DOCUMENTS : requirementsFor(permitType).documents;
   }
 
