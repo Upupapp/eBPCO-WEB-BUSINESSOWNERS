@@ -280,6 +280,23 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 3px var(--primary-100);
 }
 .input.invalid { border-color: var(--danger-500); }
+
+// Dropdowns draw their own disclosure arrow, on every pointer type. The
+// browser's native menulist puts its chevron hard against the right border
+// with no way to inset it (author padding does not move it), which reads as
+// cramped next to the 12px text inset every other field has. Turning the
+// appearance off makes the box styleable and the arrow ours: the same 16px
+// chevron the touch block below used to supply only for coarse pointers, now
+// at `right 12px` to line up with the text on the other side. The 40px right
+// padding keeps the selected value clear of it.
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23454a58' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
 .password-field { position: relative; }
 .password-field .input { padding-right: 38px; }
 .password-field .password-toggle {
@@ -377,19 +394,11 @@ a:hover { text-decoration: underline; }
   // as a `menulist` control with its own intrinsic metrics, so it stayed 25px
   // tall while the text inputs beside it were 44px. Measured on WebKit at
   // iPhone 13 metrics - computed min-height came back as 18px and padding as 0
-  // despite the rule above.
-  //
-  // Turning the appearance off makes the box styleable, which means supplying
-  // the disclosure arrow ourselves - hence the inline SVG. Scoped to coarse
-  // pointers, so desktop keeps the native control.
+  // despite the rule above. `appearance: none` and the arrow now come from the
+  // base `select.input` rule (all pointers); this only pins the touch height.
   select.input {
-    appearance: none;
-    -webkit-appearance: none;
     height: 44px;
     padding: 0 40px 0 12px;
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23454a58' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
   }
 }
 
