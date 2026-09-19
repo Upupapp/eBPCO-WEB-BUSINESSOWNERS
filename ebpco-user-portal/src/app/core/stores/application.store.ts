@@ -138,7 +138,19 @@ export class ApplicationStore {
     private readonly auth: AuthService,
     private readonly notifications: NotificationStore,
   ) {
-    this.seed();
+    // Only when no real API is configured -- this is what actually
+    // distinguishes local/demo-only running from a real deployment (staging
+    // or production both set EBPCO_API_BASE_URL). Seeding unconditionally
+    // meant `applicationById('app-seed-1')` returned "Dela Cruz Hardware &
+    // Construction Supply"'s fake, non-existent application to ANY signed-in
+    // citizen on the real deployed site who happened to open that URL --
+    // reachable by guessing, since the id is a hardcoded, publicly-visible
+    // constant in this file, not by discovery through any real navigation
+    // path (myApplications() already preferred realApplications correctly).
+    // The other seeded maps (documents/timeline/permit/assessment/payment)
+    // are keyed by these same two ids and are unreachable dead weight
+    // without this data existing at all, so gating this one call is enough.
+    if (!this.api.configured) this.seed();
 
     // Refetches whenever sign-in state changes — covers both a fresh login
     // and a session restored on reload (Stage 3's AuthService.restore()).
