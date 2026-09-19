@@ -83,8 +83,9 @@ type Step = 1 | 2 | 3;
           </div>
           <div class="field">
             <label for="register-mobile-number-9">Mobile Number<span class="required">*</span></label>
-            <input id="register-mobile-number-9" class="input" type="tel" inputmode="numeric" maxlength="11"
-              placeholder="09XXXXXXXXX" [ngModel]="mobileNumber" (ngModelChange)="onMobileNumberInput($event)" />
+            <input #mobileInput id="register-mobile-number-9" class="input" type="tel" inputmode="numeric" maxlength="11"
+              placeholder="09XXXXXXXXX" [ngModel]="mobileNumber" (ngModelChange)="onMobileNumberInput($event, mobileInput)" />
+            <p class="small muted" style="margin-top:4px;">Numbers only, 11 digits starting with 09 (e.g. 09171234567).</p>
             @if (mobileError()) { <div class="field error" style="margin-top:6px;">{{ mobileError() }}</div> }
           </div>
           <div class="field"><label for="register-house-number-street-10">House Number / Street<span class="required">*</span></label><input id="register-house-number-street-10" class="input" [(ngModel)]="street" /></div>
@@ -114,8 +115,8 @@ type Step = 1 | 2 | 3;
             </div>
             <div class="field">
               <label for="register-postal-code-14">Postal Code<span class="required">*</span></label>
-              <input id="register-postal-code-14" class="input" type="text" inputmode="numeric" maxlength="4"
-                placeholder="0000" [ngModel]="postalCode" (ngModelChange)="onPostalCodeInput($event)" />
+              <input #postalInput id="register-postal-code-14" class="input" type="text" inputmode="numeric" maxlength="4"
+                placeholder="0000" [ngModel]="postalCode" (ngModelChange)="onPostalCodeInput($event, postalInput)" />
             </div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
@@ -166,7 +167,7 @@ type Step = 1 | 2 | 3;
           <div style="display:flex; gap:10px;">
             <button class="btn btn-secondary" style="flex:1" [disabled]="submitting()" (click)="step.set(2)">Back</button>
             <button class="btn btn-primary" style="flex:2" [disabled]="submitting()" (click)="submit()">
-              {{ submitting() ? 'Creating account…' : 'Create Account' }}
+              {{ submitting() ? 'Creating Account' : 'Create Account' }}
             </button>
           </div>
         }
@@ -235,15 +236,38 @@ export class RegisterPage {
     this.emailError.set(null);
   }
 
-  /** Digits only, capped at 11 — matches the `09XXXXXXXXX` format this form actually accepts (see the regex check in `toStep3`). Sanitized on every keystroke rather than only on submit, same as a normal sign-up form's phone field. */
-  onMobileNumberInput(value: string): void {
+  /**
+   * Digits only, capped at 11 — matches the `09XXXXXXXXX` format this form
+   * actually accepts (see the regex check in `toStep3`). Sanitized on every
+   * keystroke rather than only on submit, same as a normal sign-up form's
+   * phone field.
+   *
+   * The `input` element is passed and its `.value` set directly, not left to
+   * `[ngModel]="mobileNumber"`'s own re-render. When a rejected keystroke
+   * sanitizes back to the SAME string `mobileNumber` already held (typing a
+   * letter into an empty field: '' -> '' both before and after), Angular's
+   * change detection sees no change in the bound expression and never
+   * rewrites the DOM -- so the field kept showing whatever the citizen had
+   * just typed, letters included, while the component's own `mobileNumber`
+   * was correctly empty underneath. Confirmed live: typing "sasaas" left
+   * "sasaas" sitting in the field. Setting `.value` here is unconditional,
+   * not gated on Angular detecting a change, so it always matches reality.
+   */
+  onMobileNumberInput(value: string, input: HTMLInputElement): void {
     this.mobileNumber = value.replace(/\D/g, '').slice(0, 11);
+    input.value = this.mobileNumber;
     this.mobileError.set(null);
   }
 
-  /** Digits only, capped at 4 — the PH postal-code format the server itself enforces (`postal_code ~ '^[0-9]{4}$'`, migration 036_applicant_address.sql). */
-  onPostalCodeInput(value: string): void {
+  /**
+   * Digits only, capped at 4 — the PH postal-code format the server itself
+   * enforces (`postal_code ~ '^[0-9]{4}$'`, migration 036_applicant_address.sql).
+   * `.value` set directly on the element for the same reason
+   * `onMobileNumberInput` does — see its own doc comment.
+   */
+  onPostalCodeInput(value: string, input: HTMLInputElement): void {
     this.postalCode = value.replace(/\D/g, '').slice(0, 4);
+    input.value = this.postalCode;
   }
 
   // Step 3
@@ -297,8 +321,21 @@ export class RegisterPage {
   toStep3(): void {
     this.emailError.set(null);
     this.mobileError.set(null);
-    if (!this.email || !this.mobileNumber || !this.street || !this.barangay || !this.city || !this.province || !this.postalCode) {
-      this.error.set('Please complete all required fields.');
+    // Named per field rather than one blanket message — a citizen looking at
+    // six filled-in fields and a seventh they missed should be told which one,
+    // not left to hunt for it themselves.
+    const missing: [boolean, string][] = [
+      [!this.email, 'Email Address'],
+      [!this.mobileNumber, 'Mobile Number'],
+      [!this.street, 'House Number / Street'],
+      [!this.barangay, 'Barangay'],
+      [!this.city, 'City / Municipality'],
+      [!this.province, 'Province'],
+      [!this.postalCode, 'Postal Code'],
+    ];
+    const firstMissing = missing.find(([isMissing]) => isMissing);
+    if (firstMissing) {
+      this.error.set(`${firstMissing[1]} is required.`);
       return;
     }
     if (!RegisterPage.EMAIL_PATTERN.test(this.email)) {
