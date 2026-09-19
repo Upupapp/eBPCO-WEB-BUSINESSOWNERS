@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
 import { ApplicationLifecycleStatus, LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
@@ -9,13 +10,28 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { ApplicationDocumentsComponent } from './application-documents.component';
 import { PermitReleaseComponent } from './permit-release.component';
 import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
-import { ApplicationDocument } from '../../core/domain/document.model';
+import { SavedDocumentFileType } from '../../core/domain/document.model';
 import { PermitRelease } from '../../core/api/citizen-api.models';
 import { DocumentResubmissionService, toBase64 } from '../../core/api/document-resubmission.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/api/citizen-api.models';
+
+/** Same extension-sniffing fallback as my-documents.page.ts / application-wizard.page.ts. */
+function fileTypeFromName(name: string): SavedDocumentFileType {
+  const ext = name.split('.').pop()?.toLowerCase();
+  if (ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'pdf') return ext as SavedDocumentFileType;
+  return 'pdf';
+}
+
+/** Everything `app-document-preview` actually reads — not the full `ApplicationDocument` shape, which a real, backend-fetched document has no local checklist/history for. */
+interface PreviewableDocument {
+  file: File | null;
+  fileName: string;
+  fileType: SavedDocumentFileType;
+  label: string;
+}
 
 @Component({
   selector: 'app-application-details',
@@ -283,17 +299,37 @@ export class ApplicationDetailsPage {
    * of the key's fingerprint and 409s a mismatch.
    */
   /** DOC-003. The document currently open for inspection, or null. */
-  protected readonly previewing = signal<ApplicationDocument | null>(null);
+  protected readonly previewing = signal<PreviewableDocument | null>(null);
 
   /**
    * Resolve the contract shape back to the file this build kept.
    *
    * The server's document response describes a document; it does not contain
-   * one. Matching on id rather than filename because two requirements can
-   * legitimately hold files of the same name.
+   * one. `contractDocs()` prefers `realDocuments()` the moment it is fetched,
+   * so once that has loaded, every id "Preview" is clicked with belongs to
+   * the real backend, not the local demo store — looking it up in `docs()`
+   * (as this used to, unconditionally) always missed, because a
+   * server-generated UUID never matches a seeded demo id, and silently did
+   * nothing. Fetches the real signed URL the same way
+   * `application-wizard.page.ts`'s `reuseExisting()` already does, and falls
+   * back to the local demo lookup only when nothing real was ever fetched.
    */
-  protected onPreview(doc: ApplicationDocumentResponse): void {
-    this.previewing.set(this.docs().find((d) => d.id === doc.id) ?? null);
+  protected async onPreview(doc: ApplicationDocumentResponse): Promise<void> {
+    if (this.realDocuments() === null) {
+      const local = this.docs().find((d) => d.id === doc.id);
+      this.previewing.set(local ? { file: local.file, fileName: local.fileName, fileType: local.fileType, label: local.label } : null);
+      return;
+    }
+    try {
+      const { url } = await firstValueFrom(this.api.getDocumentContent(doc.id));
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`fetch failed: ${response.status}`);
+      const blob = await response.blob();
+      const file = new File([blob], doc.fileName, { type: blob.type || doc.contentType });
+      this.previewing.set({ file, fileName: doc.fileName, fileType: fileTypeFromName(doc.fileName), label: doc.label });
+    } catch {
+      this.toast.error(`Could not open "${doc.label}". Try again.`);
+    }
   }
 
   /**
