@@ -37,7 +37,7 @@ describe('PermitDocumentPage (F-2: demo permits cannot print clean)', () => {
     expect(permit!.provenance).toBe('demo');
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('NOT VALID AS AN OFFICIAL PERMIT');
+    expect(text).toContain('SAMPLE — NOT AN OFFICIAL PERMIT');
   });
 
   it('withholds the verification QR from a document it has not cleared', () => {
@@ -74,7 +74,7 @@ describe('PermitDocumentPage (F-2: demo permits cannot print clean)', () => {
 
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('NOT VALID AS AN OFFICIAL PERMIT');
+    expect(text).toContain('SAMPLE — NOT AN OFFICIAL PERMIT');
   });
 });
 

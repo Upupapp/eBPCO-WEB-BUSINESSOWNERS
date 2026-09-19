@@ -9,9 +9,17 @@ import { RouterLink } from '@angular/router';
       <div class="card auth-card anim-pop-in" style="width:100%; max-width:420px; text-align:center;">
         <div class="badge badge-green anim-flip-in" style="margin-bottom:12px; animation-delay:0.15s;">Account Created</div>
         <h2>Welcome to eBPCO</h2>
+        <!--
+          Used to say "...in this demonstration build. It exists in your
+          browser and is saved when you close or refresh the page." That was
+          true while registration wrote to a local, in-browser store. It now
+          calls the real POST /auth/register (auth.service.ts's register())
+          and the account is a real row in the real database from this
+          screen onward -- telling the citizen otherwise is the F-16 defect
+          in the other direction.
+        -->
         <p class="muted">
-          Your account has been created in this demonstration build. It exists in your browser 
-          and is saved when you close or refresh the page.
+          Your account has been created.
         </p>
         <!--
           F-16: this used to say "Please verify your email and mobile number from

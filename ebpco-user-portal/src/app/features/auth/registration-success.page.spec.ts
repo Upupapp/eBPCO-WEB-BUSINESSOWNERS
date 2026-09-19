@@ -36,8 +36,16 @@ describe('RegistrationSuccessPage (F-16: no instruction without a control)', () 
   });
 
   it('does not imply the account reached the Municipality', () => {
+    // Used to assert 'demonstration build' / 'browser only' here, because
+    // registration used to write to a local, in-browser store and that was
+    // the honest thing to say. It now calls the real POST /auth/register
+    // (auth.service.ts's register()), so the false half of the old claim --
+    // the account isn't real -- is gone; what remains to guard is the other
+    // half, that creating an account is not the same as an office having
+    // reviewed anything.
     const text = (render().nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('demonstration build');
-    expect(text).toContain('browser only');
+    expect(text).toContain('account has been created');
+    expect(text).not.toContain('reviewed');
+    expect(text).not.toContain('approved');
   });
 });

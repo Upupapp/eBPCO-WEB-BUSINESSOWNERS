@@ -77,13 +77,16 @@ describe('Payment state is one fact (task 8)', () => {
  * Guards task 11: the receipt's cleared state must be EARNED, not inherited
  * from missing data.
  *
- * `watermarkText()` returned null when there was no payment — the same value
- * that means "genuine, no watermark" — so `gateCleared` was true precisely when
- * the data was absent. It is dead through the rendered page, because the
- * document sits inside @if (payment(); as tx), which is why a render-level test
- * cannot fail on it. So this asserts the gate itself: one refactor moving that
- * @if is all it takes for a receipt with no payment behind it to claim it is a
- * "system-generated Official Receipt issued by the Municipality".
+ * `watermarkText()` used to return null when there was no payment — the same
+ * value that meant "genuine, no watermark" — so `gateCleared` was true
+ * precisely when the data was absent. The watermark is now a fixed constant
+ * (see payment-receipt.page.ts's own doc comment: "permanent, not a gate"),
+ * so that specific failure mode no longer exists -- nothing can clear it.
+ * What still matters, and is still asserted here, is `gateCleared` itself:
+ * it still drives "Official Receipt" vs "Payment Acknowledgment" and the
+ * signature block, and it is dead through the rendered page (the document
+ * sits inside @if (payment(); as tx)), which is why a render-level test
+ * cannot fail on it.
  */
 describe('PaymentReceiptPage (task 11: cleared is earned, not inherited)', () => {
   function gate(hasPayment: boolean) {
@@ -109,15 +112,16 @@ describe('PaymentReceiptPage (task 11: cleared is earned, not inherited)', () =>
     });
     const fixture = TestBed.createComponent(PaymentReceiptPage);
     fixture.detectChanges();
-    return fixture.componentInstance as unknown as { gateCleared(): boolean; watermarkText(): string | null };
+    return fixture.componentInstance as unknown as { gateCleared(): boolean; watermarkText: string };
   }
   afterEach(() => TestBed.resetTestingModule());
 
   it('is NOT cleared when there is no payment at all', () => {
     const page = gate(false);
     expect(page.gateCleared()).toBe(false);
-    // And absence must not produce the "genuine" watermark value either.
-    expect(page.watermarkText()).not.toBeNull();
+    // The watermark is a fixed constant now (never data-derived), so this
+    // is really asserting it is still wired into the template at all.
+    expect(page.watermarkText).toBe('SAMPLE — NOT AN OFFICIAL RECEIPT');
   });
 
   it('is not cleared for a payment with no OR number — only a cashier assigns one', () => {
