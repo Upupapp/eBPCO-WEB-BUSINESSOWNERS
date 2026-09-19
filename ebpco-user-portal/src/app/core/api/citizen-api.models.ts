@@ -209,6 +209,21 @@ export interface BusinessSummary extends SubmitBusinessRequest {
   status: string;
 }
 
+/**
+ * `PATCH /businesses/:id` — matches `businessUpdateShape` in
+ * `businesses.controller.ts`: the owner-editable subset only.
+ * `registrationNumber`/`dateRegistered`/`status` are not here at all —
+ * the server rejects them (`.strict()`), not just ignores them.
+ */
+export interface UpdateBusinessRequest {
+  name: string;
+  category: SubmitBusinessRequest['category'];
+  street: string;
+  barangay: string;
+  city: string;
+  province: string;
+}
+
 /** `GET /businesses` — `{ data }`, not a bare array. */
 export interface BusinessListResponse {
   data: BusinessSummary[];

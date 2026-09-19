@@ -99,3 +99,43 @@ describe('Editing a business', () => {
     ).toThrow(/could not be found/i);
   });
 });
+
+/**
+ * Deactivating/reactivating a business — the local-demo half of the same
+ * feature `edit-business.page.ts` exercises for real once a backend is
+ * configured (see `business.store.ts`'s `deactivateReal`/`reactivateReal`).
+ */
+describe('Deactivating a business (local demo)', () => {
+  let businesses: BusinessStore;
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+    businesses = TestBed.inject(BusinessStore);
+  });
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('flips status to Inactive', () => {
+    const b = businesses.myBusinesses()[0];
+    businesses.setStatus(b.id, 'Inactive');
+    expect(businesses.businessById(b.id)!.status).toBe('Inactive');
+  });
+
+  it('is reversible', () => {
+    const b = businesses.myBusinesses()[0];
+    businesses.setStatus(b.id, 'Inactive');
+    businesses.setStatus(b.id, 'Active');
+    expect(businesses.businessById(b.id)!.status).toBe('Active');
+  });
+
+  it('refuses a business the citizen does not own', () => {
+    expect(() => businesses.setStatus('biz-does-not-exist', 'Inactive')).toThrow(/could not be found/i);
+  });
+});

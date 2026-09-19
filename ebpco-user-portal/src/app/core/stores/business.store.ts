@@ -76,7 +76,12 @@ export class BusinessStore {
    */
   private readonly realBusinesses = signal<Business[] | null>(null);
 
-  /** True once real data is the source of truth — gates the Edit action (C-5, write-once server-side). */
+  /**
+   * True once real data is the source of truth. `updateReal`/`deactivateReal`/
+   * `reactivateReal` exist now (PATCH /businesses/:id and its two status
+   * routes) — this no longer gates WHETHER a citizen may edit a business,
+   * only which methods (`update()` vs `updateReal()`) the page should call.
+   */
   readonly usingReal = computed(() => this.realBusinesses() !== null);
 
   constructor(private readonly auth: AuthService) {
@@ -180,10 +185,7 @@ export class BusinessStore {
       await this.refreshMine();
       return { ok: true, id: summary.id };
     } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Check your connection and try again.',
-      };
+      return { ok: false, error: this.messageFor(error) };
     }
   }
 
@@ -219,5 +221,63 @@ export class BusinessStore {
     };
     this.businesses.update((list) => list.map((b) => (b.id === id ? updated : b)));
     return updated;
+  }
+
+  /** Local-demo counterpart to `deactivateReal`/`reactivateReal` below — same ownership guard as `update()`, no server call. */
+  setStatus(id: string, status: Business['status']): Business {
+    const ownerId = this.auth.currentUser()?.id;
+    const existing = this.businesses().find((b) => b.id === id);
+    if (!existing || !ownerId || existing.ownerApplicantId !== ownerId) {
+      throw new Error('That business could not be found in your account.');
+    }
+    const updated: Business = { ...existing, status };
+    this.businesses.update((list) => list.map((b) => (b.id === id ? updated : b)));
+    return updated;
+  }
+
+  /** `PATCH /businesses/:id` for real — the same field set `update()` above changes locally, sent to the server and the real list refreshed from its answer. */
+  async updateReal(id: string, input: EditBusinessInput): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(this.api.updateBusiness(id, {
+        name: input.name.trim(),
+        category: input.category,
+        street: input.street.trim(),
+        barangay: input.barangay.trim(),
+        city: input.city.trim(),
+        province: input.province.trim(),
+      }));
+      await this.refreshMine();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: this.messageFor(error) };
+    }
+  }
+
+  /** `POST /businesses/:id/deactivate` — the server itself refuses this while an application against the business is still in progress; see that route's own doc comment. */
+  async deactivateReal(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(this.api.deactivateBusiness(id));
+      await this.refreshMine();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: this.messageFor(error) };
+    }
+  }
+
+  /** `POST /businesses/:id/reactivate` — reverses `deactivateReal`. */
+  async reactivateReal(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(this.api.reactivateBusiness(id));
+      await this.refreshMine();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: this.messageFor(error) };
+    }
+  }
+
+  private messageFor(error: unknown): string {
+    return error instanceof ApiError
+      ? error.citizenMessage
+      : 'We could not reach the Municipality’s system. Check your connection and try again.';
   }
 }

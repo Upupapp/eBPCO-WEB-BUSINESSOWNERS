@@ -1,10 +1,11 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
 import { applicantStatusOf } from '../../core/domain/status.model';
 import { formatDate } from '../../core/utils/ids';
+import { ToastService } from '../../shared/ui/toast.service';
 
 @Component({
   selector: 'app-business-details',
@@ -18,12 +19,31 @@ import { formatDate } from '../../core/utils/ids';
             <div class="subtitle">{{ b.category }} · Reg. No. {{ b.registrationNumber }} · Registered {{ formatDate(b.dateRegistered) }}</div>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            @if (!businessStore.usingReal()) {
-              <a [routerLink]="['/businesses', b.id, 'edit']" class="btn btn-secondary">Edit Business</a>
+            <a [routerLink]="['/businesses', b.id, 'edit']" class="btn btn-secondary">Edit Business</a>
+            @if (b.status === 'Active') {
+              <button
+                class="btn btn-secondary"
+                type="button"
+                [disabled]="changingStatus()"
+                (click)="deactivate(b.id)"
+              >{{ changingStatus() ? 'Deactivating…' : 'Deactivate' }}</button>
+            } @else {
+              <button
+                class="btn btn-secondary"
+                type="button"
+                [disabled]="changingStatus()"
+                (click)="reactivate(b.id)"
+              >{{ changingStatus() ? 'Reactivating…' : 'Reactivate' }}</button>
             }
             <a [routerLink]="['/permits']" [queryParams]="{ businessId: b.id }" class="btn btn-primary">Apply for Permit</a>
           </div>
         </div>
+
+        @if (statusError(); as err) {
+          <div class="card" style="background:var(--danger-50, #fff5f5); border:1px solid var(--danger-200, #f5c2c7); margin-bottom:16px;">
+            {{ err }}
+          </div>
+        }
 
         <div class="card" style="margin-bottom:16px;">
           <div class="card-title">Business Address</div>
@@ -66,9 +86,13 @@ export class BusinessDetailsPage {
   private readonly route = inject(ActivatedRoute);
   protected readonly businessStore = inject(BusinessStore);
   private readonly applicationStore = inject(ApplicationStore);
+  private readonly toast = inject(ToastService);
 
   protected readonly formatDate = formatDate;
   protected readonly applicantStatusOf = applicantStatusOf;
+
+  protected readonly changingStatus = signal(false);
+  protected readonly statusError = signal<string | null>(null);
 
   business() {
     const id = this.route.snapshot.paramMap.get('id')!;
@@ -78,5 +102,47 @@ export class BusinessDetailsPage {
   appsForBusiness() {
     const id = this.route.snapshot.paramMap.get('id')!;
     return this.applicationStore.myApplications().filter((a) => a.businessId === id);
+  }
+
+  protected async deactivate(id: string): Promise<void> {
+    this.statusError.set(null);
+    if (!this.businessStore.usingReal()) {
+      try {
+        this.businessStore.setStatus(id, 'Inactive');
+        this.toast.success('Business deactivated.');
+      } catch (e) {
+        this.statusError.set(e instanceof Error ? e.message : 'That change could not be saved.');
+      }
+      return;
+    }
+    this.changingStatus.set(true);
+    const result = await this.businessStore.deactivateReal(id);
+    this.changingStatus.set(false);
+    if (!result.ok) {
+      this.statusError.set(result.error);
+      return;
+    }
+    this.toast.success('Business deactivated. Reactivate it any time from this page.');
+  }
+
+  protected async reactivate(id: string): Promise<void> {
+    this.statusError.set(null);
+    if (!this.businessStore.usingReal()) {
+      try {
+        this.businessStore.setStatus(id, 'Active');
+        this.toast.success('Business reactivated.');
+      } catch (e) {
+        this.statusError.set(e instanceof Error ? e.message : 'That change could not be saved.');
+      }
+      return;
+    }
+    this.changingStatus.set(true);
+    const result = await this.businessStore.reactivateReal(id);
+    this.changingStatus.set(false);
+    if (!result.ok) {
+      this.statusError.set(result.error);
+      return;
+    }
+    this.toast.success('Business reactivated.');
   }
 }

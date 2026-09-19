@@ -77,7 +77,9 @@ import { ToastService } from '../../shared/ui/toast.service';
 
           <div style="display:flex; gap:10px; margin-top:14px;">
             <a class="btn btn-secondary" [routerLink]="['/businesses', id]">Cancel</a>
-            <button class="btn btn-primary" (click)="save()">Save Changes</button>
+            <button class="btn btn-primary" [disabled]="saving()" (click)="save()">
+              {{ saving() ? 'Saving…' : 'Save Changes' }}
+            </button>
           </div>
         </div>
       } @else {
@@ -136,24 +138,39 @@ export class EditBusinessPage {
       .filter((a) => a.businessId === this.id && a.lifecycleStatus !== 'Draft').length;
   }
 
-  save(): void {
+  protected readonly saving = signal(false);
+
+  async save(): Promise<void> {
     if (!this.name.trim() || !this.street.trim() || !this.barangay.trim() || !this.city.trim() || !this.province.trim()) {
       this.error.set('Please complete every required field.');
       return;
     }
-    try {
-      this.store.update(this.id, {
-        name: this.name,
-        category: this.category,
-        street: this.street,
-        barangay: this.barangay,
-        city: this.city,
-        province: this.province,
-      });
-    } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'That change could not be saved.');
-      return;
+    const input = {
+      name: this.name,
+      category: this.category,
+      street: this.street,
+      barangay: this.barangay,
+      city: this.city,
+      province: this.province,
+    };
+
+    if (this.store.usingReal()) {
+      this.saving.set(true);
+      const result = await this.store.updateReal(this.id, input);
+      this.saving.set(false);
+      if (!result.ok) {
+        this.error.set(result.error);
+        return;
+      }
+    } else {
+      try {
+        this.store.update(this.id, input);
+      } catch (e) {
+        this.error.set(e instanceof Error ? e.message : 'That change could not be saved.');
+        return;
+      }
     }
+
     this.error.set(null);
     // Says what was and was not changed. "Saved" alone would let a citizen
     // believe their in-progress applications moved with it.

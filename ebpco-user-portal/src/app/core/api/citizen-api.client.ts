@@ -29,6 +29,7 @@ import {
   SubmitPaymentRequest,
   SubmitPaymentResult,
   TimelineEntryResponse,
+  UpdateBusinessRequest,
   UploadDocumentRequest,
   UploadDocumentResult,
 } from './citizen-api.models';
@@ -382,15 +383,38 @@ export class CitizenApiClient {
 
   /**
    * `POST /businesses` — register a business. No Idempotency-Key: not in
-   * `applicant-write.controller.ts`, and there is genuinely no route to
-   * change or remove one once created (C-5, write-once) — see
-   * `business.store.ts`'s own doc comment on why an Edit action must not be
-   * offered once this is wired for real.
+   * `applicant-write.controller.ts`. `updateBusiness`/`deactivateBusiness`/
+   * `reactivateBusiness` below are the real routes for changing or retiring
+   * one afterward.
    */
   registerBusiness(body: SubmitBusinessRequest): Observable<BusinessSummary> {
     if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http
       .post<BusinessSummary>(`${this.baseUrl}/businesses`, body)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `PATCH /businesses/:id` — corrects the owner-editable fields only; see `UpdateBusinessRequest`'s own doc comment for what that excludes and why. */
+  updateBusiness(businessId: string, body: UpdateBusinessRequest): Observable<BusinessSummary> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .patch<BusinessSummary>(`${this.baseUrl}/businesses/${encodeURIComponent(businessId)}`, body)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `POST /businesses/:id/deactivate` — marks Inactive; the server refuses a hard delete is not offered because one is never possible once a business has any application on file (`applications.business_id` is `on delete restrict`). */
+  deactivateBusiness(businessId: string): Observable<BusinessSummary> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<BusinessSummary>(`${this.baseUrl}/businesses/${encodeURIComponent(businessId)}/deactivate`, {})
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `POST /businesses/:id/reactivate` — reverses `deactivateBusiness`. */
+  reactivateBusiness(businessId: string): Observable<BusinessSummary> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .post<BusinessSummary>(`${this.baseUrl}/businesses/${encodeURIComponent(businessId)}/reactivate`, {})
       .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 
