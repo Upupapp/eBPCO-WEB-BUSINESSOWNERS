@@ -40,9 +40,6 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
                     @for (d of visual.icon; track d) { <path [attr.d]="d" /> }
                   </svg>
                 </div>
-                <span class="badge permit-status" [class]="verified(type) ? 'badge-green' : 'badge-amber'">
-                  {{ verified(type) ? 'Verified Checklist' : 'Pending Verification' }}
-                </span>
               </div>
               <div class="permit-card__identity">
                 <h4 class="permit-card__name">{{ type }}</h4>
@@ -172,9 +169,5 @@ export class PermitCatalogPage {
 
   documentCount(type: PermitType): number {
     return this.catalog[type].documents.length;
-  }
-
-  verified(type: PermitType): boolean {
-    return this.catalog[type].verificationStatus === 'CASTILLA_OFFICIAL_FORM_VERIFIED';
   }
 }

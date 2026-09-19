@@ -33,7 +33,7 @@ type Filter = 'All' | 'Unread';
                 <div style="font-weight:600;" [class.muted]="n.isRead">{{ n.title }}</div>
                 <div class="small muted">{{ n.message }}</div>
                 @if (n.applicationId) {
-                  <a [routerLink]="['/applications', n.applicationId]" class="small" (click)="$event.stopPropagation()">View Application</a>
+                  <a [routerLink]="['/applications', n.applicationId]" class="small" (click)="onViewApplication($event, n.id)">View Application</a>
                 }
               </div>
               <div class="small muted" style="white-space:nowrap;">{{ formatDateTime(n.createdAt) }}</div>
@@ -59,6 +59,20 @@ export class NotificationsPage {
       return;
     }
     this.store.markRead(id);
+  }
+
+  /**
+   * "View Application" used to only `stopPropagation()`, which blocked the
+   * row's own `(click)="markRead(n.id)"` from ever firing -- so the ONE
+   * action a citizen actually takes on a notification (going to look at
+   * what changed) was the one action that never marked it read. Confirmed
+   * live: viewing the application left the unread count unchanged. Still
+   * stops propagation (so the row's own handler doesn't ALSO run and race
+   * a second call), but now marks it explicitly first.
+   */
+  onViewApplication(event: Event, id: string): void {
+    event.stopPropagation();
+    this.markRead(id);
   }
 
   markAllRead(): void {

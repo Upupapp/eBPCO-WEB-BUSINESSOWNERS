@@ -73,9 +73,6 @@ const ACTION_LABEL: Record<ApplicationAction, string> = {
         </div>
 
         <div class="req-modal-body">
-          <span class="badge req-modal-status" [class]="verified() ? 'badge-green' : 'badge-amber'">
-            {{ verified() ? 'Verified Checklist' : 'Pending Verification' }}
-          </span>
           @if (loading()) {
             <p class="small muted" style="margin:14px 0;">Checking for the LGU's published checklist…</p>
           }
@@ -181,9 +178,6 @@ export class RequirementsModalComponent implements OnInit, AfterViewInit, OnDest
    * bound it — reading it eagerly here is what NG8118 refuses to compile.
    */
   protected readonly entry = computed(() => requirementsFor(this.permitType()));
-  protected readonly verified = computed(
-    () => this.entry().verificationStatus === 'CASTILLA_OFFICIAL_FORM_VERIFIED',
-  );
   protected readonly formAsset = computed(() => permitFormAssetFor(this.permitType()));
 
   /** Real checklist per action, once loaded; absent means "not asked yet or the LGU hasn't published one" — falls back to the static catalog either way. */
