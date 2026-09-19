@@ -9,7 +9,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "check:assets": "node scripts/check-no-third-party-assets.mjs",
-    "verify": "npm run check:assets && npm run check:print && npm run check:labels && npm run check:headings && npm run check:vocab && npm run check:screens && npm run check:register && npm run check:headers && npm run build && npm run check:a11y && npm run check:journeys && npm test -- --watch=false",
+    "verify": "npm run check:assets && npm run check:print && npm run check:labels && npm run check:headings && npm run check:vocab && npm run check:screens && npm run check:register && npm run check:headers && npm run build && npm run check:csp && npm run check:a11y && npm run check:journeys && npm test -- --watch=false",
     "check:print": "node scripts/check-print-safety.mjs",
     "check:labels": "node scripts/check-form-labels.mjs",
     "check:headings": "node scripts/check-heading-scale.mjs",
@@ -18,7 +18,8 @@
     "check:screens": "node scripts/check-screen-inventory.mjs",
     "check:journeys": "node scripts/check-journeys.mjs",
     "check:register": "node scripts/check-register-strict.mjs",
-    "check:headers": "node scripts/check-security-headers.mjs"
+    "check:headers": "node scripts/check-security-headers.mjs",
+    "check:csp": "node scripts/check-csp-compatible-build.mjs"
   },
   "private": true,
   "packageManager": "npm@11.0.0",
