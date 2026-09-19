@@ -5,7 +5,13 @@
   <title>eBPCO Citizen Portal</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="logo.png">
+  <!-- The Municipality of Castilla, Sorsogon seal, as real icons generated from
+       logo.png (which is 603 KB and 778x721 — too heavy to be the tab icon
+       itself). favicon.ico was the Angular CLI placeholder until 19 Sep 2026;
+       browsers that fall back to /favicon.ico showed the Angular logo. -->
+  <link rel="icon" href="/favicon.ico?v=2" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <!--
     F-8: no third-party font host. Gothic A1 is bundled in src/fonts.scss and
     served from this origin. Do not reintroduce a fonts.googleapis.com or
