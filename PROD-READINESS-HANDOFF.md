@@ -32,6 +32,20 @@ page. Now opens the same in-place modal the registration form already uses.
 **Security headers**, same gap and same fix as the Admin Portal's — see that
 repo's handoff for the reasoning. `check:headers` wired into `npm run verify`.
 
+**That CSP header then broke the live login page entirely, and went unnoticed
+until the owner asked for a localhost-vs-Netlify parity check.** Confirmed
+live at the deployed URL: `/login` rendered as raw, unstyled HTML — no red
+theme, no card, default browser form controls. Root cause: Angular's
+production build (critical-CSS inlining, on by default) emits a deferred
+stylesheet `<link media="print" onload="this.media='all'">` with a
+`<noscript>` fallback that never activates (JS is enabled; only that one
+inline handler is blocked by the new `script-src 'self'`). The onboarding
+carousel broke the same way (all three slides shown at once, no pagination).
+`ng serve` sends no CSP header at all, so this was invisible in dev by
+construction. Fixed by disabling `optimization.styles.inlineCritical`, with
+a new `scripts/check-csp-compatible-build.mjs` gate that reads the real
+build output for any inline `on*=` handler.
+
 **Investigated and found NOT a bug:** `verify-permit.page.ts` (the public,
 no-login QR-verification page) unconditionally tells a visitor "eBPCO is a
 demonstration build... no permit issued by the Municipality can be confirmed
