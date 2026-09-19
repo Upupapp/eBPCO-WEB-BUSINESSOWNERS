@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { BUSINESS_CATEGORIES, BusinessCategory } from '../../core/domain/business.model';
+import { CASTILLA_BARANGAYS } from '../../core/domain/ph-reference-data';
 import { ToastService } from '../../shared/ui/toast.service';
 
 /**
@@ -50,16 +51,23 @@ import { ToastService } from '../../shared/ui/toast.service';
           <div class="form-row">
             <div class="field">
               <label for="edit-business-barangay">Barangay<span class="required">*</span></label>
-              <input id="edit-business-barangay" class="input" [(ngModel)]="barangay" />
+              <select id="edit-business-barangay" class="input" [(ngModel)]="barangay">
+                <option value="" disabled>Select</option>
+                @for (b of barangays; track b) { <option [value]="b">{{ b }}</option> }
+              </select>
             </div>
             <div class="field">
               <label for="edit-business-city">City / Municipality<span class="required">*</span></label>
-              <input id="edit-business-city" class="input" [(ngModel)]="city" />
+              <select id="edit-business-city" class="input" [(ngModel)]="city">
+                <option value="Castilla">Castilla</option>
+              </select>
             </div>
           </div>
           <div class="field">
             <label for="edit-business-province">Province<span class="required">*</span></label>
-            <input id="edit-business-province" class="input" [(ngModel)]="province" />
+            <select id="edit-business-province" class="input" [(ngModel)]="province">
+              <option value="Sorsogon">Sorsogon</option>
+            </select>
           </div>
 
           @if (openApplicationCount() > 0) {
@@ -99,6 +107,7 @@ export class EditBusinessPage {
   private readonly toast = inject(ToastService);
 
   readonly categories = BUSINESS_CATEGORIES;
+  readonly barangays = CASTILLA_BARANGAYS;
   readonly error = signal<string | null>(null);
 
   readonly id = this.route.snapshot.paramMap.get('id')!;
