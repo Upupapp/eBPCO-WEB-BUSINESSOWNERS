@@ -66,12 +66,38 @@
               <div class="field"><label for="profile-mobile-number-5">Mobile Number</label><input id="profile-mobile-number-5" class="input" [(ngModel)]="mobileNumber" /></div>
               <div class="field"><label for="profile-address-6">Address</label><input id="profile-address-6" class="input" [(ngModel)]="street" /></div>
             </div>
+            <!-- Same choices as sign-up (register.page.ts), so an address cannot be
+                 spelled one way there and another way here. -->
             <div class="form-row">
-              <div class="field"><label for="profile-barangay-7">Barangay</label><input id="profile-barangay-7" class="input" [(ngModel)]="barangay" /></div>
-              <div class="field"><label for="profile-city-municipality-8">City / Municipality</label><input id="profile-city-municipality-8" class="input" [(ngModel)]="city" /></div>
+              <div class="field">
+                <label for="profile-barangay-7">Barangay</label>
+                <select id="profile-barangay-7" class="input" [(ngModel)]="barangay">
+                  <option value="" disabled>Select</option>
+                  @for (b of barangayOptions; track b) {
+                    <option [value]="b">{{ b }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label for="profile-city-municipality-8">City / Municipality</label>
+                <select id="profile-city-municipality-8" class="input" [(ngModel)]="city">
+                  <option value="" disabled>Select</option>
+                  @for (c of cityOptions; track c) {
+                    <option [value]="c">{{ c }}</option>
+                  }
+                </select>
+              </div>
             </div>
             <div class="form-row">
-              <div class="field"><label for="profile-province-9">Province</label><input id="profile-province-9" class="input" [(ngModel)]="province" /></div>
+              <div class="field">
+                <label for="profile-province-9">Province</label>
+                <select id="profile-province-9" class="input" [(ngModel)]="province">
+                  <option value="" disabled>Select</option>
+                  @for (p of provinceOptions; track p) {
+                    <option [value]="p">{{ p }}</option>
+                  }
+                </select>
+              </div>
               <div class="field"><label for="profile-zip-code-10">ZIP Code</label><input id="profile-zip-code-10" class="input" [(ngModel)]="postalCode" /></div>
             </div>
 
@@ -306,11 +332,14 @@
           <div class="card">
             <h4>Terms &amp; Conditions</h4>
             <p class="small muted">{{ termsText }}</p>
-            <a routerLink="/terms" class="small">Read full Terms &amp; Conditions</a>
+            <button type="button" class="link-button small" (click)="openLegalModal.set('terms')">Read full Terms &amp; Conditions</button>
             <h4 style="margin-top:16px;">Privacy Policy</h4>
             <p class="small muted">{{ privacyText }}</p>
-            <a routerLink="/privacy" class="small">Read full Privacy Policy</a>
+            <button type="button" class="link-button small" (click)="openLegalModal.set('privacy')">Read full Privacy Policy</button>
           </div>
+          @if (openLegalModal(); as doc) {
+            <app-legal-modal [document]="doc" (close)="openLegalModal.set(null)" />
+          }
         }
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
 import { TERMS_CONDITIONS_TEXT, PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -14,12 +14,14 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { formatDateTime } from '../../core/utils/ids';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
+import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
+import { CASTILLA_BARANGAYS } from '../../core/domain/ph-reference-data';
 
 type Tab = 'profile' | 'password' | 'notifications' | 'privacy' | 'legal';
 
 @Component({
   selector: 'app-profile',
-  imports: [FormsModule, RouterLink, CapitalizeNameDirective],
+  imports: [FormsModule, CapitalizeNameDirective, LegalModalComponent],
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.scss',
 })
@@ -38,6 +40,13 @@ export class ProfilePage {
   readonly passwordError = signal<string | null>(null);
   readonly termsText = TERMS_CONDITIONS_TEXT;
   readonly privacyText = PRIVACY_POLICY_TEXT;
+  /**
+   * The Legal tab's "Read full …" links open the same overlay the sign-up
+   * form uses, rather than navigating to /terms or /privacy. Those pages'
+   * "Back" goes to /landing unconditionally, so reading the full text from
+   * here used to end on the public landing page instead of back on this tab.
+   */
+  readonly openLegalModal = signal<LegalDocument | null>(null);
 
   /** Fetches the real preferences the first time the tab is opened, not before — nothing else on this page needs them. */
   protected selectTab(next: Tab): void {
@@ -74,6 +83,18 @@ export class ProfilePage {
   city = this.u.city;
   province = this.u.province;
   postalCode = this.u.postalCode;
+
+  /**
+   * The address dropdowns' choices: sign-up's lists (register.page.ts), plus
+   * whatever this account already holds when that is not on them. A recorded
+   * value that a dropdown cannot show would render as blank — reading as
+   * "nothing on file" and, on save, silently replacing it with the first thing
+   * the citizen happens to pick. Keeping it as an option means the screen
+   * shows the truth and changing it is a deliberate act.
+   */
+  readonly barangayOptions = withHeld(CASTILLA_BARANGAYS, this.barangay);
+  readonly cityOptions = withHeld(['Castilla'], this.city);
+  readonly provinceOptions = withHeld(['Sorsogon'], this.province);
 
   readonly initials = signal(this.computeInitials());
 
@@ -465,4 +486,9 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('could not read the file'));
     reader.readAsDataURL(file);
   });
+}
+
+/** `list`, with `held` prepended when it is set and not already there. */
+function withHeld(list: readonly string[], held: string | null | undefined): readonly string[] {
+  return held && !list.includes(held) ? [held, ...list] : list;
 }

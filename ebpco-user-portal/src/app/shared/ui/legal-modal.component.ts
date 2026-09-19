@@ -8,9 +8,10 @@ export type LegalDocument = 'terms' | 'privacy';
  * Terms & Conditions / Privacy Policy, shown in place rather than by
  * navigating to /terms or /privacy.
  *
- * Those two routes still exist (Profile's Legal tab links to them, and they
- * work fine on their own), but linking to them from the middle of a
- * multi-step form is exactly the wrong shape: a real route navigation tears
+ * Those two routes still exist and work fine on their own (the register
+ * form and the Profile page's Legal tab both open this overlay instead), but
+ * linking to them from the middle of a multi-step form is exactly the wrong
+ * shape: a real route navigation tears
  * down the form's component and every field the citizen has already typed
  * with it, and both pages' own "Back" link goes to /landing unconditionally
  * rather than back to wherever the citizen actually came from — so returning
