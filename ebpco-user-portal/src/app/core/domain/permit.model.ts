@@ -3,10 +3,15 @@
 // exactly (PermitType union + ALL_PERMIT_TYPES order) — this is the shared
 // contract between the Admin Portal and this Citizen Portal. Do not add,
 // rename, reorder, or alias any entry without updating both apps.
+//
+// Backend migration 047 (2026-09-19) consolidated what used to be three
+// entries here — 'Building Permit – New Construction', '– Renovation /
+// Alteration', '– Addition / Extension' — into one 'Building Permit'. What
+// documents it asks for now varies by `ApplicationAction` (below) instead of
+// by a permit-type name; see `requirements-catalog.ts` and
+// `citizen-api.client.ts`'s `getRequirementsForPermitType`.
 export type PermitType =
-  | 'Building Permit – New Construction'
-  | 'Building Permit – Renovation / Alteration'
-  | 'Building Permit – Addition / Extension'
+  | 'Building Permit'
   | 'Demolition Permit'
   | 'Zoning / Locational Clearance'
   | 'Architectural Permit'
@@ -25,9 +30,7 @@ export type PermitType =
   | 'FSIC for Occupancy Permit (BFP)';
 
 export const ALL_PERMIT_TYPES: PermitType[] = [
-  'Building Permit – New Construction',
-  'Building Permit – Renovation / Alteration',
-  'Building Permit – Addition / Extension',
+  'Building Permit',
   'Demolition Permit',
   'Zoning / Locational Clearance',
   'Architectural Permit',
@@ -50,13 +53,7 @@ export const ALL_PERMIT_TYPES: PermitType[] = [
 export const PERMIT_TYPE_GROUPS: { label: string; types: PermitType[] }[] = [
   {
     label: 'Building Permit',
-    types: [
-      'Building Permit – New Construction',
-      'Building Permit – Renovation / Alteration',
-      'Building Permit – Addition / Extension',
-      'Demolition Permit',
-      'Zoning / Locational Clearance',
-    ],
+    types: ['Building Permit', 'Demolition Permit', 'Zoning / Locational Clearance'],
   },
   {
     label: 'Ancillary Permits',
@@ -133,25 +130,27 @@ export function isPermitStanding(value: unknown): value is PermitStanding {
 }
 
 /**
- * Every permit type that can arrive on the wire — the office's nineteen
- * construction permits PLUS `'Business Permit'`. **Twenty, not nineteen.**
+ * Every permit type that can arrive on the wire — the office's construction
+ * permits PLUS `'Business Permit'`. **Eighteen, not seventeen.**
  *
- * D-10 made the office's nineteen names the server's keys but deliberately did
+ * D-10 made the office's own names the server's keys but deliberately did
  * NOT remove `'Business Permit'`: the legacy business-permit flow still files
  * against it, and `033_permit_vocabulary.sql` says so in as many words —
- * *"Deleting it here would strand that flow."*
+ * *"Deleting it here would strand that flow."* (The office's own count was
+ * nineteen until migration 047 consolidated three Building Permit sub-type
+ * names into one, making it seventeen — this file's own list above.)
  *
- * The mobile lane held a nineteen-value union and hit exactly this: validation
- * failed, the type came through `null`, and those applications rendered as
- * "Not recorded" — the client claiming not to know something the server had
- * said plainly. Nothing threw. 443 tests stayed green.
+ * The mobile lane held a PermitType-only union and hit exactly this:
+ * validation failed, the type came through `null`, and those applications
+ * rendered as "Not recorded" — the client claiming not to know something the
+ * server had said plainly. Nothing threw. 443 tests stayed green.
  *
- * This portal was worse. It carried nineteen plus a literal
+ * This portal was worse. It carried the office's own names plus a literal
  * `'Business Permit'` — a THIRD spelling, invented here, that no server
  * has ever sent and none would accept. That is the "cast" the D-10 migration
  * complains about: a spelling with no authority, in a place no client can see.
  *
- * If a twenty-first value ever appears, add it here and nowhere else.
+ * If a value beyond these ever appears, add it here and nowhere else.
  */
 export type PublishedPermitType = PermitType | 'Business Permit';
 

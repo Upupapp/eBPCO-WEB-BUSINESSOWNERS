@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { PermitCatalogPage } from './permit-catalog.page';
 import { PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
@@ -34,13 +36,13 @@ describe('Permit form assets (F-13: bundled forms must be reachable)', () => {
     expect(distinct.size).toBeGreaterThan(1);
   });
 
-  it('renders a working download link once a permit\'s requirements are open', () => {
+  it('renders a working download link once a permit\'s requirements popup is open', () => {
     // The defect was a module nobody imported, so assert the RENDER, not the
     // presence of the mapping. Reading the compiled template as a string does
     // not work — Angular compiles it to a function.
     TestBed.configureTestingModule({
       imports: [PermitCatalogPage],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     const fixture = TestBed.createComponent(PermitCatalogPage);
     fixture.detectChanges();
@@ -53,10 +55,13 @@ describe('Permit form assets (F-13: bundled forms must be reachable)', () => {
       (t) => !permitFormAssetFor(t).fileName.includes('unified-application-form'),
     )!;
     expect(type).toBeTruthy();
-    (fixture.componentInstance as unknown as { toggle(t: PermitType): void }).toggle(type);
+    (fixture.componentInstance as unknown as { openRequirements(t: PermitType): void }).openRequirements(type);
     fixture.detectChanges();
 
-    const links = [...(fixture.nativeElement as HTMLElement).querySelectorAll('a[href]')]
+    // RequirementsModalComponent re-parents itself onto <body> (same reason
+    // LegalModalComponent does — see its own doc comment), so the popup's
+    // content lives outside this fixture's own element.
+    const links = [...document.body.querySelectorAll('a[href]')]
       .map((a) => a.getAttribute('href') ?? '')
       .filter((href) => href.includes('assets/permit-forms/'));
 

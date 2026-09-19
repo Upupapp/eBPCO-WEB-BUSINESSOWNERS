@@ -13,7 +13,7 @@ import {
 import { ApplicationDocument, DocumentStatus, SavedDocumentFileType } from '../domain/document.model';
 import { Assessment, AssessmentLineItem, ILLUSTRATIVE_FEE_BASIS } from '../domain/assessment.model';
 import { PaymentMethod, PaymentTransaction } from '../domain/payment.model';
-import { GENERIC_APPLICATION_DOCUMENTS, RequirementDocument, requirementsFor } from '../domain/requirements-catalog';
+import { GENERIC_APPLICATION_DOCUMENTS, RequirementDocument, documentsFor, requirementsFor } from '../domain/requirements-catalog';
 import { nextId, todayIso } from '../utils/ids';
 import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
 import { CitizenApiClient, newIdempotencyKey } from '../api/citizen-api.client';
@@ -177,7 +177,7 @@ export class ApplicationStore {
       businessId: 'biz-1',
       businessName: 'Dela Cruz Hardware & Construction Supply',
       applicantId: 'user-demo',
-      permitType: 'Building Permit – New Construction',
+      permitType: 'Building Permit',
       applicationAction: 'New',
       relatedPermitNumber: null,
       dateSubmitted: '2026-08-10T08:00:00.000Z',
@@ -489,7 +489,7 @@ export class ApplicationStore {
     statusAt: (index: number, total: number) => DocumentStatus,
   ): ApplicationDocument[] {
     if (app.permitType === 'Business Permit') return [];
-    const required = requirementsFor(app.permitType).documents.filter((d) => d.required);
+    const required = documentsFor(app.permitType, app.applicationAction).filter((d) => d.required);
     return required.map((doc, i) => {
       const status = statusAt(i, required.length);
       return {
@@ -525,7 +525,7 @@ export class ApplicationStore {
   documentsResolvedFor(applicationId: string): boolean {
     const app = this.applicationById(applicationId);
     if (!app || app.permitType === 'Business Permit') return true;
-    const required = requirementsFor(app.permitType).documents.filter((d) => d.required);
+    const required = documentsFor(app.permitType, app.applicationAction).filter((d) => d.required);
     const docs = this.documentsFor(applicationId);
     const unresolved: DocumentStatus[] = ['Missing', 'Rejected', 'Revision Required', 'Expired'];
     return required.every((req) => {
@@ -549,20 +549,33 @@ export class ApplicationStore {
    */
   private readonly realRequiredDocuments = signal<Record<string, RequirementDocument[] | null>>({});
 
-  private requirementsKeyFor(permitType: PermitType | 'generic'): string {
+  private permitTypeFor(permitType: PermitType | 'generic'): PublishedPermitType {
     return permitType === 'generic' ? 'Business Permit' : permitType;
   }
 
   /**
-   * Kicks off the real fetch for `permitType` if it hasn't been asked for
-   * yet. Side-effecting (writes `realRequiredDocuments`) — call this from a
-   * constructor or `effect()`, never from inside a `computed()`;
-   * `requiredDocumentsFor` below stays a pure read for exactly that reason.
+   * `applicationAction` folded into the cache key since migration 047:
+   * Building Permit's checklist now varies by it, so the 'New' and
+   * 'Renewal' answers for the same permit type must not overwrite each
+   * other in `realRequiredDocuments`.
    */
-  ensureRequiredDocumentsLoaded(permitType: PermitType | 'generic'): void {
-    const key = this.requirementsKeyFor(permitType);
+  private requirementsKeyFor(permitType: PermitType | 'generic', applicationAction?: ApplicationAction): string {
+    const type = this.permitTypeFor(permitType);
+    return applicationAction === undefined ? type : `${type}::${applicationAction}`;
+  }
+
+  /**
+   * Kicks off the real fetch for `permitType` (and, since migration 047,
+   * `applicationAction` — Building Permit's checklist now varies by it) if
+   * it hasn't been asked for yet. Side-effecting (writes
+   * `realRequiredDocuments`) — call this from a constructor or `effect()`,
+   * never from inside a `computed()`; `requiredDocumentsFor` below stays a
+   * pure read for exactly that reason.
+   */
+  ensureRequiredDocumentsLoaded(permitType: PermitType | 'generic', applicationAction?: ApplicationAction): void {
+    const key = this.requirementsKeyFor(permitType, applicationAction);
     if (key in this.realRequiredDocuments()) return;
-    this.api.getRequirementsForPermitType(key).subscribe({
+    this.api.getRequirementsForPermitType(this.permitTypeFor(permitType), applicationAction).subscribe({
       next: (result) => {
         const docs: RequirementDocument[] = result.documents.map((d) => ({
           id: d.code,
@@ -580,15 +593,15 @@ export class ApplicationStore {
   }
 
   /**
-   * True once the real, live checklist for `permitType` has actually
-   * loaded (not merely requested) — check this before sending a
-   * document's `id` as `requirementCode`. A static-catalog id sent as one
+   * True once the real, live checklist for `permitType`/`applicationAction`
+   * has actually loaded (not merely requested) — check this before sending
+   * a document's `id` as `requirementCode`. A static-catalog id sent as one
    * is a real, honest server refusal: the two id schemes only coincide
    * because nothing has re-published this permit type's checklist since
    * it was first seeded — see `requirements.controller.ts`.
    */
-  hasRealRequiredDocuments(permitType: PermitType | 'generic'): boolean {
-    return !!this.realRequiredDocuments()[this.requirementsKeyFor(permitType)];
+  hasRealRequiredDocuments(permitType: PermitType | 'generic', applicationAction?: ApplicationAction): boolean {
+    return !!this.realRequiredDocuments()[this.requirementsKeyFor(permitType, applicationAction)];
   }
 
   /**
@@ -596,10 +609,10 @@ export class ApplicationStore {
    * it, else the static catalog — never triggers the fetch itself (see
    * that method's own doc comment on why this one must stay pure).
    */
-  requiredDocumentsFor(permitType: PermitType | 'generic'): RequirementDocument[] {
-    const real = this.realRequiredDocuments()[this.requirementsKeyFor(permitType)];
+  requiredDocumentsFor(permitType: PermitType | 'generic', applicationAction?: ApplicationAction): RequirementDocument[] {
+    const real = this.realRequiredDocuments()[this.requirementsKeyFor(permitType, applicationAction)];
     if (real) return real;
-    return permitType === 'generic' ? GENERIC_APPLICATION_DOCUMENTS : requirementsFor(permitType).documents;
+    return permitType === 'generic' ? GENERIC_APPLICATION_DOCUMENTS : documentsFor(permitType, applicationAction ?? 'New');
   }
 
   /** Creates a Draft application — the applicant fills documents in before submitting. */

@@ -38,7 +38,8 @@ export interface UserAccount {
   city: string;
   province: string;
   postalCode: string;
-  photoPath: string | null;
+  /** Whether `GET /me/photo` has bytes — never the bytes/URL themselves. See `AuthService.photoUrl` for the real, fetched image. */
+  hasPhoto: boolean;
   accountStatus: AccountStatus;
   emailVerification: ContactVerification;
   mobileVerification: ContactVerification;
@@ -49,26 +50,11 @@ export function fullName(user: Pick<UserAccount, 'firstName' | 'middleName' | 'l
   return [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ');
 }
 
-export interface NotificationPreferences {
-  applicationUpdates: boolean;
-  paymentNotifications: boolean;
-  permitStatusUpdates: boolean;
-  documentReminders: boolean;
-  systemAnnouncements: boolean;
-  emailNotifications: boolean;
-  smsNotifications: boolean;
-  pushNotifications: boolean;
-}
-
-export function defaultNotificationPreferences(): NotificationPreferences {
-  return {
-    applicationUpdates: true,
-    paymentNotifications: true,
-    permitStatusUpdates: true,
-    documentReminders: true,
-    systemAnnouncements: true,
-    emailNotifications: true,
-    smsNotifications: false,
-    pushNotifications: true,
-  };
-}
+// Notification preferences moved to `citizen-api.models.ts`'s
+// `NotificationPreferencesResponse` — the real `GET`/`PUT
+// /notification-preferences` shape (six named categories plus quiet hours),
+// not this eight-checkbox local model. That model never matched what the
+// server actually stores (`emailNotifications`/`smsNotifications`/
+// `pushNotifications` were CHANNEL preferences no route has ever accepted),
+// and `AuthService.updateNotificationPreferences()` only ever wrote to an
+// in-memory signal nothing persisted past a reload.

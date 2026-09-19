@@ -1,4 +1,4 @@
-import { ALL_PERMIT_TYPES, PermitType } from './permit.model';
+import { ALL_PERMIT_TYPES, ApplicationAction, PermitType } from './permit.model';
 
 // The single source of truth for "what documents does permit type X need."
 // Transcribed directly from the Admin Portal's
@@ -19,6 +19,15 @@ export interface ApplicationTypeRequirements {
   permitType: PermitType;
   requiredForm: string;
   documents: RequirementDocument[];
+  /**
+   * Present only where the checklist genuinely differs by application
+   * action — today just Building Permit, since backend migration 047
+   * consolidated its three former permit-type entries ('– New
+   * Construction' / '– Renovation / Alteration' / '– Addition / Extension')
+   * into one. `documents` above still holds a real, non-empty answer (the
+   * 'New' set) for any caller that reads only that field.
+   */
+  documentsByAction?: Partial<Record<ApplicationAction, RequirementDocument[]>>;
   reviewingOffice: string;
   validityMonths: number | null;
   validityRules: string;
@@ -43,9 +52,25 @@ const COMMON_DOCS_NO_LOCATIONAL: RequirementDocument[] = COMMON_DOCS.filter((d) 
 const PENDING_NOTE =
   "Documentary requirements follow the generic national-law/reference format (PD 1096 for building-related permits, RA 9514 for fire-safety permits); the Municipality of Castilla's own confirmed checklist for this specific permit type is still pending verification with the OBO — confirm before production launch.";
 
+const RENOVATION_ALTERATION_DOCS: RequirementDocument[] = [
+  ...COMMON_DOCS,
+  doc('renovation-plan', 'Renovation/Alteration Plans (signed and sealed)', true),
+  doc('renovation-existing-permit', 'Copy of Original Building Permit (if available)', false),
+  doc('renovation-bom', 'Bill of Materials and Specifications', true),
+  doc('renovation-prc', 'PRC License and PTR of Engineer/Architect of Record', true),
+];
+
+const ADDITION_EXTENSION_DOCS: RequirementDocument[] = [
+  ...COMMON_DOCS,
+  doc('addition-plan', 'Addition / Extension Plans (signed and sealed)', true),
+  doc('addition-struct-plan', 'Structural Analysis for the added load (signed and sealed)', true),
+  doc('addition-bom', 'Bill of Materials and Specifications', true),
+  doc('addition-prc', 'PRC License and PTR of Engineer/Architect of Record', true),
+];
+
 export const REQUIREMENTS_CATALOG: Record<PermitType, ApplicationTypeRequirements> = {
-  'Building Permit – New Construction': {
-    permitType: 'Building Permit – New Construction',
+  'Building Permit': {
+    permitType: 'Building Permit',
     requiredForm: 'Unified Building Permit Form',
     reviewingOffice: 'Office of the Building Official (OBO)',
     validityMonths: 12,
@@ -76,38 +101,15 @@ export const REQUIREMENTS_CATALOG: Record<PermitType, ApplicationTypeRequirement
       doc('bpnc-construction-safety-health', 'Approved Construction Safety and Health Program', true, 'Issued by DOLE.'),
       doc('bpnc-road-clearance', 'Road Clearance', true, 'Issued by DPWH/PEO.'),
     ],
-  },
-  'Building Permit – Renovation / Alteration': {
-    permitType: 'Building Permit – Renovation / Alteration',
-    requiredForm: 'Application for Building Permit (Renovation / Alteration)',
-    reviewingOffice: 'Office of the Building Official (OBO)',
-    validityMonths: 12,
-    validityRules: 'Valid for twelve (12) months from issuance.',
-    verificationStatus: 'PENDING_CASTILLA_VERIFICATION',
-    sourceNote: PENDING_NOTE,
-    documents: [
-      ...COMMON_DOCS,
-      doc('renovation-plan', 'Renovation/Alteration Plans (signed and sealed)', true),
-      doc('renovation-existing-permit', 'Copy of Original Building Permit (if available)', false),
-      doc('renovation-bom', 'Bill of Materials and Specifications', true),
-      doc('renovation-prc', 'PRC License and PTR of Engineer/Architect of Record', true),
-    ],
-  },
-  'Building Permit – Addition / Extension': {
-    permitType: 'Building Permit – Addition / Extension',
-    requiredForm: 'Application for Building Permit (Addition / Extension)',
-    reviewingOffice: 'Office of the Building Official (OBO)',
-    validityMonths: 12,
-    validityRules: 'Valid for twelve (12) months from issuance.',
-    verificationStatus: 'PENDING_CASTILLA_VERIFICATION',
-    sourceNote: PENDING_NOTE,
-    documents: [
-      ...COMMON_DOCS,
-      doc('addition-plan', 'Addition / Extension Plans (signed and sealed)', true),
-      doc('addition-struct-plan', 'Structural Analysis for the added load (signed and sealed)', true),
-      doc('addition-bom', 'Bill of Materials and Specifications', true),
-      doc('addition-prc', 'PRC License and PTR of Engineer/Architect of Record', true),
-    ],
+    // 047 mapped New Construction -> 'New', Renovation/Alteration -> 'Renewal',
+    // Addition/Extension -> 'Amendment', in the order the product owner gave
+    // the three names in. `documents` above IS the 'New' set — see
+    // `documentsFor()` below, which falls back to it for an action with no
+    // entry here.
+    documentsByAction: {
+      Renewal: RENOVATION_ALTERATION_DOCS,
+      Amendment: ADDITION_EXTENSION_DOCS,
+    },
   },
   'Demolition Permit': {
     permitType: 'Demolition Permit',
@@ -354,6 +356,18 @@ export const REQUIREMENTS_CATALOG: Record<PermitType, ApplicationTypeRequirement
 
 export function requirementsFor(permitType: PermitType): ApplicationTypeRequirements {
   return REQUIREMENTS_CATALOG[permitType];
+}
+
+/**
+ * The checklist for one permit type AND ONE ACTION — falls back to the
+ * type's plain `documents` for a type that does not distinguish by action
+ * (everything but Building Permit today) or for an action with no override.
+ * This is the static, disclosed fallback only; the real answer is
+ * `CitizenApiClient.getRequirementsForPermitType(permitType, action)`.
+ */
+export function documentsFor(permitType: PermitType, action: ApplicationAction): RequirementDocument[] {
+  const entry = REQUIREMENTS_CATALOG[permitType];
+  return entry.documentsByAction?.[action] ?? entry.documents;
 }
 
 /** The simpler, fixed 3-item checklist used only by the generic New Application wizard (Section 8 of the master command) — kept separate from the 19-type catalog above, never merged into it. */

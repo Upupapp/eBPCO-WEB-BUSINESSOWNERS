@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, throwError } from 'rxjs';
 import { API_BASE_URL, ApiNotConfiguredError, RESUBMIT_MAX_FILE_BYTES } from './api-config';
 import { problemFrom } from './problem';
+import { ApplicationAction } from '../domain/permit.model';
 import {
   ApplicationDocumentResponse,
   ApplicationListResponse,
@@ -16,6 +17,7 @@ import {
   LimitsResponse,
   DocumentHistoryEntry,
   NotificationFeedResponse,
+  NotificationPreferencesResponse,
   PaymentHistoryEntry,
   PermitRequirementsResponse,
   PermitResponse,
@@ -144,9 +146,18 @@ export class CitizenApiClient {
    * real `requirementCode` from the moment it's chosen, not just after
    * filing. Same underlying catalogue the Admin Portal's own "Permit
    * Release > Permit Types" editor publishes to.
+   *
+   * `applicationAction`, since migration 047: Building Permit's checklist
+   * now varies by New/Renewal/Amendment and the server returns nothing for
+   * it without one (every other permit type ignores the param and answers
+   * the same either way — see `RequirementsService.forPermitType`'s own
+   * doc comment on the server).
    */
-  getRequirementsForPermitType(permitType: string): Observable<PermitRequirementsResponse> {
-    return this.get<PermitRequirementsResponse>(`/requirements/${encodeURIComponent(permitType)}`);
+  getRequirementsForPermitType(
+    permitType: string, applicationAction?: ApplicationAction,
+  ): Observable<PermitRequirementsResponse> {
+    const query = applicationAction === undefined ? '' : `?applicationAction=${encodeURIComponent(applicationAction)}`;
+    return this.get<PermitRequirementsResponse>(`/requirements/${encodeURIComponent(permitType)}${query}`);
   }
 
   /**
@@ -178,6 +189,38 @@ export class CitizenApiClient {
     if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http
       .patch<RectificationResult>(`${this.baseUrl}/me`, patch)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /**
+   * `PUT /me/photo` — replaces the profile photo. `contentBase64` is the
+   * whole file, base64-encoded, same convention `uploadDocument` uses.
+   */
+  uploadPhoto(fileName: string, contentBase64: string): Observable<{ contentType: string }> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .put<{ contentType: string }>(`${this.baseUrl}/me/photo`, { fileName, contentBase64 })
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `DELETE /me/photo` — a no-op, not an error, when there was never a photo. */
+  removePhoto(): Observable<void> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .delete<void>(`${this.baseUrl}/me/photo`)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /**
+   * `GET /me/photo` — the bytes, as a `Blob`. Not an `<img [src]>` the
+   * browser fetches on its own: this route takes a bearer token, which an
+   * `<img>` tag cannot attach, so the caller fetches it through here and
+   * turns the result into an object URL instead (`URL.createObjectURL`).
+   */
+  getPhotoBlob(): Observable<Blob> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .get(`${this.baseUrl}/me/photo`, { responseType: 'blob' })
       .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 
@@ -348,6 +391,24 @@ export class CitizenApiClient {
     if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http
       .post<BusinessSummary>(`${this.baseUrl}/businesses`, body)
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  /** `GET /notification-preferences` — the real, currently-saved preferences (never a client-side default). */
+  getNotificationPreferences(): Observable<NotificationPreferencesResponse> {
+    return this.get<NotificationPreferencesResponse>('/notification-preferences');
+  }
+
+  /**
+   * `PUT /notification-preferences` — replaces the whole set. Whole-object,
+   * not partial, for the same reason the server's own route is a PUT: an
+   * absent category would be ambiguous between "leave alone" and "unmute",
+   * and the caller always holds the full set it just showed on screen.
+   */
+  replaceNotificationPreferences(body: NotificationPreferencesResponse): Observable<NotificationPreferencesResponse> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .put<NotificationPreferencesResponse>(`${this.baseUrl}/notification-preferences`, body)
       .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 

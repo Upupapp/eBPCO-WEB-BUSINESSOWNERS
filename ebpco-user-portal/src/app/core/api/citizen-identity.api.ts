@@ -33,6 +33,20 @@ export interface RegisterInput {
   sex?: string;
   civilStatus?: string;
   nationality?: string;
+  /**
+   * Migration 036, accepted by this route since 2026-09-19. Optional on the
+   * wire for the same reason the four above are: a caller that does not
+   * collect these must still register cleanly. This portal's own
+   * `register.page.ts` collects all six and, until this route accepted
+   * them, quietly discarded what its own form had just required and
+   * validated.
+   */
+  middleName?: string;
+  street?: string;
+  barangay?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -159,6 +173,36 @@ export class CitizenIdentityApi {
           return { kind: 'weak-password', message: passwordErrors.map((e) => e.message).join(' ') };
         }
         return { kind: 'invalid-link' };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * `POST /auth/password/change` — changing a password from inside an
+   * active session, as opposed to `resetPassword` above which starts from
+   * an emailed link and no prior credential. Ends every other session on
+   * success (server-side, `IdentityService.changePassword`), the same as a
+   * reset does — the caller is expected to sign the citizen out locally and
+   * send them back through `/login` rather than pretend this tab's own
+   * session survives untouched.
+   */
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ kind: 'done' } | { kind: 'wrong-current-password' } | { kind: 'weak-password'; message: string }> {
+    try {
+      await this.post('/auth/password/change', { currentPassword, newPassword });
+      return { kind: 'done' };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 400) {
+        const passwordErrors = (error.problem?.fieldErrors ?? []).filter((e) => e.pointer === '/newPassword');
+        if (passwordErrors.length > 0) {
+          return { kind: 'weak-password', message: passwordErrors.map((e) => e.message).join(' ') };
+        }
+      }
+      if (error instanceof ApiError && error.status === 401) {
+        return { kind: 'wrong-current-password' };
       }
       throw error;
     }

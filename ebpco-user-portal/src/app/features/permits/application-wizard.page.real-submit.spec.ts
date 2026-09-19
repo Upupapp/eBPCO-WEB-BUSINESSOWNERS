@@ -118,8 +118,14 @@ describe('ApplicationWizardPage — submitReal() sends the real business id (reg
     const fixture = TestBed.createComponent(ApplicationWizardPage);
     // Fired unconditionally by the constructor once api.configured is true —
     // unrelated to this bug, drained here so it is never mistaken for the
-    // request under test.
+    // request under test. `waitForRequest` below matches ANY pending
+    // request, so an undrained one here would be exactly as likely to be
+    // picked up as the real refresh it's meant to find.
     http.expectOne(`${BASE}/documents/me`).flush([]);
+    // The generic flow's own constructor-time checklist fetch (`GET
+    // /requirements/Business%20Permit?applicationAction=New`) — same
+    // reasoning as above.
+    http.expectOne((r) => r.url.startsWith(`${BASE}/requirements/`)).flush({ documents: [] });
     fixture.detectChanges();
     page = fixture.componentInstance;
   });

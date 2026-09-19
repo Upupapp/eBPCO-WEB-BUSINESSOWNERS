@@ -220,10 +220,13 @@ export interface BusinessListResponse {
  * translation from the domain, so this is the contract, not an internal
  * shape leaking through).
  */
+export type NotificationCategory =
+  'applicationUpdates' | 'payments' | 'permitStatus' | 'documentReminders' | 'appointments' | 'account';
+
 export interface NotificationEntry {
   id: string;
   type: string;
-  category: 'applicationUpdates' | 'payments' | 'permitStatus' | 'documentReminders' | 'appointments' | 'account';
+  category: NotificationCategory;
   applicationId: string | null;
   title: string;
   body: string;
@@ -238,6 +241,23 @@ export interface NotificationFeedResponse {
   data: NotificationEntry[];
   nextCursor: string | null;
   unresolvedCount: number;
+}
+
+/**
+ * `GET`/`PUT /notification-preferences` — a boolean per category (true means
+ * NOT muted, i.e. "send me this"), plus one shared do-not-disturb window.
+ * `start`/`end` are `HH:MM`, required even when `enabled` is false so
+ * switching quiet hours off does not lose the times a citizen already set.
+ */
+export interface QuietHours {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
+export interface NotificationPreferencesResponse {
+  categories: Record<NotificationCategory, boolean>;
+  quietHours: QuietHours;
 }
 
 /** `POST /me/export` — RA 10173 §18 data portability. Same request replayed while queued, not a new one. */

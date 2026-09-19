@@ -1,15 +1,15 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import {
   ApplicantType,
   CivilStatus,
-  NotificationPreferences,
   Sex,
   UserAccount,
-  defaultNotificationPreferences,
   unverifiedContact,
 } from '../domain/user.model';
 import { CitizenIdentityApi } from '../api/citizen-identity.api';
+import { CitizenApiClient } from '../api/citizen-api.client';
 import { CitizenTokenStore } from '../api/citizen-token-store';
 import { MeResponse } from '../api/citizen-profile';
 import { ApiError } from '../api/problem';
@@ -71,10 +71,24 @@ export interface RegisterSecurityInfo {
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly identity = inject(CitizenIdentityApi);
+  private readonly api = inject(CitizenApiClient);
   private readonly tokens = inject(CitizenTokenStore);
   private readonly router = inject(Router);
 
   private readonly _profile = signal<UserAccount | null>(null);
+
+  /**
+   * The profile photo, fetched and cached as an object URL — never the raw
+   * server bytes held directly in a signal, and never `currentUser()
+   * .hasPhoto` treated as though it were the image. `GET /me/photo` takes a
+   * bearer token an `<img src>` cannot attach, so this is the one place that
+   * fetches it (via `CitizenApiClient.getPhotoBlob()`) and turns the result
+   * into something the DOM can render — shared by the Profile screen and the
+   * app shell's own avatar, so both show the same photo without either
+   * fetching it twice.
+   */
+  private readonly _photoUrl = signal<string | null>(null);
+  readonly photoUrl = this._photoUrl.asReadonly();
 
   // Proactive background refresh, matching the Admin Portal's
   // `SessionService` — see `scheduleRefresh` below for why. Only an explicit
@@ -89,8 +103,6 @@ export class AuthService {
    * this session — it is never sent anywhere and does not survive a reload.
    */
   private readonly _applicantTypeOverride = signal<ApplicantType | null>(null);
-
-  private readonly _preferences = signal<NotificationPreferences>(defaultNotificationPreferences());
 
   readonly currentUser = computed<UserAccount | null>(() => {
     const profile = this._profile();
@@ -118,6 +130,7 @@ export class AuthService {
       }
       this._profile.set(meResponseToAccount(me));
       this.scheduleRefresh();
+      void this.refreshPhoto();
       return { ok: true };
     } catch (error) {
       return { ok: false, error: describeError(error) };
@@ -140,13 +153,24 @@ export class AuthService {
         sex: personal.sex,
         civilStatus: personal.civilStatus,
         nationality: personal.nationality,
+        // Migration 036, sent here since 2026-09-19. `register.page.ts`'s
+        // Step 1/2 has required all six of these for longer than the server
+        // had a field for them — this was the gap where a citizen filled in
+        // a real address, watched the form accept it, and found it blank on
+        // their own Profile screen afterward with nothing telling them why.
+        // `personal.middleName` is nullable on this type (an optional field
+        // on the form itself); `undefined`, not `null`, is what a Zod
+        // `.optional()` field on the wire actually means "omit this".
+        ...(personal.middleName ? { middleName: personal.middleName } : {}),
+        street: contact.street,
+        barangay: contact.barangay,
+        city: contact.city,
+        province: contact.province,
+        postalCode: contact.postalCode,
       });
       // The server does not return an id (202, no body) and does not say
       // whether the address was already registered — identical either way,
-      // by design (enumeration). middleName/street/barangay/city/province/
-      // postalCode were also collected on this form and are still NOT sent:
-      // no field exists for THOSE at registration (see class doc) — only
-      // dateOfBirth/sex/civilStatus/nationality gained one, in migration 038.
+      // by design (enumeration).
       return { ok: true };
     } catch (error) {
       // A weak/breached/repetitive password comes back as a 400 with a field
@@ -195,6 +219,14 @@ export class AuthService {
     this._profile.set(null);
     this._applicantTypeOverride.set(null);
     this.clearRefreshTimer();
+    // Revoked, not just cleared: an object URL keeps its Blob alive in memory
+    // until this is called, and the next citizen to sign in on this device
+    // (a shared counter machine, or just a second account in the same tab)
+    // must not have the previous one's photo linger in memory or, worse,
+    // flash on screen for a moment before the new one loads.
+    const current = this._photoUrl();
+    if (current !== null) URL.revokeObjectURL(current);
+    this._photoUrl.set(null);
   }
 
   /**
@@ -229,6 +261,7 @@ export class AuthService {
       if (me.kind === 'applicant') {
         this._profile.set(meResponseToAccount(me));
         this.scheduleRefresh();
+        void this.refreshPhoto();
       }
     } catch {
       // An expired or revoked token is not an error worth showing on load —
@@ -302,7 +335,7 @@ export class AuthService {
    */
   updateProfile(
     patch: Partial<
-      Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'street' | 'barangay' | 'city' | 'province' | 'postalCode' | 'photoPath'>
+      Pick<UserAccount, 'firstName' | 'middleName' | 'lastName' | 'mobileNumber' | 'street' | 'barangay' | 'city' | 'province' | 'postalCode'>
     >,
   ): void {
     const current = this._profile();
@@ -311,30 +344,67 @@ export class AuthService {
   }
 
   /**
-   * No backend route exists for "change my password while signed in" — only
-   * the forgot/reset-by-email flow (`POST /auth/password/forgot` →
-   * `POST /auth/password/reset`, wired in `CitizenIdentityApi`). This method
-   * stays a local-only stand-in and refuses honestly rather than claim a
-   * change that was never sent anywhere.
+   * Called by the Profile screen right after `PUT`/`DELETE /me/photo`
+   * succeeds — flips the local flag `GET /me` will confirm on the next
+   * fetch anyway, so the avatar updates on THIS screen and in the app
+   * shell without waiting for one, then re-fetches the actual bytes.
    */
-  changePassword(): { ok: false; error: string } {
-    return {
-      ok: false,
-      error: 'Changing your password here isn’t connected yet — use "Forgot password?" on the sign-in screen instead.',
-    };
+  async setHasPhoto(value: boolean): Promise<void> {
+    const current = this._profile();
+    if (current) this._profile.set({ ...current, hasPhoto: value });
+    await this.refreshPhoto();
+  }
+
+  /** Re-fetches the photo blob (or clears it) to match `currentUser()?.hasPhoto`. See `photoUrl`'s own doc comment for why this exists at all. */
+  private async refreshPhoto(): Promise<void> {
+    const previous = this._photoUrl();
+    const hasPhoto = this._profile()?.hasPhoto ?? false;
+
+    if (!hasPhoto) {
+      this._photoUrl.set(null);
+    } else {
+      try {
+        const blob = await firstValueFrom(this.api.getPhotoBlob());
+        this._photoUrl.set(URL.createObjectURL(blob));
+      } catch {
+        // The server said `hasPhoto: true` and the fetch failed anyway --
+        // treated as no photo rather than surfaced as an error. An avatar
+        // is decoration, not a fact the citizen came to this screen to
+        // learn, and a transient network blip should not toast over it.
+        this._photoUrl.set(null);
+      }
+    }
+
+    // Revoked last, after the new one (if any) is already live -- revoking
+    // first would leave a moment where an `<img>` bound to the old URL fails
+    // to load before the new one is ready.
+    if (previous !== null) URL.revokeObjectURL(previous);
+  }
+
+  /**
+   * `POST /auth/password/change`, real since this account gained one.
+   * Ending every other session is the SERVER's doing
+   * (`IdentityService.changePassword`), not this method's — by the time this
+   * resolves `ok: true`, every refresh token on this account, including this
+   * tab's own, has already been revoked. The caller (`profile.page.ts`) is
+   * expected to sign out locally and send the citizen back through `/login`
+   * rather than let this tab keep acting as though its session survived.
+   */
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const result = await this.identity.changePassword(currentPassword, newPassword);
+    if (result.kind === 'done') return { ok: true };
+    if (result.kind === 'wrong-current-password') {
+      return { ok: false, error: 'That is not your current password.' };
+    }
+    return { ok: false, error: result.message };
   }
 
   applicantTypeSet(type: ApplicantType): void {
     if (!this._profile()) return;
     this._applicantTypeOverride.set(type);
-  }
-
-  notificationPreferencesFor(): NotificationPreferences {
-    return { ...this._preferences() };
-  }
-
-  updateNotificationPreferences(next: NotificationPreferences): void {
-    this._preferences.set({ ...next });
   }
 }
 
@@ -373,7 +443,7 @@ function meResponseToAccount(me: MeResponse): UserAccount {
     city: me.city ?? '',
     province: me.province ?? '',
     postalCode: me.postalCode ?? '',
-    photoPath: null,
+    hasPhoto: me.hasPhoto,
     // No server field for this either. Derived from email verification as
     // the closest real signal, rather than invented: an unverified email
     // reads as "pending", a verified one as "verified". This is an

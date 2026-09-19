@@ -35,6 +35,7 @@ export class FakeCitizenIdentityApi {
     sex: 'Male',
     civilStatus: 'Married',
     nationality: 'Filipino',
+    hasPhoto: false,
   };
 
   async signIn(email: string, password: string): Promise<MeResponse> {
@@ -49,6 +50,9 @@ export class FakeCitizenIdentityApi {
   }
   async requestPasswordReset(): Promise<void> {}
   async resetPassword(): Promise<{ kind: 'done' }> {
+    return { kind: 'done' };
+  }
+  async changePassword(): Promise<{ kind: 'done' }> {
     return { kind: 'done' };
   }
   async refresh(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {

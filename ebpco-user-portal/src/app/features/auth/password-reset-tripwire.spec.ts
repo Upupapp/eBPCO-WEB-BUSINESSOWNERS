@@ -3,8 +3,11 @@ import { Route } from '@angular/router';
 import { routes } from '../../app.routes';
 import { AuthService } from '../../core/session/auth.service';
 import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { API_BASE_URL } from '../../core/api/api-config';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+
+const BASE = 'https://api.example.gov.ph';
 
 /**
  * PUB-007 Reset Password — a tripwire, not a screen.
@@ -30,18 +33,27 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
  * `POST /auth/password/forgot` then `POST /auth/password/reset`, wired as
  * `CitizenIdentityApi.requestPasswordReset`/`resetPassword` — so the first
  * test below now looks for it on `CitizenIdentityApi`, not
- * `CitizenApiClient` (which never held it). `AuthService.changePassword()`
- * went the other direction: it used to take a current password and verify
- * it locally against the in-memory mock; the real backend has no
- * "change password while signed in" route at all, only the forgot/reset
- * flow, so it now takes NO arguments and always refuses — an even stronger
- * guarantee than before, since there is no argument shape left to get
- * wrong. `app.routes.ts` has no reset route yet (that is Stage 11 of the
- * connection plan), so the first test's early return still applies today.
+ * `CitizenApiClient` (which never held it). `app.routes.ts` has no reset
+ * route yet (that is Stage 11 of the connection plan), so the first test's
+ * early return still applies today.
+ *
+ * Updated AGAIN once `POST /auth/password/change` landed:
+ * `AuthService.changePassword()` now takes a current password and a new one
+ * and sends both to the server, which verifies the current one
+ * (`IdentityService.changePassword`, scrypt-comparing it against the stored
+ * hash) before touching anything. That is not the local, unverified setter
+ * this file exists to catch — it is the SAME shape as `resetPassword`'s own
+ * verified change, just verified by a password already in hand instead of a
+ * mailed token. What the last two tests below now check is that shape: the
+ * method's own signature requires a current password (nothing shorter would
+ * compile), and a real HTTP round trip proves the server is what decides,
+ * not this client.
  */
 describe('PUB-007 — a password reset cannot be faked', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: API_BASE_URL, useValue: BASE }],
+    });
   });
   afterEach(() => TestBed.resetTestingModule());
 
@@ -63,14 +75,15 @@ describe('PUB-007 — a password reset cannot be faked', () => {
     // add the verified server call it needs.
   });
 
-  it('AuthService offers no local way to set a password at all', () => {
+  it('AuthService offers no local way to set a password without one already in hand', () => {
     const proto = Object.getPrototypeOf(TestBed.inject(AuthService));
     const setters = Object.getOwnPropertyNames(proto).filter((m) => /password/i.test(m));
 
-    // changePassword() takes zero arguments and always refuses — see its own
-    // doc comment. Anything else matching /password/ that is not it, or that
-    // is it but accepts arguments, would be a local password-set path with
-    // nothing verifying the requester.
+    // changePassword(currentPassword, newPassword) — two arguments, not
+    // zero. That is the point now: a method that set a password with FEWER
+    // than a current-password argument would be the local, unverified path
+    // this file exists to catch. Anything else matching /password/ that is
+    // not it would be a second such path.
     for (const name of setters) {
       if (name !== 'changePassword') {
         throw new Error(
@@ -79,12 +92,27 @@ describe('PUB-007 — a password reset cannot be faked', () => {
         );
       }
       const fn = proto[name] as (...a: unknown[]) => unknown;
-      expect(fn.length).toBe(0);
+      expect(fn.length).toBe(2);
     }
   });
 
-  it('changePassword always refuses — the real reset path is CitizenIdentityApi.resetPassword', () => {
+  it('changePassword sends the current password for the SERVER to verify, and trusts only its answer', () => {
     const auth = TestBed.inject(AuthService);
-    expect(auth.changePassword().ok).toBe(false);
+    const http = TestBed.inject(HttpTestingController);
+
+    const result = auth.changePassword('whatever the citizen typed', 'A new one entirely!2');
+    const req = http.expectOne(`${BASE}/auth/password/change`);
+    expect(req.request.method).toBe('POST');
+    // Both, always — this client never decides on its own that a change is
+    // acceptable. A request that omitted `currentPassword` would be exactly
+    // the unverified setter this file exists to catch.
+    expect(req.request.body).toEqual({
+      currentPassword: 'whatever the citizen typed',
+      newPassword: 'A new one entirely!2',
+    });
+
+    // The server, not this client, is what refuses a wrong current password.
+    req.flush({ type: '/problems/unauthorized', title: 'unauthorized' }, { status: 401, statusText: 'Unauthorized' });
+    return result.then((r) => expect(r.ok).toBe(false));
   });
 });

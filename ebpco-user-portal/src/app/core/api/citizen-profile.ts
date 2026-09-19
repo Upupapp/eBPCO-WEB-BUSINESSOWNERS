@@ -51,6 +51,8 @@ export interface MeResponse extends CitizenProfile {
   email: string;
   emailVerifiedAt: string | null;
   mobileVerifiedAt: string | null;
+  /** Whether `GET /me/photo` has bytes to return — not the bytes themselves. See that route's own doc comment for why. */
+  hasPhoto: boolean;
 }
 
 /** What PATCH /me answers with: the new profile, plus what the change cost. */

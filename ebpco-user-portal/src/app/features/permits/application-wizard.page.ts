@@ -369,9 +369,9 @@ export class ApplicationWizardPage {
    * call fails: the static catalog is a genuine, disclosed fallback, not
    * an error state.
    */
-  private loadRealDocuments(permitType: PermitType | 'generic'): void {
+  private loadRealDocuments(permitType: PermitType | 'generic', applicationAction: ApplicationAction): void {
     const key = permitType === 'generic' ? 'Business Permit' : permitType;
-    this.api.getRequirementsForPermitType(key).subscribe({
+    this.api.getRequirementsForPermitType(key, applicationAction).subscribe({
       next: (result) => {
         if (result.documents.length === 0) return;
         const previousDocs = this.documents;
@@ -438,9 +438,9 @@ export class ApplicationWizardPage {
     if (source.permitType !== 'Business Permit') {
       this.isGeneric = false;
       this.permitType = source.permitType as PermitType;
-      this.documents = this.applicationStore.requiredDocumentsFor(source.permitType);
+      this.documents = this.applicationStore.requiredDocumentsFor(source.permitType, this.applicationAction);
       this.usingRealRequirementCodes = false;
-      this.loadRealDocuments(source.permitType);
+      this.loadRealDocuments(source.permitType, this.applicationAction);
     }
 
     const previous = this.applicationStore.documentsFor(source.applicationId);
@@ -481,12 +481,12 @@ export class ApplicationWizardPage {
     if (typeParam && typeParam !== 'generic' && isValidPermitType(typeParam)) {
       this.isGeneric = false;
       this.permitType = typeParam;
-      this.documents = this.applicationStore.requiredDocumentsFor(typeParam);
-      this.loadRealDocuments(typeParam);
+      this.documents = this.applicationStore.requiredDocumentsFor(typeParam, this.applicationAction);
+      this.loadRealDocuments(typeParam, this.applicationAction);
     } else {
       this.isGeneric = true;
-      this.documents = this.applicationStore.requiredDocumentsFor('generic');
-      this.loadRealDocuments('generic');
+      this.documents = this.applicationStore.requiredDocumentsFor('generic', this.applicationAction);
+      this.loadRealDocuments('generic', this.applicationAction);
     }
     if (this.api.configured) {
       this.api.getMyDocuments().subscribe({

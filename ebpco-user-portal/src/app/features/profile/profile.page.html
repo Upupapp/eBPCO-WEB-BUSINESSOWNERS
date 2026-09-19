@@ -10,13 +10,13 @@
     <div class="profile-layout">
       <div class="card profile-side">
         <div class="profile-avatar-wrap">
-          @if (photoPreview(); as photo) {
+          @if (auth.photoUrl(); as photo) {
             <img [src]="photo" alt="" class="profile-avatar-img" />
           } @else {
             <div class="profile-avatar-fallback" aria-hidden="true">{{ initials() }}</div>
           }
-          <label class="profile-avatar-edit" aria-label="Change profile photo">
-            <input type="file" accept="image/*" (change)="onPhotoSelected($event)" />
+          <label class="profile-avatar-edit" aria-label="Change profile photo" [class.disabled]="photoBusy()">
+            <input type="file" accept="image/*" [disabled]="photoBusy()" (change)="onPhotoSelected($event)" />
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
               <circle cx="12" cy="12.5" r="3.2" />
@@ -25,8 +25,10 @@
         </div>
         <h2 class="profile-side-name">{{ u.firstName }} {{ u.lastName }}</h2>
         <div class="small muted profile-side-email">{{ u.email }}</div>
-        @if (photoPreview()) {
-          <button type="button" class="btn btn-secondary btn-sm btn-block profile-remove-photo" (click)="removePhoto()">Remove Photo</button>
+        @if (auth.photoUrl()) {
+          <button type="button" class="btn btn-secondary btn-sm btn-block profile-remove-photo" [disabled]="photoBusy()" (click)="removePhoto()">
+            {{ photoBusy() ? 'Working…' : 'Remove Photo' }}
+          </button>
         }
 
         <hr class="divider" />
@@ -43,11 +45,11 @@
 
       <div class="profile-main">
         <div class="profile-tabs">
-          <button class="btn btn-sm" [class.btn-primary]="tab() === 'profile'" [class.btn-secondary]="tab() !== 'profile'" (click)="tab.set('profile')">Edit Profile</button>
-          <button class="btn btn-sm" [class.btn-primary]="tab() === 'password'" [class.btn-secondary]="tab() !== 'password'" (click)="tab.set('password')">Change Password</button>
-          <button class="btn btn-sm" [class.btn-primary]="tab() === 'notifications'" [class.btn-secondary]="tab() !== 'notifications'" (click)="tab.set('notifications')">Notification Preferences</button>
-          <button class="btn btn-sm" [class.btn-primary]="tab() === 'privacy'" [class.btn-secondary]="tab() !== 'privacy'" (click)="tab.set('privacy')">Your Data</button>
-          <button class="btn btn-sm" [class.btn-primary]="tab() === 'legal'" [class.btn-secondary]="tab() !== 'legal'" (click)="tab.set('legal')">Legal</button>
+          <button class="btn btn-sm" [class.btn-primary]="tab() === 'profile'" [class.btn-secondary]="tab() !== 'profile'" (click)="selectTab('profile')">Edit Profile</button>
+          <button class="btn btn-sm" [class.btn-primary]="tab() === 'password'" [class.btn-secondary]="tab() !== 'password'" (click)="selectTab('password')">Change Password</button>
+          <button class="btn btn-sm" [class.btn-primary]="tab() === 'notifications'" [class.btn-secondary]="tab() !== 'notifications'" (click)="selectTab('notifications')">Notification Preferences</button>
+          <button class="btn btn-sm" [class.btn-primary]="tab() === 'privacy'" [class.btn-secondary]="tab() !== 'privacy'" (click)="selectTab('privacy')">Your Data</button>
+          <button class="btn btn-sm" [class.btn-primary]="tab() === 'legal'" [class.btn-secondary]="tab() !== 'legal'" (click)="selectTab('legal')">Legal</button>
         </div>
 
         @if (tab() === 'profile') {
@@ -72,6 +74,26 @@
               <div class="field"><label for="profile-province-9">Province</label><input id="profile-province-9" class="input" [(ngModel)]="province" /></div>
               <div class="field"><label for="profile-zip-code-10">ZIP Code</label><input id="profile-zip-code-10" class="input" [(ngModel)]="postalCode" /></div>
             </div>
+
+            <!--
+              Collected at registration (migration 038) and real on this
+              account, but not correctable through THIS screen — PATCH /me
+              has no field for any of the four (see AuthService's own doc
+              comment on why). Shown read-only rather than left off the
+              screen entirely: an omitted real value reads as "the office
+              does not have this," which is the opposite of true.
+            -->
+            <div class="form-row">
+              <div class="field"><label for="profile-dob-20">Date of Birth <span class="small muted">(read-only)</span></label><input id="profile-dob-20" class="input" [value]="heldValue(u.dateOfBirth)" disabled /></div>
+              <div class="field"><label for="profile-sex-21">Sex <span class="small muted">(read-only)</span></label><input id="profile-sex-21" class="input" [value]="heldValue(u.sex)" disabled /></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label for="profile-civil-status-22">Civil Status <span class="small muted">(read-only)</span></label><input id="profile-civil-status-22" class="input" [value]="heldValue(u.civilStatus)" disabled /></div>
+              <div class="field"><label for="profile-nationality-23">Nationality <span class="small muted">(read-only)</span></label><input id="profile-nationality-23" class="input" [value]="heldValue(u.nationality)" disabled /></div>
+            </div>
+            <p class="small muted" style="margin:-8px 0 8px;">
+              To correct any of these four, contact {{ engineer.shortName }} on {{ engineer.mobile }}.
+            </p>
             <!--
               F-25: no endpoint exists to send any of this. The Municipality
               cannot receive a profile change from this portal, and the field
@@ -133,30 +155,81 @@
         @if (tab() === 'password') {
           <div class="card">
             <div class="form-row">
-              <div class="field"><label for="profile-current-password-11">Current Password</label><input id="profile-current-password-11" class="input" type="password" [(ngModel)]="currentPassword" /></div>
-              <div class="field"><label for="profile-new-password-12">New Password</label><input id="profile-new-password-12" class="input" type="password" [(ngModel)]="newPassword" /><div class="hint">Minimum 8 characters, at least 1 letter and 1 number.</div></div>
+              <div class="field"><label for="profile-current-password-11">Current Password</label><input id="profile-current-password-11" class="input" type="password" [(ngModel)]="currentPassword" [disabled]="changingPassword()" /></div>
+              <div class="field"><label for="profile-new-password-12">New Password</label><input id="profile-new-password-12" class="input" type="password" [(ngModel)]="newPassword" [disabled]="changingPassword()" /><div class="hint">At least 12 characters, with an uppercase letter, a lowercase letter, a number and a punctuation mark.</div></div>
             </div>
-            <div class="field field-narrow"><label for="profile-confirm-new-password-13">Confirm New Password</label><input id="profile-confirm-new-password-13" class="input" type="password" [(ngModel)]="confirmPassword" /></div>
+            <div class="field field-narrow"><label for="profile-confirm-new-password-13">Confirm New Password</label><input id="profile-confirm-new-password-13" class="input" type="password" [(ngModel)]="confirmPassword" [disabled]="changingPassword()" /></div>
             @if (passwordError()) { <div class="field error">{{ passwordError() }}</div> }
-            <button class="btn btn-primary" (click)="changePassword()">Update Password</button>
+            <p class="small muted">Changing your password signs you out everywhere, including this tab — you'll sign in again with the new one.</p>
+            <button class="btn btn-primary" [disabled]="changingPassword()" (click)="changePassword()">
+              {{ changingPassword() ? 'Updating…' : 'Update Password' }}
+            </button>
           </div>
         }
 
         @if (tab() === 'notifications') {
           <div class="card">
-            <div class="profile-prefs-grid">
-              @for (key of prefKeys; track key) {
-                <label class="checkbox-row">
-                  <input type="checkbox" [(ngModel)]="prefs[key]" [ngModelOptions]="{ standalone: true }" /> {{ prefLabel(key) }}
-                </label>
-              }
-            </div>
-            <!--
-              F-15: this Save button is the point. The checkboxes were always
-              bound, but bound to a local object nobody stored — the panel
-              looked functional and configured nothing.
-            -->
-            <button class="btn btn-primary" (click)="savePreferences()">Save Preferences</button>
+            @if (preferencesError(); as err) { <div class="field error" style="margin-bottom:12px;">{{ err }}</div> }
+            @if (preferences(); as prefs) {
+              <p class="small muted" style="margin-top:0;">
+                Off means the Municipality still records the notice in your feed, but does not send it.
+              </p>
+              <div class="profile-prefs-grid">
+                @for (category of categoryOrder; track category) {
+                  <label class="checkbox-row">
+                    <input
+                      type="checkbox"
+                      [checked]="prefs.categories[category]"
+                      [disabled]="preferencesBusy()"
+                      (change)="toggleCategory(category)"
+                    /> {{ categoryLabels[category] }}
+                  </label>
+                }
+              </div>
+
+              <hr class="divider" />
+
+              <h4>Quiet Hours</h4>
+              <p class="small muted">A window nothing is sent in, regardless of the categories above.</p>
+              <label class="checkbox-row">
+                <input
+                  type="checkbox"
+                  [checked]="prefs.quietHours.enabled"
+                  [disabled]="preferencesBusy()"
+                  (change)="setQuietHours({ enabled: !prefs.quietHours.enabled })"
+                /> Enable quiet hours
+              </label>
+              <div class="form-row">
+                <div class="field">
+                  <label for="profile-quiet-start-30">From</label>
+                  <input
+                    id="profile-quiet-start-30"
+                    class="input"
+                    type="time"
+                    [value]="prefs.quietHours.start"
+                    [disabled]="preferencesBusy()"
+                    (change)="setQuietHours({ start: $any($event.target).value })"
+                  />
+                </div>
+                <div class="field">
+                  <label for="profile-quiet-end-31">To</label>
+                  <input
+                    id="profile-quiet-end-31"
+                    class="input"
+                    type="time"
+                    [value]="prefs.quietHours.end"
+                    [disabled]="preferencesBusy()"
+                    (change)="setQuietHours({ end: $any($event.target).value })"
+                  />
+                </div>
+              </div>
+
+              <button class="btn btn-primary" [disabled]="preferencesBusy()" (click)="savePreferences()">
+                {{ preferencesBusy() ? 'Saving…' : 'Save Preferences' }}
+              </button>
+            } @else {
+              <p class="small muted">{{ preferencesBusy() ? 'Loading…' : 'Could not load your preferences.' }}</p>
+            }
           </div>
         }
 

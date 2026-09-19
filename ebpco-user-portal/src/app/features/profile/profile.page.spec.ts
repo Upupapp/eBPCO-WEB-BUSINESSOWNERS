@@ -1,12 +1,16 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ProfilePage } from './profile.page';
 import { AuthService } from '../../core/session/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
+import { API_BASE_URL } from '../../core/api/api-config';
+import { NotificationPreferencesResponse } from '../../core/api/citizen-api.models';
 import { FakeCitizenIdentityApi } from '../../core/testing/fake-citizen-identity-api';
+
+const BASE = 'https://api.example.gov.ph';
 
 function configure(): void {
   TestBed.configureTestingModule({
@@ -20,6 +24,20 @@ function configure(): void {
   });
 }
 
+/** Same as `configure()`, plus a real `API_BASE_URL` so `CitizenApiClient` calls actually reach `HttpTestingController` instead of throwing `ApiNotConfiguredError`. */
+function configureWithBackend(): void {
+  TestBed.configureTestingModule({
+    imports: [ProfilePage],
+    providers: [
+      provideRouter([]),
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      { provide: API_BASE_URL, useValue: BASE },
+    ],
+  });
+}
+
 async function signInAndCreate() {
   const auth = TestBed.inject(AuthService);
   await auth.login('juan.delacruz@example.com', 'Password1');
@@ -29,70 +47,107 @@ async function signInAndCreate() {
 }
 
 /**
- * Guards F-15: the Notification Preferences panel bound eight checkboxes to a
- * freshly-built local object that nothing ever stored. Toggling one changed a
- * value discarded on navigation.
+ * Guards F-15's ORIGINAL intent — the Notification Preferences panel must
+ * actually persist a change, not merely look like it does — now against the
+ * real `GET`/`PUT /notification-preferences` route this screen used to have
+ * nothing behind at all.
  *
- * Every control HAD a binding, which is why a dead-control scan — looking for
- * handler-less buttons and unbound selects — reported this screen clean.
- * Bound is not persisted.
+ * F-15 itself was about eight checkboxes bound to a freshly-built local
+ * object nothing stored; every control HAD a binding, which is why a
+ * dead-control scan reported the screen clean. "Bound" was never "persisted"
+ * — and now that this really is a `PUT`, the test that matters is that the
+ * PUT actually happens and carries what was on screen.
  */
-describe('ProfilePage (F-15: preferences must actually persist)', () => {
+describe('ProfilePage (preferences round-trip through the real backend)', () => {
   async function setup() {
-    configure();
+    configureWithBackend();
     return signInAndCreate();
   }
   afterEach(() => TestBed.resetTestingModule());
 
-  it('reads preferences from the account, not from a fresh default each time', async () => {
-    const { auth } = await setup();
-    const stored = auth.notificationPreferencesFor();
-    stored.smsNotifications = !stored.smsNotifications;
-    auth.updateNotificationPreferences(stored);
-    expect(auth.notificationPreferencesFor().smsNotifications).toBe(stored.smsNotifications);
+  const SAMPLE: NotificationPreferencesResponse = {
+    categories: {
+      applicationUpdates: true, payments: true, permitStatus: true,
+      documentReminders: true, appointments: true, account: false,
+    },
+    quietHours: { enabled: false, start: '22:00', end: '06:00' },
+  };
+
+  it('fetches the real preferences the first time the tab is opened, not a client default', async () => {
+    const { fixture } = await setup();
+    const http = TestBed.inject(HttpTestingController);
+    const page = fixture.componentInstance as unknown as {
+      selectTab(t: string): void;
+      preferences: () => NotificationPreferencesResponse | null;
+    };
+
+    page.selectTab('notifications');
+    const req = http.expectOne(`${BASE}/notification-preferences`);
+    expect(req.request.method).toBe('GET');
+    req.flush(SAMPLE);
+    await fixture.whenStable();
+
+    expect(page.preferences()).toEqual(SAMPLE);
+    http.verify();
   });
 
-  it('survives a change round-trip through the page', async () => {
-    const { fixture, auth } = await setup();
+  it('saving sends the SAME categories and quiet hours shown on screen', async () => {
+    const { fixture } = await setup();
+    const http = TestBed.inject(HttpTestingController);
     const page = fixture.componentInstance as unknown as {
-      prefs: Record<string, boolean>;
-      savePreferences(): void;
+      selectTab(t: string): void;
+      toggleCategory(c: keyof NotificationPreferencesResponse['categories']): void;
+      savePreferences(): Promise<void>;
     };
-    const before = auth.notificationPreferencesFor().emailNotifications;
-    page.prefs['emailNotifications'] = !before;
-    page.savePreferences();
-    expect(auth.notificationPreferencesFor().emailNotifications).toBe(!before);
+
+    page.selectTab('notifications');
+    http.expectOne(`${BASE}/notification-preferences`).flush(SAMPLE);
+    await fixture.whenStable();
+
+    page.toggleCategory('account');
+    const save = page.savePreferences();
+    const put = http.expectOne(`${BASE}/notification-preferences`);
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({
+      ...SAMPLE,
+      categories: { ...SAMPLE.categories, account: true },
+    });
+    put.flush({ ...SAMPLE, categories: { ...SAMPLE.categories, account: true } });
+    await save;
+    http.verify();
   });
 
   it('offers a control to save them', async () => {
     const { fixture } = await setup();
-    (fixture.componentInstance as unknown as { tab: { set(t: string): void } }).tab.set('notifications');
+    const http = TestBed.inject(HttpTestingController);
+    const page = fixture.componentInstance as unknown as { selectTab(t: string): void };
+    page.selectTab('notifications');
+    http.expectOne(`${BASE}/notification-preferences`).flush(SAMPLE);
+    await fixture.whenStable();
     fixture.detectChanges();
+
     const labels = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].map(
       (b) => b.textContent?.trim() ?? '',
     );
     expect(labels).toContain('Save Preferences');
-  });
-
-  it('hands out a copy, so an unsaved edit cannot leak into the account', async () => {
-    const { auth } = await setup();
-    const a = auth.notificationPreferencesFor();
-    a.pushNotifications = !a.pushNotifications;
-    expect(auth.notificationPreferencesFor().pushNotifications).not.toBe(a.pushNotifications);
+    http.verify();
   });
 });
 
 /**
  * Guards F-20's ORIGINAL intent — Change Password must never silently accept
- * a blank/weak new password — under the real backend's constraints.
+ * a blank/weak new password — now against the REAL `POST
+ * /auth/password/change` route (see `password-reset-tripwire.spec.ts` for
+ * the test proving that route, not this client, is what decides whether a
+ * candidate password is accepted).
  *
- * F-20 itself no longer applies as written: there is no local password-set
- * path left to have a weak-input bug in. The backend has no "change password
- * while signed in" route at all (only forgot/reset by email — see
- * `AuthService.changePassword`'s own doc comment), so this now guards that
- * the screen is HONEST about that rather than pretending to change anything.
+ * `FakeCitizenIdentityApi.changePassword()` always answers `{ kind: 'done'
+ * }` — there is no server here to refuse a weak password with, so this file
+ * only guards what belongs to the CLIENT: the two checks that must happen
+ * before a round trip is even attempted, and that a real success actually
+ * ends the session rather than merely closing a form.
  */
-describe('ProfilePage (Change Password honestly refuses — no backend route exists)', () => {
+describe('ProfilePage (Change Password: client-side checks and a real success)', () => {
   async function setup() {
     configure();
     return signInAndCreate();
@@ -104,27 +159,47 @@ describe('ProfilePage (Change Password honestly refuses — no backend route exi
     newPassword: string;
     confirmPassword: string;
     passwordError: () => string | null;
-    changePassword(): void;
+    changePassword(): Promise<void>;
   };
 
-  it('refuses any change, with an honest reason, rather than silently accepting one', async () => {
+  it('refuses a blank current or new password before any round trip', async () => {
     const { fixture } = await setup();
     const page = fixture.componentInstance as unknown as PasswordPage;
-    page.currentPassword = 'Password1';
-    page.newPassword = 'NewPassword2';
-    page.confirmPassword = 'NewPassword2';
-    page.changePassword();
-    expect(page.passwordError()).toMatch(/isn.?t connected yet|forgot password/i);
+    page.currentPassword = '';
+    page.newPassword = 'A New Passphrase!2';
+    page.confirmPassword = 'A New Passphrase!2';
+    await page.changePassword();
+    expect(page.passwordError()).toMatch(/enter your current password/i);
   });
 
-  it('still enforces its own client-side checks before even trying', async () => {
+  it('refuses when the new and confirm fields do not match', async () => {
     const { fixture } = await setup();
     const page = fixture.componentInstance as unknown as PasswordPage;
     page.currentPassword = 'Password1';
-    page.newPassword = 'short1';
-    page.confirmPassword = 'short1';
-    page.changePassword();
-    expect(page.passwordError()).toBe('Password must be at least 8 characters with at least 1 letter and 1 number.');
+    page.newPassword = 'A New Passphrase!2';
+    page.confirmPassword = 'Something Else Entirely!3';
+    await page.changePassword();
+    expect(page.passwordError()).toBe('New passwords do not match.');
+  });
+
+  it('on a real success, signs the citizen out and sends them to sign in again', async () => {
+    const { fixture, auth } = await setup();
+    const router = TestBed.inject(Router);
+    const navigated: unknown[][] = [];
+    router.navigate = (commands: unknown[]) => {
+      navigated.push(commands);
+      return Promise.resolve(true);
+    };
+    const page = fixture.componentInstance as unknown as PasswordPage;
+
+    page.currentPassword = 'Password1';
+    page.newPassword = 'A New Passphrase!2';
+    page.confirmPassword = 'A New Passphrase!2';
+    await page.changePassword();
+
+    expect(page.passwordError()).toBeNull();
+    expect(auth.isAuthenticated()).toBe(false);
+    expect(navigated).toEqual([['/login']]);
   });
 });
 

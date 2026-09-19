@@ -50,7 +50,7 @@ export class AppShellComponent {
   }
 
   userPhoto(): string | null {
-    return this.auth.currentUser()?.photoPath ?? null;
+    return this.auth.photoUrl();
   }
 
   async logout(): Promise<void> {

@@ -23,17 +23,10 @@ const unifiedFallback: PermitFormAsset = {
 };
 
 export const PERMIT_FORM_ASSETS: Record<PermitType, PermitFormAsset> = {
-  'Building Permit – New Construction': {
-    fileName: 'assets/permit-forms/unified-application-form.pdf',
-    label: 'Unified Application Form',
-    isFallback: false,
-  },
-  'Building Permit – Renovation / Alteration': {
-    fileName: 'assets/permit-forms/unified-application-form.pdf',
-    label: 'Unified Application Form',
-    isFallback: false,
-  },
-  'Building Permit – Addition / Extension': {
+  // One real physical form for all three application actions (New/Renewal/
+  // Amendment), same as the Admin Portal's permit-form-templates.ts — the
+  // Unified Building Permit Form's own Scope of Work checkboxes cover them.
+  'Building Permit': {
     fileName: 'assets/permit-forms/unified-application-form.pdf',
     label: 'Unified Application Form',
     isFallback: false,

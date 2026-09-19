@@ -90,7 +90,7 @@ describe('VerifyPermitPage (L-2: revocation cannot fall through to Valid)', () =
           useValue: { snapshot: { paramMap: convertToParamMap({ permitNumber: 'BP-2026-0001' }) } } },
         { provide: ApplicationStore, useValue: {
             permitByNumber: () => permit,
-            applicationById: () => ({ id: 'app-x', permitType: 'Building Permit – New Construction',
+            applicationById: () => ({ id: 'app-x', permitType: 'Building Permit',
                                       businessId: 'biz-1', businessName: 'Test' }),
           } },
       ],
