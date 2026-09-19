@@ -56,10 +56,19 @@ function bypassBrowserNavigations(req) {
 // device running `ng serve` should see the same real, persistent database
 // (one Postgres on the Linode box), not its own empty local one. Point back
 // at http://localhost:3000 if you specifically need an isolated local API for
-// one-off testing. Swap to https://api.castilla-ebpco.online once that
-// domain's DNS/TLS is live -- the bare IP is a stand-in until then.
-const API_TARGET = 'http://139.162.51.165:3000';
-const COMMON = { target: API_TARGET, secure: false, changeOrigin: true };
+// one-off testing.
+//
+// HTTPS since 2026-09-19: 139-162-51-165.sslip.io is that Linode's IP as a
+// hostname (public wildcard DNS), with a Let's Encrypt certificate served by
+// the Caddy in front of the API -- the same URL the deployed portal is built
+// with (netlify.toml). Until then this pointed at http://139.162.51.165:3000,
+// plain HTTP, which sent every citizen's password across the internet in
+// clear text on every `ng serve` login; that port is being closed. `secure`
+// is true on purpose: a certificate problem must fail loudly here, not be
+// waved through. Swap to https://api.castilla-ebpco.online once that
+// domain's DNS points at the Linode (backend repo, apps/ebpco-api/deploy/).
+const API_TARGET = 'https://139-162-51-165.sslip.io';
+const COMMON = { target: API_TARGET, secure: true, changeOrigin: true };
 
 module.exports = {
   '/auth': COMMON,
