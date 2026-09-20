@@ -134,6 +134,17 @@ export class CitizenApiClient {
   }
 
   /**
+   * `DELETE /documents/{id}` — removes the citizen's own copy from My
+   * Documents. The server refuses this outright (422) for a document
+   * currently attached to an application; see that route's own doc
+   * comment. Never called for an attached row from this client either —
+   * My Documents Page only shows the button for an unattached one.
+   */
+  deleteDocument(documentId: string): Observable<void> {
+    return this.delete<void>(`/documents/${encodeURIComponent(documentId)}`);
+  }
+
+  /**
    * A signed URL the server minted, made fetchable from THIS page.
    *
    * The server signs a PATH — `/documents/content?key=…&sig=…` — meant to be
@@ -476,6 +487,11 @@ export class CitizenApiClient {
   private get<T>(path: string): Observable<T> {
     if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http.get<T>(`${this.baseUrl}${path}`).pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  private delete<T>(path: string): Observable<T> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http.delete<T>(`${this.baseUrl}${path}`).pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 
   private post<T>(path: string, body: unknown, idempotencyKey: string): Observable<T> {

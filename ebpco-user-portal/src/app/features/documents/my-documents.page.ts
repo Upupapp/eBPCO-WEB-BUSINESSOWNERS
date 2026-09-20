@@ -14,6 +14,14 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
   return 'pdf';
 }
 
+/** What a real document's preview needs — built from fetched bytes, not the demo store's SavedDocument. */
+interface RealPreview {
+  file: File;
+  fileName: string;
+  fileType: SavedDocumentFileType;
+  label: string;
+}
+
 /**
  * Real data now exists to show: `GET /documents/me` (broadened — see
  * `citizen-api.client.ts`'s `getMyDocuments`) returns every document this
@@ -51,24 +59,39 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
         } @else if (realDocuments().length === 0) {
           <div class="card empty-state">No documents uploaded yet.</div>
         } @else {
-          <div class="grid grid-3">
+          <div class="doc-grid">
             @for (d of realDocuments(); track d.id) {
-              <div class="card card-fill">
-                @if (d.applicationReference) {
-                  <div class="badge badge-secondary" style="align-self:flex-start; margin-bottom:8px;">Attached — {{ d.applicationReference }}</div>
-                } @else {
-                  <div class="badge badge-primary" style="align-self:flex-start; margin-bottom:8px;">Available to reuse</div>
-                }
-                <div style="font-weight:600; word-break:break-word;">{{ d.fileName }}</div>
-                <div class="small muted">{{ d.label }}</div>
-                <div class="small muted">{{ (Number(d.byteSize) / 1024).toFixed(0) }} KB &middot; {{ formatDate(d.uploadedAt) }}</div>
-                @if (d.expiresOn) {
-                  <div class="small muted">Expires {{ formatDate(d.expiresOn) }}</div>
-                }
-                <div class="card-footer">
-                  <button class="btn btn-secondary btn-sm" [disabled]="opening() === d.id" (click)="openReal(d)">
-                    {{ opening() === d.id ? 'Opening…' : 'Open' }}
+              <div class="doc-card">
+                <div class="doc-card-top">
+                  <span class="doc-type-chip" [class.doc-type-chip--image]="fileTypeOf(d) !== 'pdf'">
+                    {{ fileTypeOf(d) === 'pdf' ? 'PDF' : 'IMG' }}
+                  </span>
+                  @if (d.applicationReference) {
+                    <span class="doc-badge doc-badge--attached">Attached to an application</span>
+                  } @else {
+                    <span class="doc-badge doc-badge--reusable">Available to reuse</span>
+                  }
+                </div>
+                <div class="doc-name" [title]="d.fileName">{{ d.fileName }}</div>
+                <div class="doc-label">{{ d.label }}</div>
+                <div class="doc-meta">
+                  {{ (Number(d.byteSize) / 1024).toFixed(0) }} KB &middot; {{ formatDate(d.uploadedAt) }}
+                  @if (d.expiresOn) {
+                    &middot; Expires {{ formatDate(d.expiresOn) }}
+                  }
+                </div>
+                <div class="doc-actions">
+                  <button class="btn btn-secondary btn-sm" [disabled]="viewingId() === d.id" (click)="viewReal(d)">
+                    {{ viewingId() === d.id ? 'Opening…' : 'View' }}
                   </button>
+                  <button class="btn btn-secondary btn-sm" [disabled]="downloadingId() === d.id" (click)="downloadReal(d)">
+                    {{ downloadingId() === d.id ? 'Downloading…' : 'Download' }}
+                  </button>
+                  @if (!d.applicationReference) {
+                    <button class="btn btn-ghost btn-sm" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
+                      {{ deletingId() === d.id ? 'Removing…' : 'Delete' }}
+                    </button>
+                  }
                 </div>
               </div>
             }
@@ -85,13 +108,18 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
         @if (filtered().length === 0) {
           <div class="card empty-state">No documents in this category yet.</div>
         } @else {
-          <div class="grid grid-3">
+          <div class="doc-grid">
             @for (d of filtered(); track d.id) {
-              <div class="card card-fill">
-                <div class="badge badge-primary" style="align-self:flex-start; margin-bottom:8px;">{{ labels[d.category] }}</div>
-                <div style="font-weight:600; word-break:break-word;">{{ d.fileName }}</div>
-                <div class="small muted">{{ (d.sizeBytes / 1024).toFixed(0) }} KB · {{ formatDate(d.uploadedAt) }}</div>
-                <div class="card-footer">
+              <div class="doc-card">
+                <div class="doc-card-top">
+                  <span class="doc-type-chip" [class.doc-type-chip--image]="d.fileType !== 'pdf'">
+                    {{ d.fileType === 'pdf' ? 'PDF' : 'IMG' }}
+                  </span>
+                  <span class="doc-badge doc-badge--reusable">{{ labels[d.category] }}</span>
+                </div>
+                <div class="doc-name" [title]="d.fileName">{{ d.fileName }}</div>
+                <div class="doc-meta">{{ (d.sizeBytes / 1024).toFixed(0) }} KB · {{ formatDate(d.uploadedAt) }}</div>
+                <div class="doc-actions">
                   <button class="btn btn-secondary btn-sm" (click)="preview.set(d)">Preview</button>
                   <button class="btn btn-ghost btn-sm" (click)="remove(d.id)">Remove</button>
                 </div>
@@ -111,12 +139,113 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           (close)="preview.set(null)"
         />
       }
+
+      @if (realPreview(); as p) {
+        <app-document-preview
+          [file]="p.file"
+          [fileName]="p.fileName"
+          [fileType]="p.fileType"
+          [label]="p.label"
+          (close)="realPreview.set(null)"
+        />
+      }
     </div>
   `,
+  styles: [`
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .doc-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--surface, #fff);
+      border: 1px solid var(--border-light, #eeeef2);
+      border-radius: var(--radius-lg, 12px);
+      padding: 16px;
+      transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+    }
+    .doc-card:hover {
+      border-color: var(--border-medium, #e6e6ec);
+      box-shadow: 0 6px 18px rgba(31, 36, 48, .08);
+      transform: translateY(-1px);
+    }
+    .doc-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .doc-type-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: .03em;
+      background: var(--primary-100, #fdeceb);
+      color: var(--primary-700, #a5182a);
+    }
+    .doc-type-chip--image {
+      background: #e8f1ff;
+      color: #1d4ed8;
+    }
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .doc-badge--attached {
+      background: #e7f7ee;
+      color: #157347;
+    }
+    .doc-badge--reusable {
+      background: var(--primary-100, #fdeceb);
+      color: var(--primary-700, #a5182a);
+    }
+    .doc-name {
+      font-weight: 700;
+      color: var(--gray-900, #1f2430);
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .doc-label {
+      font-size: 12.5px;
+      color: var(--gray-500, #6b7080);
+    }
+    .doc-meta {
+      font-size: 12px;
+      color: var(--gray-400, #8b8f9b);
+      margin-bottom: 6px;
+    }
+    .doc-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-light, #eeeef2);
+    }
+  `],
 })
 export class MyDocumentsPage {
-  /** The document being previewed, or null. DOC-003. Demo path only — the real path opens the signed URL directly. */
+  /** The document being previewed, or null. DOC-003. Demo path only — the real path builds its own RealPreview from fetched bytes. */
   protected readonly preview = signal<SavedDocument | null>(null);
+  /** Real path's preview — built in viewReal() from bytes actually fetched, never from the forced-download signed URL directly (that response is always Content-Disposition: attachment; see documents.controller.ts). */
+  protected readonly realPreview = signal<RealPreview | null>(null);
 
   private readonly store = inject(DocumentLibraryStore);
   private readonly toast = inject(ToastService);
@@ -127,10 +256,13 @@ export class MyDocumentsPage {
   readonly filter = signal<SavedDocumentCategory | null>(null);
   protected readonly formatDate = formatDate;
   protected readonly Number = Number;
+  protected readonly fileTypeOf = (d: DocumentHistoryEntry) => fileTypeFromName(d.fileName);
 
   protected readonly realChecked = signal(false);
   protected readonly realDocuments = signal<DocumentHistoryEntry[]>([]);
-  protected readonly opening = signal<string | null>(null);
+  protected readonly viewingId = signal<string | null>(null);
+  protected readonly downloadingId = signal<string | null>(null);
+  protected readonly deletingId = signal<string | null>(null);
   protected readonly uploading = signal(false);
 
   constructor() {
@@ -183,11 +315,64 @@ export class MyDocumentsPage {
     input.value = '';
   }
 
-  openReal(d: DocumentHistoryEntry): void {
-    this.opening.set(d.id);
+  /**
+   * Shows the document in-page instead of forcing a download.
+   *
+   * `getDocumentContent` returns a signed URL whose response is ALWAYS
+   * `Content-Disposition: attachment` (documents.controller.ts — a
+   * deliberate XSS guard, never relaxed). Navigating to it directly, the
+   * old behaviour here, therefore always downloads regardless of file
+   * type. Fetching the bytes with `fetch()` and building our OWN blob: URL
+   * sidesteps that header entirely — the same pattern
+   * DocumentPreviewComponent already uses for a locally-picked File, typed
+   * from OUR OWN extension enum rather than trusted from the response.
+   */
+  viewReal(d: DocumentHistoryEntry): void {
+    this.viewingId.set(d.id);
     this.api.getDocumentContent(d.id).subscribe({
-      next: ({ url }) => { window.open(url, '_blank', 'noopener'); this.opening.set(null); },
-      error: () => { this.toast.error('Could not open this document. Try again.'); this.opening.set(null); },
+      next: ({ url }) => {
+        void fetch(url)
+          .then((response) => {
+            if (!response.ok) throw new Error(`${response.status}`);
+            return response.blob();
+          })
+          .then((blob) => {
+            this.realPreview.set({
+              file: new File([blob], d.fileName),
+              fileName: d.fileName,
+              fileType: fileTypeFromName(d.fileName),
+              label: d.label,
+            });
+          })
+          .catch(() => this.toast.error('Could not open this document. Try again.'))
+          .finally(() => this.viewingId.set(null));
+      },
+      error: () => { this.toast.error('Could not open this document. Try again.'); this.viewingId.set(null); },
+    });
+  }
+
+  downloadReal(d: DocumentHistoryEntry): void {
+    this.downloadingId.set(d.id);
+    this.api.getDocumentContent(d.id).subscribe({
+      next: ({ url }) => { window.open(url, '_blank', 'noopener'); this.downloadingId.set(null); },
+      error: () => { this.toast.error('Could not download this document. Try again.'); this.downloadingId.set(null); },
+    });
+  }
+
+  /** Only ever called for an unattached document — the button is hidden otherwise. The server refuses an attached one anyway (see citizen-api.client.ts's deleteDocument doc comment). */
+  deleteReal(d: DocumentHistoryEntry): void {
+    if (!confirm(`Remove ${d.fileName} from My Documents? This does not affect any application it may already be part of.`)) return;
+    this.deletingId.set(d.id);
+    this.api.deleteDocument(d.id).subscribe({
+      next: () => {
+        this.realDocuments.update((docs) => docs.filter((x) => x.id !== d.id));
+        this.toast.success(`${d.fileName} removed.`);
+        this.deletingId.set(null);
+      },
+      error: () => {
+        this.toast.error(`Could not remove ${d.fileName}. Try again.`);
+        this.deletingId.set(null);
+      },
     });
   }
 
