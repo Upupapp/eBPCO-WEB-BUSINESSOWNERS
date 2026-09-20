@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/session/auth.service';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
 import { CivilStatus, Sex } from '../../core/domain/user.model';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
 import { CASTILLA_BARANGAYS, NATIONALITIES } from '../../core/domain/ph-reference-data';
@@ -78,8 +79,39 @@ type Step = 1 | 2 | 3;
         @if (step() === 2) {
           <div class="field">
             <label for="register-email-address-8">Email Address<span class="required">*</span></label>
-            <input id="register-email-address-8" class="input" type="email" [ngModel]="email" (ngModelChange)="onEmailInput($event)" />
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input id="register-email-address-8" class="input" type="email" style="flex:1"
+                [ngModel]="email" (ngModelChange)="onEmailInput($event)" [disabled]="emailVerified()" />
+              @if (emailVerified()) {
+                <span class="badge badge-green" style="white-space:nowrap;">✓ Verified</span>
+              } @else {
+                <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;"
+                  [disabled]="sendingCode() || !email"
+                  (click)="sendVerificationCode()">
+                  {{ sendingCode() ? 'Sending…' : (codeSent() ? 'Resend Code' : 'Verify Email') }}
+                </button>
+              }
+            </div>
             @if (emailError()) { <div class="field error" style="margin-top:6px;">{{ emailError() }}</div> }
+
+            @if (codeSent() && !emailVerified()) {
+              <div style="margin-top:10px;">
+                <label for="register-email-code">Enter the 6-digit code sent to your email<span class="required">*</span></label>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                  <input id="register-email-code" class="input" style="flex:1" inputmode="numeric" maxlength="6"
+                    [(ngModel)]="verificationCode" placeholder="123456" />
+                  <button type="button" class="btn btn-primary btn-sm" style="white-space:nowrap;"
+                    [disabled]="confirmingCode() || verificationCode.length !== 6"
+                    (click)="confirmVerificationCode()">
+                    {{ confirmingCode() ? 'Checking…' : 'Confirm' }}
+                  </button>
+                </div>
+                @if (codeError()) { <div class="field error" style="margin-top:6px;">{{ codeError() }}</div> }
+                @if (codeNotice()) { <p class="small muted" style="margin-top:6px;">{{ codeNotice() }}</p> }
+              </div>
+            } @else if (skipVerification()) {
+              <p class="small muted" style="margin-top:6px;">{{ skipVerification() }}</p>
+            }
           </div>
           <div class="field">
             <label for="register-mobile-number-9">Mobile Number<span class="required">*</span></label>
@@ -199,6 +231,7 @@ type Step = 1 | 2 | 3;
 })
 export class RegisterPage {
   private readonly auth = inject(AuthService);
+  private readonly identity = inject(CitizenIdentityApi);
   private readonly router = inject(Router);
 
   readonly step = signal<Step>(1);
@@ -234,6 +267,106 @@ export class RegisterPage {
   onEmailInput(value: string): void {
     this.email = value;
     this.emailError.set(null);
+    // A verified/in-progress code belongs to the PREVIOUS email — editing
+    // the field after Verify Email (or after confirming) must reset the
+    // whole verification state, or a citizen could type in someone else's
+    // already-confirmed address and register it as verified on the strength
+    // of a code that was never sent to that address at all.
+    if (this.emailVerified() || this.codeSent()) {
+      this.emailVerified.set(false);
+      this.codeSent.set(false);
+      this.verificationCode = '';
+      this.codeError.set(null);
+      this.codeNotice.set(null);
+      this.skipVerification.set(null);
+    }
+  }
+
+  // ---- Email verification (Step 2, before an account exists) ------------
+  // Sends and checks a real 6-digit code via /auth/register/email/request
+  // and /auth/register/email/confirm — see RegistrationVerificationService
+  // on the server. Confirming here does not itself create anything; the
+  // server spends the confirmation once, the moment submit() below actually
+  // calls register().
+
+  readonly emailVerified = signal(false);
+  readonly codeSent = signal(false);
+  readonly sendingCode = signal(false);
+  readonly confirmingCode = signal(false);
+  readonly codeError = signal<string | null>(null);
+  /** A non-error status line under the code field — "code resent", not a failure. */
+  readonly codeNotice = signal<string | null>(null);
+  /**
+   * Set only when the LGU could not send a code at all (no mail provider,
+   * or a real one that just failed) — explains why Continue works without a
+   * confirmed code, rather than a citizen wondering why the requirement
+   * they were just shown silently stopped applying. `null` the rest of the
+   * time, including before Verify Email has ever been clicked.
+   */
+  readonly skipVerification = signal<string | null>(null);
+  verificationCode = '';
+
+  async sendVerificationCode(): Promise<void> {
+    if (!RegisterPage.EMAIL_PATTERN.test(this.email)) {
+      this.emailError.set('Please enter a valid email address.');
+      return;
+    }
+    this.emailError.set(null);
+    this.codeError.set(null);
+    this.codeNotice.set(null);
+    this.sendingCode.set(true);
+    try {
+      const result = await this.identity.requestRegistrationEmailCode(this.email);
+      if (result.kind === 'sent') {
+        this.codeSent.set(true);
+        this.skipVerification.set(null);
+        this.codeNotice.set('A 6-digit code was sent. It expires in a few minutes.');
+      } else if (result.kind === 'too-soon') {
+        // A live code from moments ago is still good — keep that entry open
+        // rather than treating this as a failure.
+        this.codeSent.set(true);
+        this.codeNotice.set(result.detail);
+      } else {
+        // 'not-sent' (no provider configured) or 'failed' (a real one that
+        // just failed) — either way, a citizen must not be locked out of
+        // creating an account entirely because of an LGU infrastructure
+        // problem. Falls back to today's behaviour: register, verify later
+        // from Profile.
+        this.codeSent.set(false);
+        this.skipVerification.set(
+          `${result.detail} You can continue without verifying now, and verify this email later from your Profile.`,
+        );
+      }
+    } catch {
+      this.skipVerification.set(
+        'Could not reach the Municipality’s system to send a code. '
+          + 'You can continue without verifying now, and verify this email later from your Profile.',
+      );
+    } finally {
+      this.sendingCode.set(false);
+    }
+  }
+
+  async confirmVerificationCode(): Promise<void> {
+    if (!/^\d{6}$/.test(this.verificationCode)) {
+      this.codeError.set('Enter the 6-digit code exactly as sent.');
+      return;
+    }
+    this.codeError.set(null);
+    this.codeNotice.set(null);
+    this.confirmingCode.set(true);
+    try {
+      const result = await this.identity.confirmRegistrationEmailCode(this.email, this.verificationCode);
+      if (result.kind === 'confirmed') {
+        this.emailVerified.set(true);
+        this.codeSent.set(false);
+        this.verificationCode = '';
+      } else {
+        this.codeError.set(result.detail);
+      }
+    } finally {
+      this.confirmingCode.set(false);
+    }
   }
 
   /**

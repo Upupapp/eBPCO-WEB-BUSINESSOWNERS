@@ -94,6 +94,55 @@ export class CitizenIdentityApi {
   }
 
   /**
+   * `POST /auth/register/email/request` — Step 2 of the registration
+   * wizard's own email verification, BEFORE `register()` above has ever
+   * been called. Public on the server for the same reason `register` is:
+   * there is no account yet to hold a bearer token for.
+   *
+   * `delivery` mirrors the server's own honesty split — 'sent' once a real
+   * mail provider is configured, 'not-sent' while none is (same as this
+   * portal never claiming a forgot-password email went out when it did
+   * not), 'failed' for a real provider that just failed this once.
+   */
+  async requestRegistrationEmailCode(
+    email: string,
+  ): Promise<{ kind: 'sent' | 'not-sent' | 'failed'; detail: string } | { kind: 'too-soon'; detail: string }> {
+    try {
+      const result = await this.post<{ delivery: 'sent' | 'not-sent' | 'failed'; detail: string }>(
+        '/auth/register/email/request', { email },
+      );
+      return { kind: result.delivery, detail: result.detail };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        return { kind: 'too-soon', detail: error.citizenMessage };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * `POST /auth/register/email/confirm` — checks the 6-digit code against
+   * the request above. Does NOT create an account and does not itself
+   * prove `register()` will accept the email as verified — that proof is
+   * spent, once, the moment `register()` actually runs (server-side,
+   * RegistrationVerificationService.consumeConfirmedProof), which is why
+   * this only ever needs to be called once per address per attempt.
+   */
+  async confirmRegistrationEmailCode(
+    email: string, code: string,
+  ): Promise<{ kind: 'confirmed' } | { kind: 'refused'; detail: string }> {
+    try {
+      await this.post('/auth/register/email/confirm', { email, code });
+      return { kind: 'confirmed' };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        return { kind: 'refused', detail: error.citizenMessage };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * `POST /auth/token/refresh` — trades the stored refresh token for a new
    * access/refresh pair.
    *
