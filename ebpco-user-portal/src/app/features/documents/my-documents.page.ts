@@ -87,11 +87,9 @@ interface RealPreview {
                   <button class="btn btn-secondary btn-sm" [disabled]="downloadingId() === d.id" (click)="downloadReal(d)">
                     {{ downloadingId() === d.id ? 'Downloading…' : 'Download' }}
                   </button>
-                  @if (!d.applicationReference) {
-                    <button class="btn btn-ghost btn-sm" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
-                      {{ deletingId() === d.id ? 'Removing…' : 'Delete' }}
-                    </button>
-                  }
+                  <button class="btn btn-ghost btn-sm" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
+                    {{ deletingId() === d.id ? 'Removing…' : 'Delete' }}
+                  </button>
                 </div>
               </div>
             }
@@ -359,14 +357,25 @@ export class MyDocumentsPage {
     });
   }
 
-  /** Only ever called for an unattached document — the button is hidden otherwise. The server refuses an attached one anyway (see citizen-api.client.ts's deleteDocument doc comment). */
+  /**
+   * Always shown, whether or not the document is attached — the server
+   * (`DELETE /documents/{id}`, see citizen-api.client.ts's deleteDocument
+   * doc comment) does two different things underneath depending on that,
+   * so the confirmation says which one this document will get: an
+   * unattached copy is genuinely deleted; an attached one only stops being
+   * offered here — it stays exactly as filed on its application.
+   */
   deleteReal(d: DocumentHistoryEntry): void {
-    if (!confirm(`Remove ${d.fileName} from My Documents? This does not affect any application it may already be part of.`)) return;
+    const question = d.applicationReference
+      ? `Remove ${d.fileName} from My Documents? It will stay exactly as filed on ${d.applicationReference} — this only stops it being offered for reuse elsewhere.`
+      : `Remove ${d.fileName} from My Documents? This deletes it.`;
+    if (!confirm(question)) return;
+
     this.deletingId.set(d.id);
     this.api.deleteDocument(d.id).subscribe({
       next: () => {
         this.realDocuments.update((docs) => docs.filter((x) => x.id !== d.id));
-        this.toast.success(`${d.fileName} removed.`);
+        this.toast.success(`${d.fileName} removed from My Documents.`);
         this.deletingId.set(null);
       },
       error: () => {

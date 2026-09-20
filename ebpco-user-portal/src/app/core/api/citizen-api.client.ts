@@ -135,10 +135,11 @@ export class CitizenApiClient {
 
   /**
    * `DELETE /documents/{id}` — removes the citizen's own copy from My
-   * Documents. The server refuses this outright (422) for a document
-   * currently attached to an application; see that route's own doc
-   * comment. Never called for an attached row from this client either —
-   * My Documents Page only shows the button for an unattached one.
+   * Documents. Two different things happen server-side depending on
+   * whether the document is attached to an application: unattached is a
+   * real deletion; attached only stops it being offered here again — it
+   * stays exactly as filed. See `DocumentService.deleteMine`'s own doc
+   * comment (backend repo) for the full reasoning.
    */
   deleteDocument(documentId: string): Observable<void> {
     return this.delete<void>(`/documents/${encodeURIComponent(documentId)}`);
