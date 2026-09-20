@@ -22,6 +22,7 @@ import { toBase64 } from '../../core/api/document-resubmission.service';
 import { ApiError } from '../../core/api/problem';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
 import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
+import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -67,6 +68,14 @@ type Slot =
   | ({ kind: 'upload'; supersedesDocumentId?: string | null } & AttachedDoc)
   | ({ kind: 'reused' } & ReusedDoc);
 
+/** What the "view what I attached" popup needs. Built straight from an 'upload' slot's own File, or fetched fresh for a 'reused' one — see previewAttached(). */
+interface WizardPreview {
+  file: File;
+  fileName: string;
+  fileType: SavedDocumentFileType;
+  label: string;
+}
+
 function fileTypeFromName(name: string): SavedDocumentFileType {
   const ext = name.split('.').pop()?.toLowerCase();
   if (ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'pdf') return ext as SavedDocumentFileType;
@@ -86,7 +95,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
  */
 @Component({
   selector: 'app-application-wizard',
-  imports: [FormsModule, RouterLink, CapitalizeNameDirective, LegalModalComponent],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective, LegalModalComponent, DocumentPreviewComponent],
   template: `
     <div class="page" style="max-width:760px;">
       <div class="page-header">
@@ -206,7 +215,15 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                 @if (uploadingRequirementId() === d.id) {
                   <span class="badge">Sending…</span>
                 } @else if (attached[d.id]; as slot) {
-                  <span class="badge badge-green">{{ slot.fileName }}</span>
+                  <button
+                    type="button" class="badge badge-green"
+                    style="border:none; cursor:pointer; font:inherit;"
+                    [disabled]="previewingId() === d.id"
+                    [attr.aria-label]="'View ' + slot.fileName"
+                    (click)="previewAttached(d)"
+                  >
+                    {{ previewingId() === d.id ? 'Opening…' : slot.fileName }}
+                  </button>
                   @if (slot.kind === 'upload' && api.configured && !uploadedDocumentIds()[d.id]) {
                     <span class="small muted">Not sent yet</span>
                   }
@@ -318,7 +335,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           -->
           <label class="checkbox-row" style="margin-bottom:14px;">
             <input type="checkbox" [(ngModel)]="agreeTerms" /> I agree to the
-            <button type="button" class="link-button" (click)="openLegalModal.set('terms')">Terms &amp; Conditions</button>.
+            <button type="button" class="link-button" (click)="openLegalModal.set('terms')">Terms &amp; Conditions</button>
           </label>
           @if (openLegalModal(); as doc) {
             <app-legal-modal [document]="doc" (close)="openLegalModal.set(null)" />
@@ -331,6 +348,16 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
             </button>
           </div>
         </div>
+      }
+
+      @if (preview(); as p) {
+        <app-document-preview
+          [file]="p.file"
+          [fileName]="p.fileName"
+          [fileType]="p.fileType"
+          [label]="p.label"
+          (close)="preview.set(null)"
+        />
       }
     </div>
   `,
@@ -360,6 +387,11 @@ export class ApplicationWizardPage {
    */
   protected readonly uploadedDocumentIds = signal<Record<string, string>>({});
   protected readonly uploadingRequirementId = signal<string | null>(null);
+
+  /** What's showing in the "view what I attached" popup, or null. See previewAttached(). */
+  protected readonly preview = signal<WizardPreview | null>(null);
+  /** Which requirement's reused document is currently being fetched for preview (an 'upload' slot already holds its File, so this only ever applies to 'reused'). */
+  protected readonly previewingId = signal<string | null>(null);
 
   protected readonly realDocuments = signal<DocumentHistoryEntry[]>([]);
 
@@ -690,6 +722,48 @@ export class ApplicationWizardPage {
     // The native control remembers the last pick independently of our state;
     // clear it so the row does not keep naming a file that is no longer attached.
     if (fileInput) fileInput.value = '';
+  }
+
+  /**
+   * Shows what's actually attached to this requirement, in-page.
+   *
+   * An 'upload' slot already holds the real File in memory (AttachedDoc's
+   * own doc comment on why) — no network trip needed, straight into the
+   * preview. A 'reused' slot is deliberately just a reference to a real
+   * document on the server (ReusedDoc's own doc comment), so its bytes are
+   * fetched fresh, the same fetch-then-blob: URL pattern
+   * my-documents.page.ts's viewReal() uses and for the same reason: a
+   * direct GET /documents/{id}/content response is ALWAYS
+   * Content-Disposition: attachment (documents.controller.ts, backend
+   * repo — a deliberate XSS guard), which navigating to it directly would
+   * always download rather than show.
+   */
+  async previewAttached(d: RequirementDocument): Promise<void> {
+    const slot = this.attached[d.id];
+    if (!slot) return;
+
+    if (slot.kind === 'upload') {
+      this.preview.set({ file: slot.file, fileName: slot.fileName, fileType: slot.fileType, label: d.label });
+      return;
+    }
+
+    this.previewingId.set(d.id);
+    try {
+      const { url } = await firstValueFrom(this.api.getDocumentContent(slot.documentId));
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(String(response.status));
+      const blob = await response.blob();
+      this.preview.set({
+        file: new File([blob], slot.fileName),
+        fileName: slot.fileName,
+        fileType: slot.fileType,
+        label: d.label,
+      });
+    } catch {
+      this.toast.error('Could not open this document. Try again.');
+    } finally {
+      this.previewingId.set(null);
+    }
   }
 
   toStep(next: Step): void {
