@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, throwError } from 'rxjs';
+import { Observable, catchError, map, throwError } from 'rxjs';
 import { API_BASE_URL, ApiNotConfiguredError, RESUBMIT_MAX_FILE_BYTES } from './api-config';
 import { problemFrom } from './problem';
 import { ApplicationAction } from '../domain/permit.model';
@@ -129,7 +129,25 @@ export class CitizenApiClient {
    * there is no "attach by reference" route, only "upload fresh bytes".
    */
   getDocumentContent(documentId: string): Observable<{ url: string }> {
-    return this.get<{ url: string }>(`/documents/${encodeURIComponent(documentId)}/content`);
+    return this.get<{ url: string }>(`/documents/${encodeURIComponent(documentId)}/content`)
+      .pipe(map((result) => ({ url: this.absolute(result.url) })));
+  }
+
+  /**
+   * A signed URL the server minted, made fetchable from THIS page.
+   *
+   * The server signs a PATH — `/documents/content?key=…&sig=…` — meant to be
+   * redeemed on ITS origin (`signed-url.ts`, backend). Handed to `fetch`
+   * as-is, the browser resolves it against this site's origin instead. Under
+   * `ng serve` the dev proxy forwards `/documents` and `/me` to the API, so
+   * it worked; on the deployed site that is Netlify, which answers every
+   * unknown path with index.html — so previewing an uploaded document, or
+   * downloading a data export, got an HTML page back. Resolved against the
+   * same base every other call uses; an empty base (same-origin gateway)
+   * resolves against the page, which is what it always did.
+   */
+  private absolute(url: string): string {
+    return new URL(url, this.baseUrl || globalThis.location.origin).toString();
   }
 
   /**
@@ -358,7 +376,8 @@ export class CitizenApiClient {
 
   /** `GET /me/export/{requestId}/content` — a short-lived signed URL, minted fresh on each call. */
   getExportContent(requestId: string): Observable<ExportContentResult> {
-    return this.get<ExportContentResult>(`/me/export/${encodeURIComponent(requestId)}/content`);
+    return this.get<ExportContentResult>(`/me/export/${encodeURIComponent(requestId)}/content`)
+      .pipe(map((result) => ({ ...result, url: this.absolute(result.url) })));
   }
 
   /**
