@@ -30,27 +30,18 @@
   flex-direction: column;
   background: #ffffff;
   border-right: 1px solid var(--ds-border);
-  // Was 34px/20px/20px, and every nav item was 52px tall with a 25px/16px
-  // rule margin below the logo — nine items plus Log Out added up to more
-  // than a typical laptop viewport, forcing a scrollbar the redesign never
-  // intended. Tightened throughout rather than just here; see each rule's
-  // own comment below for its share.
   padding: 20px 18px 16px;
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+  // The sidebar itself no longer scrolls as one piece — see `.ds-nav`
+  // below, same split the Admin Portal's own sidebar already uses (and
+  // learned the hard way: an earlier version scrolled the whole column,
+  // which took Log Out along with the nav list on a short viewport).
+  // `.ds-brand` and `.ds-divider`/`.ds-logout` are pinned by being outside
+  // the one region that scrolls now.
+  overflow: hidden;
   transition: width 200ms ease, padding 200ms ease;
-
-  // Thin, unobtrusive scrollbar for when the nav list needs to scroll —
-  // the browser default is visually noisy against this otherwise quiet panel.
-  scrollbar-width: thin;
-  scrollbar-color: #d6d9df transparent;
-  &::-webkit-scrollbar { width: 5px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #d6d9df; border-radius: 999px; }
-  &::-webkit-scrollbar-thumb:hover { background: #bfc4cc; }
 }
 
 .ds-brand {
@@ -111,31 +102,57 @@
 .ds-nav {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
+  // Grows to fill whatever space `.ds-brand`/`.ds-brand-rule` above and
+  // `.ds-divider`/`.ds-logout` below leave, and only scrolls internally if
+  // its own content ever exceeds that (mirrors the Admin Portal's
+  // `.nav-sections`). `min-height: 0` is required for a flex child to be
+  // allowed to shrink below its content size at all.
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  // Nine items is short enough to leave real space in this region on most
+  // viewports (confirmed live: it did, badly — one large blank block below
+  // Log Out). Centering the list inside its own flexible region splits
+  // that space evenly above and below instead, which reads as deliberate
+  // breathing room rather than an unfinished page.
+  justify-content: center;
+
+  // Thin, unobtrusive scrollbar for on the rare viewport short enough that
+  // this list actually needs to scroll.
+  scrollbar-width: thin;
+  scrollbar-color: #d6d9df transparent;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: #d6d9df; border-radius: 999px; }
+  &::-webkit-scrollbar-thumb:hover { background: #bfc4cc; }
 }
 
 .ds-nav-link {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  // Was 52px — the single biggest contributor to the sidebar overflowing:
-  // nine items at 52px is 468px before gaps, padding or anything else.
-  height: 42px;
-  padding: 0 12px;
+  gap: 13px;
+  // Was 52px originally, then 42px — now a middle ground: `.ds-nav`
+  // centering itself absorbs most of the leftover space, so this no
+  // longer has to be as small as possible just to avoid a scrollbar.
+  height: 46px;
+  padding: 0 13px;
   border-radius: 10px;
   color: var(--ds-ink-secondary);
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
   background: transparent;
   border: none;
   width: 100%;
+  flex-shrink: 0;
   text-align: left;
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
-.ds-nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
+.ds-nav-icon { width: 19px; height: 19px; flex-shrink: 0; }
 .ds-nav-badge {
   margin-left: auto;
   min-width: 20px;
@@ -158,11 +175,9 @@
   content: '';
   position: absolute;
   left: 2px;
-  // Was 12px/12px, tuned for a 52px-tall link — kept proportional to the
-  // link's own new 42px height rather than left as-is, which would have
-  // shrunk the visible bar to barely a third of the row.
-  top: 9px;
-  bottom: 9px;
+  // Kept proportional to `.ds-nav-link`'s own height (currently 46px).
+  top: 10px;
+  bottom: 10px;
   width: 3px;
   border-radius: 999px;
   background: var(--ds-red);
@@ -176,12 +191,9 @@
   border: none;
   height: 1px;
   background: var(--ds-border);
-  // Was `margin: auto 0 16px` — the auto top margin is a flex "push to
-  // bottom" trick, so on a tall window it opened a large, viewport-height-
-  // dependent gap above the divider/Log Out that grew or shrank as the
-  // window resized, instead of always sitting close to the nav list.
   margin: 12px 0;
   width: 100%;
+  flex-shrink: 0;
 }
 
 .ds-logout { color: var(--ds-red); }
