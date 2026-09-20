@@ -96,7 +96,14 @@
     # — everything else this app talks to is itself. The generated permit's
     # verification QR is drawn to a <canvas> from a locally-built URL string
     # (permit-document.page.ts); nothing is fetched to produce it.
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://139-162-51-165.sslip.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    # `blob:` in `img-src` and an explicit `frame-src` (which would otherwise
+    # inherit `default-src 'self'`): document preview and the permit document
+    # fetch the real file from the API (allowed by `connect-src`) and show it
+    # from an object URL — an <img> for images, an <iframe> for PDFs. Without
+    # these, the bytes arrived and the browser refused to render them (found
+    # live on the Admin Portal, same policy, 2026-09-20). A blob: URL is
+    # same-origin memory this page created; it opens nothing to a third party.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; frame-src 'self' blob:; object-src 'none'; font-src 'self'; connect-src 'self' https://139-162-51-165.sslip.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     # A year, subdomains included. No `preload`: that is a one-way submission
     # to browsers' built-in preload list and a human call, not a default.
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
