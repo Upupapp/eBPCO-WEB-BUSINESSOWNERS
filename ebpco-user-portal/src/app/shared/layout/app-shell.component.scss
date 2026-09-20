@@ -112,12 +112,13 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  // Nine items is short enough to leave real space in this region on most
-  // viewports (confirmed live: it did, badly — one large blank block below
-  // Log Out). Centering the list inside its own flexible region splits
-  // that space evenly above and below instead, which reads as deliberate
-  // breathing room rather than an unfinished page.
-  justify-content: center;
+  // Top-aligned, like the Admin Portal's `.nav-sections`: the list starts
+  // directly under the brand and whatever space is left sits above Log Out,
+  // where empty space reads as normal. This was `center` for a while, which
+  // split the leftover height above AND below the list — so Home floated a
+  // third of the way down the sidebar with a blank block over it, and the
+  // two portals stopped looking like one product (owner call, 2026-09-20).
+  justify-content: flex-start;
 
   // Thin, unobtrusive scrollbar for on the rare viewport short enough that
   // this list actually needs to scroll.
