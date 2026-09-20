@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { SAVED_DOCUMENT_CATEGORY_LABELS, SavedDocument, SavedDocumentCategory, SavedDocumentFileType } from '../../core/domain/document.model';
 import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
+import { ConfirmModalComponent } from '../../shared/ui/confirm-modal.component';
 import { formatDate } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
@@ -37,7 +38,7 @@ interface RealPreview {
  */
 @Component({
   selector: 'app-my-documents',
-  imports: [DocumentPreviewComponent],
+  imports: [DocumentPreviewComponent, ConfirmModalComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -87,10 +88,10 @@ interface RealPreview {
                   <button class="btn btn-secondary btn-sm" [disabled]="downloadingId() === d.id" (click)="downloadReal(d)">
                     {{ downloadingId() === d.id ? 'Downloading…' : 'Download' }}
                   </button>
-                  <button class="btn btn-ghost btn-sm" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
-                    {{ deletingId() === d.id ? 'Removing…' : 'Delete' }}
-                  </button>
                 </div>
+                <button class="btn btn-sm doc-delete" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
+                  {{ deletingId() === d.id ? 'Removing…' : 'Delete' }}
+                </button>
               </div>
             }
           </div>
@@ -145,6 +146,19 @@ interface RealPreview {
           [fileType]="p.fileType"
           [label]="p.label"
           (close)="realPreview.set(null)"
+        />
+      }
+
+      @if (confirmDeleteFor(); as d) {
+        <app-confirm-modal
+          title="Remove from My Documents"
+          [message]="d.applicationReference
+            ? 'Remove ' + d.fileName + ' from My Documents? It will stay exactly as filed on ' + d.applicationReference + ' — this only stops it being offered for reuse elsewhere.'
+            : 'Remove ' + d.fileName + ' from My Documents? This deletes it.'"
+          confirmLabel="Remove"
+          tone="danger"
+          (confirm)="confirmDelete()"
+          (cancel)="confirmDeleteFor.set(null)"
         />
       }
     </div>
@@ -232,10 +246,27 @@ interface RealPreview {
     .doc-actions {
       display: flex;
       gap: 6px;
-      flex-wrap: wrap;
       margin-top: auto;
       padding-top: 8px;
       border-top: 1px solid var(--border-light, #eeeef2);
+    }
+    .doc-actions .btn {
+      flex: 1;
+    }
+    // A real button, not a bare red link floating under the row above —
+    // same border/radius/padding weight as View and Download, just tinted
+    // for a destructive action, so it reads as a deliberate part of the
+    // card rather than something left unstyled (found live 2026-09-20).
+    .doc-delete {
+      width: 100%;
+      margin-top: 6px;
+      background: transparent;
+      color: var(--danger-text, #a5182a);
+      border: 1px solid var(--danger-100, #fdeceb);
+    }
+    .doc-delete:hover:not(:disabled) {
+      background: var(--danger-100, #fdeceb);
+      border-color: var(--danger-500, #dc2626);
     }
   `],
 })
@@ -357,6 +388,9 @@ export class MyDocumentsPage {
     });
   }
 
+  /** Which document confirmDeleteFor's modal is asking about, or null — set by deleteReal, read+acted on by confirmDelete. */
+  protected readonly confirmDeleteFor = signal<DocumentHistoryEntry | null>(null);
+
   /**
    * Always shown, whether or not the document is attached — the server
    * (`DELETE /documents/{id}`, see citizen-api.client.ts's deleteDocument
@@ -366,10 +400,13 @@ export class MyDocumentsPage {
    * offered here — it stays exactly as filed on its application.
    */
   deleteReal(d: DocumentHistoryEntry): void {
-    const question = d.applicationReference
-      ? `Remove ${d.fileName} from My Documents? It will stay exactly as filed on ${d.applicationReference} — this only stops it being offered for reuse elsewhere.`
-      : `Remove ${d.fileName} from My Documents? This deletes it.`;
-    if (!confirm(question)) return;
+    this.confirmDeleteFor.set(d);
+  }
+
+  protected confirmDelete(): void {
+    const d = this.confirmDeleteFor();
+    this.confirmDeleteFor.set(null);
+    if (!d) return;
 
     this.deletingId.set(d.id);
     this.api.deleteDocument(d.id).subscribe({
