@@ -483,6 +483,16 @@ export class RegisterPage {
       this.error.set('Postal code must be exactly 4 digits.');
       return;
     }
+    // A code was actually sent to this address and never confirmed — do not
+    // let Continue past that silently. `skipVerification()` is the one
+    // deliberate escape hatch (no provider configured, or delivery just
+    // failed): the citizen was already told, on this same step, that they
+    // may proceed unverified, and holding them here anyway would contradict
+    // what was just shown.
+    if (!this.emailVerified() && this.codeSent() && !this.skipVerification()) {
+      this.error.set('Please confirm the code sent to your email, or use Resend Code if it did not arrive.');
+      return;
+    }
     this.error.set(null);
     this.step.set(3);
   }

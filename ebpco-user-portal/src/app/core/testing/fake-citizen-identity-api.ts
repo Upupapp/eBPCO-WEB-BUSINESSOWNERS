@@ -52,6 +52,12 @@ export class FakeCitizenIdentityApi {
   async resetPassword(): Promise<{ kind: 'done' }> {
     return { kind: 'done' };
   }
+  async requestRegistrationEmailCode(): Promise<{ kind: 'sent'; detail: string }> {
+    return { kind: 'sent', detail: 'A 6-digit code was sent.' };
+  }
+  async confirmRegistrationEmailCode(): Promise<{ kind: 'confirmed' }> {
+    return { kind: 'confirmed' };
+  }
   async changePassword(): Promise<{ kind: 'done' }> {
     return { kind: 'done' };
   }
