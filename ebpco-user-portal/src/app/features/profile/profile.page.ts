@@ -262,7 +262,6 @@ export class ProfilePage {
   }
 
   /** True once a save has un-verified the mobile number, as the server reported. */
-  protected readonly mobileUnverified = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
   saveProfile(): void {
@@ -322,18 +321,11 @@ export class ProfilePage {
     }
 
     this.api.patchMe(patch).subscribe({
-      next: (result) => {
-        // Stated by the server, not inferred. Changing the number cleared the
-        // verification that belonged to the OLD one, and a screen that does not
-        // say so leaves a citizen holding an unverified contact they believe is
-        // verified.
-        this.mobileUnverified.set(result.mobileVerificationCleared);
-        this.toast.success(
-          result.mobileVerificationCleared
-            ? 'Sent to the Municipality. Your mobile number is now unverified.'
-            : 'Sent to the Municipality.',
-        );
-      },
+      // The server still reports `mobileVerificationCleared`; it is not
+      // surfaced. The LGU does not verify mobile numbers, so telling a
+      // citizen their new number is "unverified" would name a state nothing
+      // ever confirms.
+      next: () => this.toast.success('Sent to the Municipality.'),
       error: (e) =>
         this.saveError.set(
           e instanceof ApiError

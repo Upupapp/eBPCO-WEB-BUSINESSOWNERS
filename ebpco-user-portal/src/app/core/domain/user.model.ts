@@ -2,7 +2,11 @@
 // mobile's UserModel (ebpco-mobile/lib/core/models/user_model.dart) into
 // the one account shape this portal owns and authenticates directly —
 // unlike the Admin Portal, this app IS the applicant's real login surface.
-export type VerificationMethod = 'Email Verification Link' | 'Mobile OTP';
+// Email only. The LGU records a mobile number and does not verify it — there
+// is no SMS provider and no intention to add one — so a "Mobile OTP" method
+// and a mobile verification state were removed (2026-09-20) rather than left
+// as badges nothing could ever change.
+export type VerificationMethod = 'Email Verification Link';
 export type VerificationStatus = 'Unverified' | 'Pending Verification' | 'Verified' | 'Verification Failed';
 
 export interface ContactVerification {
@@ -42,7 +46,6 @@ export interface UserAccount {
   hasPhoto: boolean;
   accountStatus: AccountStatus;
   emailVerification: ContactVerification;
-  mobileVerification: ContactVerification;
   registeredSince: string;
 }
 

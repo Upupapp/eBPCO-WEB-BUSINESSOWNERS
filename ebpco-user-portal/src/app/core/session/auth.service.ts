@@ -452,9 +452,8 @@ function meResponseToAccount(me: MeResponse): UserAccount {
     emailVerification: me.emailVerifiedAt
       ? { status: 'Verified', method: 'Email Verification Link', verifiedAt: me.emailVerifiedAt }
       : unverifiedContact(),
-    mobileVerification: me.mobileVerifiedAt
-      ? { status: 'Verified', method: 'Mobile OTP', verifiedAt: me.mobileVerifiedAt }
-      : unverifiedContact(),
+    // `me.mobileVerifiedAt` is deliberately not mapped: the LGU does not
+    // verify mobile numbers, so nothing in this portal shows a state for it.
     // No server field for account-creation time either — not returned by
     // `/me`. '' rather than a guessed date.
     registeredSince: '',

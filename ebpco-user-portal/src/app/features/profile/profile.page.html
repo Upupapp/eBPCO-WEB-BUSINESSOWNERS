@@ -33,13 +33,23 @@
 
         <hr class="divider" />
 
+        <!--
+          Email only. Verified means the citizen confirmed the code sent to
+          this address when they signed up (register.page.ts, step 2). There
+          is no mobile badge: the Municipality records a mobile number and
+          does not verify it, so a "Mobile: Unverified" label described a
+          check that was never going to happen.
+        -->
         <div class="profile-side-badges">
           <span class="badge" [class]="u.emailVerification.status === 'Verified' ? 'badge-green' : 'badge-amber'">Email: {{ u.emailVerification.status }}</span>
-          <span class="badge" [class]="u.mobileVerification.status === 'Verified' ? 'badge-green' : 'badge-amber'">Mobile: {{ u.mobileVerification.status }}</span>
         </div>
-        <!-- F-16: these badges report a status nothing can change and nothing enforces. Say so. -->
         <p class="small muted profile-side-note">
-          Verification is not available in this build and is not required for anything here.
+          @if (u.emailVerification.status === 'Verified') {
+            Your email address was confirmed when you signed up.
+          } @else {
+            Your email address was not confirmed when this account was created. This does not block
+            anything here; the Municipality may confirm it with you directly.
+          }
         </p>
       </div>
 
@@ -136,25 +146,6 @@
                 The Municipality has no address on file for you. This is not something you left
                 blank — until now there was nowhere in the system to record it, so you were never
                 asked. Filling it in lets the office write to you about an application.
-              </div>
-            }
-
-            @if (mobileUnverified()) {
-              <!--
-                Stated by the server (mobileVerificationCleared), not inferred.
-                The change takes effect IMMEDIATELY and the verification that
-                belonged to the old number is gone with it. A screen that stayed
-                silent would leave a citizen holding an unverified contact they
-                believe is verified.
-              -->
-              <div
-                class="card"
-                style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin:12px 0;"
-              >
-                <strong>Your new mobile number is not verified.</strong>
-                The Municipality has recorded it, but the verification belonged to your old number.
-                eBPCO cannot send a verification code yet, so the office may confirm the number with
-                you directly.
               </div>
             }
 

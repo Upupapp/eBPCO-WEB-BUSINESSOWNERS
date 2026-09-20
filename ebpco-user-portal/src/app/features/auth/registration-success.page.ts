@@ -31,9 +31,15 @@ import { RouterLink } from '@angular/router';
           real precondition. It was a dead instruction pointing at a screen with
           no such control. Do not restore it without the control it names.
         -->
+        <!--
+          Rewritten 2026-09-20: sign-up now confirms the email address with a
+          real code (step 2), so "not available yet" stopped being true. Mobile
+          numbers are recorded and not verified, by decision — say so rather
+          than imply a step the citizen should go looking for.
+        -->
         <p class="small muted">
-          Email and mobile verification are not available yet, so your account shows as pending. That
-          does not block anything in this build.
+          If you confirmed the code sent to your email during sign-up, your address shows as
+          Verified on your Profile. Your mobile number is kept on file and is not verified.
         </p>
         <a routerLink="/login" class="btn btn-primary btn-block" style="margin-top:12px;">Continue to Log In</a>
       </div>

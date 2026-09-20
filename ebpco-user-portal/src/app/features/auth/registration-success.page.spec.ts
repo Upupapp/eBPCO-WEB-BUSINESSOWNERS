@@ -29,10 +29,16 @@ describe('RegistrationSuccessPage (F-16: no instruction without a control)', () 
     expect(text).not.toContain('before submitting a permit application');
   });
 
-  it('says verification is unavailable and blocks nothing', () => {
+  it('describes email verification as the sign-up step it now is, and mobile as recorded-not-verified', () => {
+    // Sign-up confirms the email address with a real code since 2026-09-20,
+    // so "not available yet" stopped being true. Mobile numbers are kept on
+    // file and never verified — by decision, not as a gap — and the page
+    // must not send anyone looking for a step that does not exist.
     const text = (render().nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('not available yet');
-    expect(text).toContain('does not block anything');
+    expect(text).toContain('confirmed the code sent to your email during sign-up');
+    expect(text).toContain('mobile number is kept on file and is not verified');
+    expect(text).not.toContain('not available yet');
+    expect(text).not.toMatch(/verify your mobile/i);
   });
 
   it('does not imply the account reached the Municipality', () => {
