@@ -96,13 +96,27 @@ export function bytesMatchType(head: Uint8Array, fileType: SavedDocumentFileType
             </div>
           }
 
+          <!--
+            No sandbox attribute on the frame, deliberately. Chrome's PDF viewer will
+            not run inside a sandboxed iframe at all — the frame showed a
+            broken-document icon for every PDF on the deployed site
+            (2026-09-20), while the same bytes rendered fine unsandboxed. The
+            protection the sandbox was standing in for is already provided
+            twice over: the Blob is typed application/pdf from OUR enum (see
+            SAFE_MIME — the browser can only ever hand it to the PDF viewer,
+            never parse it as HTML), and the frame is only rendered once the
+            bytes have been checked to begin with %PDF (verified()); a file
+            that merely calls itself a PDF gets the mismatch notice above and
+            no frame.
+          -->
           @if (fileType() === 'pdf') {
-            <iframe
-              class="doc-preview-frame"
-              [src]="safeUrl()"
-              [title]="'Preview of ' + fileName()"
-              sandbox
-            ></iframe>
+            @if (verified()) {
+              <iframe
+                class="doc-preview-frame"
+                [src]="safeUrl()"
+                [title]="'Preview of ' + fileName()"
+              ></iframe>
+            }
           } @else {
             <img class="doc-preview-image" [src]="url()" [alt]="'Preview of ' + fileName()" />
           }
@@ -142,6 +156,8 @@ export class DocumentPreviewComponent implements OnDestroy {
 
   private readonly objectUrl = signal<string | null>(null);
   protected readonly mismatch = signal(false);
+  /** True once the first bytes have been read AND match the claimed type — the gate for rendering a PDF frame. */
+  protected readonly verified = signal(false);
 
   /**
    * The live URL, held OUTSIDE the signal graph.
@@ -162,13 +178,16 @@ export class DocumentPreviewComponent implements OnDestroy {
       const type = this.fileType();
       this.revoke();
       this.mismatch.set(false);
+      this.verified.set(false);
       if (!f) return;
       // The blob is typed from OUR enum, not from f.type. See SAFE_MIME.
       const url = URL.createObjectURL(new Blob([f], { type: mimeFor(type) }));
       this.liveUrl = url;
       this.objectUrl.set(url);
       void f.slice(0, 8).arrayBuffer().then((buf) => {
-        this.mismatch.set(!bytesMatchType(new Uint8Array(buf), type));
+        const matches = bytesMatchType(new Uint8Array(buf), type);
+        this.mismatch.set(!matches);
+        this.verified.set(matches);
       });
     });
   }
