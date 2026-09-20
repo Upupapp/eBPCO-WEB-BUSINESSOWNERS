@@ -299,6 +299,11 @@ select.input {
 }
 .password-field { position: relative; }
 .password-field .input { padding-right: 38px; }
+// Edge/IE draw their own reveal-password eye inside type="password" inputs;
+// left alone it sits right next to our .password-toggle button, showing two
+// eye icons at once (found live 2026-09-20).
+.password-field .input::-ms-reveal,
+.password-field .input::-ms-clear { display: none; }
 .password-field .password-toggle {
   position: absolute;
   top: 50%;
