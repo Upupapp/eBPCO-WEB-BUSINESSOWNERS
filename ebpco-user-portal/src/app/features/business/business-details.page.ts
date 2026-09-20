@@ -61,8 +61,10 @@ import { ToastService } from '../../shared/ui/toast.service';
               <tbody>
                 @for (app of appsForBusiness(); track app.id) {
                   <tr>
-                    <td><a [routerLink]="['/applications', app.id]">{{ app.applicationNumber }}</a></td>
-                    <td>{{ app.permitType }}</td>
+                    <td>
+                      <a [routerLink]="['/applications', app.id]" class="table-cell-clip" [title]="app.applicationNumber">{{ app.applicationNumber }}</a>
+                    </td>
+                    <td><span class="table-cell-clip" [title]="app.permitType">{{ app.permitType }}</span></td>
                     <td><app-status-pill [label]="applicantStatusOf(app.lifecycleStatus)" /></td>
                     <td>{{ formatDate(app.dateSubmitted) }}</td>
                   </tr>

@@ -434,9 +434,43 @@ select.input {
 }
 
 table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-table.table th { text-align: left; color: var(--primary-700); background: var(--primary-50); padding: 10px 12px; font-weight: 700; }
+table.table th { text-align: left; color: var(--primary-700); background: var(--primary-50); padding: 10px 12px; font-weight: 700; white-space: nowrap; }
 table.table td { padding: 10px 12px; border-bottom: 1px solid var(--border-light); }
 table.table tr:last-child td { border-bottom: none; }
+
+// A long reference number or permit type name was the single biggest
+// contributor to a table needing the horizontal scroll above at all — this
+// keeps a cell from stretching a column wider than its content actually
+// needs to be read at a glance, the full value is still one tap/hover away.
+.table-cell-clip {
+  display: inline-block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+// The 390px-phone table-scroll fix above (.card:has(table.table)) still
+// needed real testing at that width to confirm it actually reads as a
+// scrollable table rather than a broken one — it did not: at 390px a
+// 4-column table's own borders and content ran past the card's visible
+// edge before the native scrollbar affordance was obvious (found live
+// 2026-09-20, business-details.page.ts's own Applications table). Tighter
+// padding and font-size buy back real width instead of only shrinking the
+// gap between "fits" and "needs to scroll."
+@media (max-width: 480px) {
+  table.table {
+    font-size: 12.5px;
+  }
+  table.table th,
+  table.table td {
+    padding: 8px 8px;
+  }
+  .table-cell-clip {
+    max-width: 110px;
+  }
+}
 
 // Steps
 .steps { display: flex; align-items: center; gap: 4px; margin-bottom: 24px; flex-wrap: wrap; }
