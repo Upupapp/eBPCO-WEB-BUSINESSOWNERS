@@ -21,6 +21,7 @@ import { UploadLimitsService } from '../../core/api/upload-limits.service';
 import { toBase64 } from '../../core/api/document-resubmission.service';
 import { ApiError } from '../../core/api/problem';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
+import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -85,7 +86,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
  */
 @Component({
   selector: 'app-application-wizard',
-  imports: [FormsModule, RouterLink, CapitalizeNameDirective],
+  imports: [FormsModule, RouterLink, CapitalizeNameDirective, LegalModalComponent],
   template: `
     <div class="page" style="max-width:760px;">
       <div class="page-header">
@@ -240,7 +241,15 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                     </div>
                   }
                 }
+                <!--
+                  #fileInput is handed to Remove and to the reuse picker so
+                  they can clear it. A native file input keeps showing the
+                  last chosen filename on its own, so after "Remove" the row
+                  read "Choose File  sample.pdf" while nothing was attached —
+                  the citizen could not tell whether the removal had happened.
+                -->
                 <input
+                  #fileInput
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
                   [attr.aria-label]="(attached[d.id]?.kind === 'reused' ? 'Replace ' : 'Attach ') + d.label"
@@ -254,7 +263,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                     style="max-width:260px;"
                     [ngModel]="null"
                     [ngModelOptions]="{ standalone: true }"
-                    (ngModelChange)="reuseExisting(d, $event)"
+                    (ngModelChange)="reuseExisting(d, $event, fileInput)"
                   >
                     <option [ngValue]="null">A document you've already uploaded…</option>
                     @for (saved of reusable(); track saved.id) {
@@ -271,7 +280,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   </select>
                 }
                 @if (attached[d.id]) {
-                  <button class="btn btn-ghost btn-sm" (click)="removeAttachment(d)">Remove</button>
+                  <button class="btn btn-ghost btn-sm" (click)="removeAttachment(d, fileInput)">Remove</button>
                 }
               </div>
             </div>
@@ -302,9 +311,18 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           <label class="checkbox-row" style="margin-bottom:8px;">
             <input type="checkbox" [(ngModel)]="understandRequirements" /> I understand the application requirements and certify the information provided is true and correct.
           </label>
+          <!--
+            Same overlay the sign-up form uses (legal-modal.component.ts) —
+            a citizen asked to agree to terms mid-application must be able to
+            read them without leaving the form, and this used to be plain text.
+          -->
           <label class="checkbox-row" style="margin-bottom:14px;">
-            <input type="checkbox" [(ngModel)]="agreeTerms" /> I agree to the Terms &amp; Conditions.
+            <input type="checkbox" [(ngModel)]="agreeTerms" /> I agree to the
+            <button type="button" class="link-button" (click)="openLegalModal.set('terms')">Terms &amp; Conditions</button>.
           </label>
+          @if (openLegalModal(); as doc) {
+            <app-legal-modal [document]="doc" (close)="openLegalModal.set(null)" />
+          }
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
             <button class="btn btn-secondary" [disabled]="submitting()" (click)="step.set(3)">Back</button>
@@ -327,6 +345,8 @@ export class ApplicationWizardPage {
   protected readonly api = inject(CitizenApiClient);
   private readonly uploadLimits = inject(UploadLimitsService);
   readonly submitting = signal(false);
+  /** Which legal document the Review step's overlay is showing, if any. */
+  readonly openLegalModal = signal<LegalDocument | null>(null);
 
   /**
    * Real, server-assigned document ids for this wizard's uploads, keyed by
@@ -624,9 +644,12 @@ export class ApplicationWizardPage {
    * listed under My Documents and could never be used again.
    */
   protected async reuseExisting(
-    d: RequirementDocument, item: DocumentHistoryEntry | SavedDocument | null,
+    d: RequirementDocument, item: DocumentHistoryEntry | SavedDocument | null, fileInput?: HTMLInputElement,
   ): Promise<void> {
     if (!item) return;
+    // Reusing replaces whatever the native control last picked; clear it so the
+    // row does not show one filename beside an attachment that is another.
+    if (fileInput) fileInput.value = '';
 
     if (this.api.configured) {
       const real = item as DocumentHistoryEntry;
@@ -660,10 +683,13 @@ export class ApplicationWizardPage {
     this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
   }
 
-  removeAttachment(d: RequirementDocument): void {
+  removeAttachment(d: RequirementDocument, fileInput?: HTMLInputElement): void {
     const { [d.id]: _removed, ...rest } = this.attached;
     this.attached = rest;
     this.uploadedDocumentIds.update(({ [d.id]: _drop, ...ids }) => ids);
+    // The native control remembers the last pick independently of our state;
+    // clear it so the row does not keep naming a file that is no longer attached.
+    if (fileInput) fileInput.value = '';
   }
 
   toStep(next: Step): void {

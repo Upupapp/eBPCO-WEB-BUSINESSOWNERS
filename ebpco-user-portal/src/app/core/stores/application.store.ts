@@ -73,6 +73,8 @@ function fromServerSummary(row: ApplicationSummary, applicantId: string): Applic
     relatedPermitNumber: null,
     dateSubmitted: row.dateSubmitted,
     lifecycleStatus: row.lifecycleStatus as ApplicationLifecycleStatus,
+    applicantStatus: row.applicantStatus,
+    requiresApplicantAction: row.requiresApplicantAction,
     // See doc comment above — no server field exists for these two.
     evaluationStage: 'Initial',
     evaluationResult: 'Pending',

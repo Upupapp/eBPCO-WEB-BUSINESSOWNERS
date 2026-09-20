@@ -64,14 +64,26 @@ export class DashboardPage {
     return applicantStatusOf(status);
   }
 
+  /**
+   * Both counts read the server's own projection (`applicantStatus`,
+   * `requiresApplicantAction`) and fall back to the local projection only for
+   * a row the server did not supply — the same rule `statusLabel` uses for
+   * the list, so a card and the rows beside it can never disagree. Found
+   * live: an application whose permit had been released showed "Ready for
+   * Release" in the list while this card, counting only the exact server
+   * status, said 0.
+   */
   awaitingAction(): number {
     return this.applications
       .myApplications()
-      .filter((a) => ['Draft', 'Revision Required', 'Assessed'].includes(a.lifecycleStatus)).length;
+      .filter((a) => a.requiresApplicantAction
+        ?? ['Draft', 'Revision Required', 'Assessed'].includes(a.lifecycleStatus)).length;
   }
 
   readyForRelease(): number {
-    return this.applications.myApplications().filter((a) => a.lifecycleStatus === 'Ready for Release').length;
+    return this.applications
+      .myApplications()
+      .filter((a) => (a.applicantStatus ?? applicantStatusOf(a.lifecycleStatus)) === 'Ready for Release').length;
   }
 
   get kpis(): DashboardKpi[] {

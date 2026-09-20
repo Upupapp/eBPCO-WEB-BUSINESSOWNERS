@@ -27,6 +27,16 @@ export interface ApplicationRecord {
   relatedPermitNumber: string | null;
   dateSubmitted: string | null;
   lifecycleStatus: ApplicationLifecycleStatus;
+  /**
+   * The server's own citizen-facing status and "waiting on you" flag, when the
+   * record came from the server. Every screen that counts or labels by status
+   * should read these rather than re-derive them: the dashboard's "Ready for
+   * Release" card once counted only the exact server status while the list
+   * beside it labelled Released/Completed as "Ready for Release" too, so the
+   * card said 0 next to a row that said otherwise. Absent on local-only rows.
+   */
+  applicantStatus?: string;
+  requiresApplicantAction?: boolean;
   evaluationStage: EvaluationStage;
   evaluationResult: EvaluationResult;
   paymentStatus: PaymentStatus;
