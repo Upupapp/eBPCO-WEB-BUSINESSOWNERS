@@ -30,7 +30,12 @@
   flex-direction: column;
   background: #ffffff;
   border-right: 1px solid var(--ds-border);
-  padding: 34px 20px 20px;
+  // Was 34px/20px/20px, and every nav item was 52px tall with a 25px/16px
+  // rule margin below the logo — nine items plus Log Out added up to more
+  // than a typical laptop viewport, forcing a scrollbar the redesign never
+  // intended. Tightened throughout rather than just here; see each rule's
+  // own comment below for its share.
+  padding: 20px 18px 16px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -79,16 +84,20 @@
 }
 
 .ds-brand-seal {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   flex-shrink: 0;
   transition: width 200ms ease, height 200ms ease;
 }
 .ds-brand-title {
-  font-size: 21px;
+  // Was 21px — at that size "eBPCO Citizen Portal" wrapped to two lines in
+  // this width, adding a full extra line's height above every page. One
+  // line at this size and weight still reads clearly as the wordmark.
+  font-size: 17px;
   font-weight: 700;
   color: var(--ds-ink);
+  line-height: 1.2;
 }
 .ds-brand-rule {
   // A touch darker than --ds-border (#e8eaee) — that shade reads as
@@ -96,29 +105,27 @@
   // whole point of this rule is to be visibly there, just quiet.
   height: 1px;
   background: #d8dbe2;
-  // Was 24px/20px — nine times the 5px gap `.ds-nav` uses between every
-  // other pair of items, which is what made the space right after the
-  // logo read as a conspicuous gap rather than normal section breathing
-  // room.
-  margin: 25px 0 16px;
+  margin: 16px 0 12px;
 }
 
 .ds-nav {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .ds-nav-link {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
-  height: 52px;
-  padding: 0 14px;
-  border-radius: 11px;
+  gap: 12px;
+  // Was 52px — the single biggest contributor to the sidebar overflowing:
+  // nine items at 52px is 468px before gaps, padding or anything else.
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 10px;
   color: var(--ds-ink-secondary);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   background: transparent;
@@ -128,11 +135,11 @@
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
-.ds-nav-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.ds-nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
 .ds-nav-badge {
   margin-left: auto;
-  min-width: 22px;
-  height: 22px;
+  min-width: 20px;
+  height: 20px;
   padding: 0 6px;
   display: inline-flex;
   align-items: center;
@@ -151,8 +158,11 @@
   content: '';
   position: absolute;
   left: 2px;
-  top: 12px;
-  bottom: 12px;
+  // Was 12px/12px, tuned for a 52px-tall link — kept proportional to the
+  // link's own new 42px height rather than left as-is, which would have
+  // shrunk the visible bar to barely a third of the row.
+  top: 9px;
+  bottom: 9px;
   width: 3px;
   border-radius: 999px;
   background: var(--ds-red);
@@ -170,7 +180,7 @@
   // bottom" trick, so on a tall window it opened a large, viewport-height-
   // dependent gap above the divider/Log Out that grew or shrank as the
   // window resized, instead of always sitting close to the nav list.
-  margin: 16px 0;
+  margin: 12px 0;
   width: 100%;
 }
 
