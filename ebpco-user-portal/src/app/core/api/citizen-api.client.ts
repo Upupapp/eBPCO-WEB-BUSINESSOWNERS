@@ -10,6 +10,7 @@ import {
   ApplicationSummary,
   BusinessListResponse,
   BusinessSummary,
+  DraftPatchRequest,
   ErasureReceipt,
   ExportContentResult,
   ExportRequestResult,
@@ -309,6 +310,27 @@ export class CitizenApiClient {
   }
 
   /**
+   * `PATCH /applications/{id}` — keeps editing a Draft this citizen already
+   * started. Refused once the application has actually been filed; see
+   * `DraftPatchRequest`'s own doc comment.
+   */
+  updateDraft(applicationId: string, patch: DraftPatchRequest): Observable<ApplicationSummary> {
+    return this.patch<ApplicationSummary>(`/applications/${encodeURIComponent(applicationId)}`, patch);
+  }
+
+  /**
+   * `POST /applications/{id}/submit` — finalizes a Draft, the resume flow's
+   * last step. `Idempotency-Key` required for the same reason
+   * `fileApplication`'s is: a retry after a dropped connection must not be
+   * read as a second attempt to submit.
+   */
+  submitDraft(applicationId: string, idempotencyKey: string): Observable<ApplicationSummary> {
+    return this.post<ApplicationSummary>(
+      `/applications/${encodeURIComponent(applicationId)}/submit`, {}, idempotencyKey,
+    );
+  }
+
+  /**
    * `POST /applications/{id}/payments` — submit proof of payment against an
    * already-issued Order of Payment. `no-order-of-payment` (422) and
    * `already settled`-type refusals (409) are surfaced via the server's own
@@ -499,6 +521,13 @@ export class CitizenApiClient {
     if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
     return this.http
       .post<T>(`${this.baseUrl}${path}`, body, { headers: { 'Idempotency-Key': idempotencyKey } })
+      .pipe(catchError((e) => throwError(() => this.toApiError(e))));
+  }
+
+  private patch<T>(path: string, body: unknown): Observable<T> {
+    if (this.baseUrl === null) return throwError(() => new ApiNotConfiguredError());
+    return this.http
+      .patch<T>(`${this.baseUrl}${path}`, body)
       .pipe(catchError((e) => throwError(() => this.toApiError(e))));
   }
 

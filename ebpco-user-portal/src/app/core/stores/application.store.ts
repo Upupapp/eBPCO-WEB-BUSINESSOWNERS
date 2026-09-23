@@ -17,7 +17,15 @@ import { GENERIC_APPLICATION_DOCUMENTS, RequirementDocument, documentsFor, requi
 import { nextId, todayIso } from '../utils/ids';
 import { MUNICIPAL_ENGINEER } from '../domain/lgu-contact';
 import { CitizenApiClient, newIdempotencyKey } from '../api/citizen-api.client';
-import { ApplicationSummary, PermitRelease, PermitResponse, SubmitApplicationRequest, SubmitPaymentRequest } from '../api/citizen-api.models';
+import {
+  ApplicationDocumentResponse,
+  ApplicationSummary,
+  DraftPatchRequest,
+  PermitRelease,
+  PermitResponse,
+  SubmitApplicationRequest,
+  SubmitPaymentRequest,
+} from '../api/citizen-api.models';
 import { ApiError } from '../api/problem';
 
 export interface CreateApplicationInput {
@@ -72,9 +80,10 @@ function fromServerSummary(row: ApplicationSummary, applicantId: string): Applic
     applicantId,
     permitType: row.permitType as PublishedPermitType,
     applicationAction: row.applicationAction as ApplicationAction,
-    relatedPermitNumber: null,
-    priorPermitClaim: null,
+    relatedPermitNumber: row.renewsPermitNumber,
+    priorPermitClaim: row.priorPermitClaim,
     dateSubmitted: row.dateSubmitted,
+    updatedAt: row.updatedAt,
     lifecycleStatus: row.lifecycleStatus as ApplicationLifecycleStatus,
     applicantStatus: row.applicantStatus,
     requiresApplicantAction: row.requiresApplicantAction,
@@ -199,6 +208,7 @@ export class ApplicationStore {
       relatedPermitNumber: null,
       priorPermitClaim: null,
       dateSubmitted: '2026-08-10T08:00:00.000Z',
+      updatedAt: '2026-08-14T13:00:00.000Z',
       lifecycleStatus: 'Under Evaluation',
       evaluationStage: 'OBO',
       evaluationResult: 'Pending',
@@ -220,6 +230,7 @@ export class ApplicationStore {
       relatedPermitNumber: null,
       priorPermitClaim: null,
       dateSubmitted: '2026-07-15T08:00:00.000Z',
+      updatedAt: '2026-08-05T08:00:00.000Z',
       lifecycleStatus: 'Ready for Release',
       evaluationStage: 'Final Approval',
       evaluationResult: 'Passed',
@@ -657,6 +668,7 @@ export class ApplicationStore {
       relatedPermitNumber: input.relatedPermitNumber,
       priorPermitClaim: input.priorPermitClaim,
       dateSubmitted: null,
+      updatedAt: new Date().toISOString(),
       lifecycleStatus: 'Draft',
       evaluationStage: 'Initial',
       evaluationResult: 'Pending',
@@ -696,6 +708,65 @@ export class ApplicationStore {
       );
       await this.refreshMine();
       return { ok: true, id: summary.id };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
+  }
+
+  /**
+   * `PATCH /applications/{id}` for real — saves further changes to a Draft
+   * already started (`fileReal` with `saveAsDraft: true` created it and
+   * returned its id). Does not refresh `realApplications`: this fires on
+   * every step advance while the wizard is open, and a list neither the
+   * wizard nor its caller is showing does not need to be kept current on
+   * every keystroke-adjacent save.
+   */
+  async updateDraftReal(
+    applicationId: string, patch: DraftPatchRequest,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(this.api.updateDraft(applicationId, patch));
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
+  }
+
+  /**
+   * `POST /applications/{id}/submit` for real — finalizes a Draft. Refreshes
+   * `realApplications` afterward: unlike a mid-wizard autosave, this is the
+   * moment the application actually becomes a real filing, which My
+   * Applications needs to reflect immediately.
+   */
+  async submitDraftReal(applicationId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(this.api.submitDraft(applicationId, newIdempotencyKey()));
+      await this.refreshMine();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
+  }
+
+  /**
+   * The raw wire shapes for resuming a Draft — `GET /applications/{id}` and
+   * `GET /applications/{id}/documents`, un-mapped. `fromServerSummary`
+   * above is lossy by design (see its own doc comment) and drops exactly
+   * the fields a resume needs back (`permitType`/`form`/etc. survive it,
+   * but the wizard needs the untranslated wire shape to refill its own
+   * fields one-to-one, the same way `application-details.page.ts` reads
+   * `getApplication` directly for its own purposes).
+   */
+  async fetchForResume(
+    applicationId: string,
+  ): Promise<{ ok: true; application: ApplicationSummary; documents: ApplicationDocumentResponse[] }
+    | { ok: false; error: string }> {
+    try {
+      const [application, documents] = await Promise.all([
+        firstValueFrom(this.api.getApplication(applicationId)),
+        firstValueFrom(this.api.listDocuments(applicationId)),
+      ]);
+      return { ok: true, application, documents };
     } catch (error) {
       return { ok: false, error: describeApplicationError(error) };
     }

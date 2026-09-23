@@ -97,6 +97,8 @@ function summaryFor(businessId: string | null): ApplicationSummary {
     businessId,
     businessName: businessId ? 'Dela Cruz Hardware & Construction Supply' : null,
     location: '123 Rizal Street',
+    renewsPermitNumber: null,
+    priorPermitClaim: null,
     lifecycleStatus: 'Submitted',
     applicantStatus: 'Submitted',
     requiresApplicantAction: false,

@@ -39,8 +39,20 @@ const FILTERS: (ApplicantStatus | 'All')[] = ['All', 'Draft', 'Submitted', 'Unde
                   <td>{{ app.permitType }}</td>
                   <td>{{ app.businessName }}</td>
                   <td><app-status-pill [label]="applicantStatusOf(app.lifecycleStatus)" /></td>
-                  <td>{{ formatDate(app.dateSubmitted) }}</td>
-                  <td><a [routerLink]="['/applications', app.id]" class="btn btn-secondary btn-sm">View</a></td>
+                  <td>
+                    @if (app.lifecycleStatus === 'Draft') {
+                      Started {{ formatDate(app.updatedAt) }}
+                    } @else {
+                      {{ formatDate(app.dateSubmitted) }}
+                    }
+                  </td>
+                  <td>
+                    @if (app.lifecycleStatus === 'Draft') {
+                      <a [routerLink]="['/permits/apply']" [queryParams]="{ draft: app.id }" class="btn btn-secondary btn-sm">Continue</a>
+                    } @else {
+                      <a [routerLink]="['/applications', app.id]" class="btn btn-secondary btn-sm">View</a>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>

@@ -90,6 +90,8 @@ export interface ApplicationDocumentResponse {
    * file is not a verdict on the application.
    */
   quarantined: boolean;
+  /** Which checklist entry this answers (C-6). Null means unattributed, never "answers none". */
+  requirementCode: string | null;
 }
 
 export interface ResubmitRequest {
@@ -115,6 +117,10 @@ export interface ApplicationSummary {
   businessId: string | null;
   businessName: string | null;
   location: string | null;
+  /** The permit this Renewal/Amendment renews, when it's a real one already on file. Null for New, and also null on the unverified claim path — see priorPermitClaim. */
+  renewsPermitNumber: string | null;
+  /** The permit this Renewal/Amendment renews, self-reported because it predates eBPCO. Never verified. Mutually exclusive with renewsPermitNumber. */
+  priorPermitClaim: string | null;
   lifecycleStatus: string;
   /** The coarse, citizen-facing status — computed server-side. Prefer this over deriving one locally from lifecycleStatus. */
   applicantStatus: string;
@@ -346,6 +352,27 @@ export interface SubmitApplicationRequest {
   /** Real, already-uploaded document ids. Empty until document upload is wired (Stage 6). */
   documentIds?: string[];
   form?: Record<string, unknown>;
+  /** Files at Draft instead of Submitted — a real, resumable row with a real reference number, just not yet filed. */
+  saveAsDraft?: boolean;
+}
+
+/**
+ * `PATCH /applications/{id}` — keeps editing a Draft. Every field optional:
+ * a partial save is the normal case, the citizen changed one thing and
+ * nothing else. Mirrors `SubmitApplicationRequest` minus the fields a Draft
+ * cannot change about itself (there are none) plus `documentIds`, which
+ * here means "attach these newly uploaded documents", not "replace the
+ * whole set" — see `SubmissionService.updateDraft`'s own doc comment.
+ */
+export interface DraftPatchRequest {
+  permitType?: string;
+  applicationAction?: 'New' | 'Renewal' | 'Amendment';
+  renewsPermitNumber?: string | null;
+  priorPermitClaim?: string | null;
+  businessId?: string | null;
+  location?: string | null;
+  form?: Record<string, unknown>;
+  documentIds?: string[];
 }
 
 /** `GET /applications` — `{ data, nextCursor }`, not a bare array (unlike documents/timeline). */

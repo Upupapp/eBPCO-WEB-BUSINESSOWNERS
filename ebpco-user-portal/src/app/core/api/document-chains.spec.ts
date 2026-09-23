@@ -14,6 +14,7 @@ const doc = (over: Partial<ApplicationDocumentResponse>): ApplicationDocumentRes
   byteSize: '1000', sha256: 'a'.repeat(64), uploadedAt: '2026-01-01T00:00:00.000Z',
   expiresOn: null, reviewStatus: null, reviewedAt: null, reviewReason: null, reviewRemark: null,
   supersedesDocumentId: null, supersededByDocumentId: null, scanCleared: true, quarantined: false,
+  requirementCode: null,
   ...over,
 });
 

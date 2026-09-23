@@ -37,6 +37,7 @@ export function toContractShape(d: ApplicationDocument): ApplicationDocumentResp
     supersededByDocumentId: null,
     scanCleared: true,
     quarantined: false,
+    requirementCode: d.requirementId,
   };
 }
 

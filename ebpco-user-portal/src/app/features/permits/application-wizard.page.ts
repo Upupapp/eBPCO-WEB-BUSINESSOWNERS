@@ -10,6 +10,7 @@ import {
   existingPermitPrompt,
 } from '../../core/domain/application.model';
 import { SavedDocument, SavedDocumentFileType } from '../../core/domain/document.model';
+import { SubmitApplicationRequest } from '../../core/api/citizen-api.models';
 import { formatDate } from '../../core/utils/ids';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
@@ -64,9 +65,25 @@ interface ReusedDoc {
   certifiedOn: string | null;
 }
 
+/**
+ * A document already attached to THIS (still-Draft) application from an
+ * earlier autosave, surviving a reload with no in-browser File to show.
+ *
+ * Deliberately not the 'reused' kind: that one means "carried over from a
+ * DIFFERENT, previously-issued permit" and renders text saying so. This
+ * document was uploaded and attached within this same application; it is
+ * simply not resident in memory any more.
+ */
+interface AlreadyAttachedDoc {
+  documentId: string;
+  fileName: string;
+  fileType: SavedDocumentFileType;
+}
+
 type Slot =
   | ({ kind: 'upload'; supersedesDocumentId?: string | null } & AttachedDoc)
-  | ({ kind: 'reused' } & ReusedDoc);
+  | ({ kind: 'reused' } & ReusedDoc)
+  | ({ kind: 'attached' } & AlreadyAttachedDoc);
 
 /** What the "view what I attached" popup needs. Built straight from an 'upload' slot's own File, or fetched fresh for a 'reused' one — see previewAttached(). */
 interface WizardPreview {
@@ -103,6 +120,21 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           <h1>{{ isGeneric ? 'New Business Permit Application' : permitType }}</h1>
           <div class="subtitle">{{ isGeneric ? 'Generic application flow' : reviewingOffice() }}</div>
         </div>
+        @if (api.configured && step() < 4) {
+          <div style="text-align:right;">
+            <button type="button" class="btn btn-secondary" [disabled]="saveStatus() === 'saving'" (click)="saveAndExit()">
+              Save &amp; Exit
+            </button>
+            <div class="hint" style="margin-top:6px;">
+              @switch (saveStatus()) {
+                @case ('saving') { Saving… }
+                @case ('saved') { Saved }
+                @case ('error') { Could not save — try again }
+                @default { Your progress is saved automatically as you go }
+              }
+            </div>
+          </div>
+        }
       </div>
 
       <div class="steps">
@@ -310,6 +342,8 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                     <div class="small muted" style="flex-basis:100%;">
                       Reused from your previous permit@if (slot.certifiedOn) {, certified {{ formatDate(slot.certifiedOn) }}}.
                     </div>
+                  } @else if (slot.kind === 'attached') {
+                    <div class="small muted" style="flex-basis:100%;">Saved from where you left off.</div>
                   }
                 }
                 <!--
@@ -457,6 +491,19 @@ export class ApplicationWizardPage {
 
   readonly step = signal<Step>(1);
   readonly error = signal<string | null>(null);
+
+  /** The real server id, once this application exists there as a Draft — set by the first autosave, or by resumeDraft(). */
+  protected readonly draftId = signal<string | null>(null);
+  /** Drives the small status line beside Save & Exit. 'idle' before the first autosave has any reason to fire. */
+  protected readonly saveStatus = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  /**
+   * Document ids already confirmed attached to this draft server-side, so a
+   * later autosave sends only what is actually new. Resending an id already
+   * attached would fail `updateDraft`'s own ownership check — it looks for
+   * an UNATTACHED document uploaded by this citizen, and an id already
+   * attached to this same application no longer matches that.
+   */
+  private readonly attachedToServer = new Set<string>();
 
   isGeneric = true;
   permitType: PermitType | null = null;
@@ -655,10 +702,18 @@ export class ApplicationWizardPage {
   agreeTerms = false;
 
   constructor() {
+    const draftParam = this.route.snapshot.queryParamMap.get('draft');
     const typeParam = this.route.snapshot.queryParamMap.get('type');
     const businessParam = this.route.snapshot.queryParamMap.get('businessId');
     if (businessParam) this.businessId = businessParam;
-    if (typeParam && typeParam !== 'generic' && isValidPermitType(typeParam)) {
+    if (draftParam && this.api.configured) {
+      // Resume replaces every field below once it answers -- see its own
+      // doc comment. Still need SOME starting checklist in the meantime so
+      // the template has something to render before that arrives.
+      this.isGeneric = true;
+      this.documents = this.applicationStore.requiredDocumentsFor('generic', this.applicationAction);
+      void this.resumeDraft(draftParam);
+    } else if (typeParam && typeParam !== 'generic' && isValidPermitType(typeParam)) {
       this.isGeneric = false;
       this.permitType = typeParam;
       this.documents = this.applicationStore.requiredDocumentsFor(typeParam, this.applicationAction);
@@ -674,6 +729,76 @@ export class ApplicationWizardPage {
         error: () => {},
       });
     }
+  }
+
+  /**
+   * Resume a Draft this citizen already started — `?draft=<id>` from either
+   * "Continue" on My Applications or the wizard's own Save & Exit.
+   *
+   * `GET /applications/{id}` and `GET /applications/{id}/documents` are the
+   * server's own record of what was saved, read back the same way a fresh
+   * GET always would be — nothing here is reconstructed from local state,
+   * because there is none: a reload is exactly the case this exists for.
+   *
+   * Lands on step 1 rather than guessing which step the citizen was on —
+   * every field is pre-filled and still editable from there regardless, and
+   * guessing wrong would hide a field that needs a second look.
+   */
+  private async resumeDraft(id: string): Promise<void> {
+    const result = await this.applicationStore.fetchForResume(id);
+    if (!result.ok) {
+      this.error.set(result.error);
+      return;
+    }
+    const { application, documents } = result;
+    this.draftId.set(id);
+    this.businessId = application.businessId;
+    this.applicationAction = (application.applicationAction as ApplicationAction) ?? 'New';
+    this.relatedPermitNumber = application.renewsPermitNumber;
+    this.priorPermitClaim = application.priorPermitClaim;
+    this.projectAddress = application.location ?? '';
+    const form = application.form ?? {};
+    this.scopeOfWork = typeof form['scopeOfWork'] === 'string' ? form['scopeOfWork'] : '';
+    this.professionalName = typeof form['professionalName'] === 'string' ? form['professionalName'] : '';
+    this.prcNumber = typeof form['prcNumber'] === 'string' ? form['prcNumber'] : '';
+
+    // 'Business Permit' is the one value the generic flow's own submit
+    // always sends and the claim picker's PermitType list never offers
+    // (PublishedPermitType's own doc comment) — so it unambiguously means
+    // the generic flow, never a specific chosen type.
+    if (application.permitType !== 'Business Permit' && isValidPermitType(application.permitType)) {
+      this.isGeneric = false;
+      this.permitType = application.permitType;
+    } else {
+      this.isGeneric = true;
+      this.permitType = null;
+    }
+    this.documents = this.applicationStore.requiredDocumentsFor(
+      this.isGeneric ? 'generic' : this.permitType!, this.applicationAction,
+    );
+    this.usingRealRequirementCodes = false;
+    this.loadRealDocuments(this.isGeneric ? 'generic' : this.permitType!, this.applicationAction);
+
+    // Every already-attached document came back with the requirement code
+    // it answers (C-6) — re-hydrated as 'attached' rather than 'upload':
+    // there is no in-browser File to reconstruct after a reload, and unlike
+    // a carried-over renewal document (Slot's 'reused' kind) this is not a
+    // reuse of something from a DIFFERENT permit, so it gets its own kind
+    // rather than borrowing that label and its "reused from your previous
+    // permit" text.
+    const attached: Record<string, Slot> = {};
+    const ids: Record<string, string> = {};
+    for (const doc of documents) {
+      if (!doc.requirementCode) continue;
+      attached[doc.requirementCode] = {
+        kind: 'attached', documentId: doc.id, fileName: doc.fileName, fileType: fileTypeFromName(doc.fileName),
+      };
+      ids[doc.requirementCode] = doc.id;
+      this.attachedToServer.add(doc.id);
+    }
+    this.attached = attached;
+    this.uploadedDocumentIds.set(ids);
+    this.saveStatus.set('saved');
   }
 
   reviewingOffice(): string {
@@ -875,6 +1000,8 @@ export class ApplicationWizardPage {
       return;
     }
 
+    // 'reused' and 'attached' both hold only a reference — the real bytes
+    // are fetched fresh, same as my-documents.page.ts's viewReal().
     this.previewingId.set(d.id);
     try {
       const { url } = await firstValueFrom(this.api.getDocumentContent(slot.documentId));
@@ -942,7 +1069,69 @@ export class ApplicationWizardPage {
     // already carried over by the time the citizen reaches step 3 rather than
     // being something they have to ask for.
     if (next >= 3) this.carryOverDocuments();
+    // Fire-and-forget, on navigation only — never on keystroke. By the time
+    // `next` is 2 or more, Step 1's own checks above already established the
+    // real minimum a Draft row needs (a business, and a complete reference
+    // if this is a Renewal/Amendment), so there is always something worth
+    // saving from here on.
+    if (next >= 2) void this.autoSave();
     this.step.set(next);
+  }
+
+  /** What both autosave and the final filing send — the one place their shapes are kept from drifting apart. */
+  private buildRequest(): Omit<SubmitApplicationRequest, 'documentIds' | 'saveAsDraft'> {
+    return {
+      permitType: this.isGeneric ? 'Business Permit' : this.permitType!,
+      applicationAction: this.applicationAction,
+      renewsPermitNumber: this.relatedPermitNumber,
+      priorPermitClaim: this.priorPermitClaim,
+      businessId: this.businessId,
+      location: this.projectAddress || null,
+      form: {
+        scopeOfWork: this.scopeOfWork,
+        professionalName: this.professionalName || null,
+        prcNumber: this.prcNumber || null,
+      },
+    };
+  }
+
+  /** Document ids uploaded but not yet confirmed attached to the draft server-side — see attachedToServer's own comment. */
+  private newlyUploadedIds(): string[] {
+    return Object.values(this.uploadedDocumentIds()).filter((id) => !this.attachedToServer.has(id));
+  }
+
+  /**
+   * Saves progress for real — the first call per application files a Draft
+   * (`POST /applications` with `saveAsDraft: true`) and captures its id;
+   * every call after that is a `PATCH` against that same id. Demo mode has
+   * its own local, unrelated draft mechanism (`ApplicationStore.createDraft`)
+   * and is untouched here.
+   */
+  private async autoSave(): Promise<void> {
+    if (!this.api.configured) return;
+    this.saveStatus.set('saving');
+    const request = this.buildRequest();
+    const newIds = this.newlyUploadedIds();
+    const id = this.draftId();
+
+    if (id === null) {
+      const result = await this.applicationStore.fileReal({ ...request, saveAsDraft: true, documentIds: newIds });
+      if (!result.ok) { this.saveStatus.set('error'); return; }
+      this.draftId.set(result.id);
+    } else {
+      const result = await this.applicationStore.updateDraftReal(
+        id, { ...request, ...(newIds.length > 0 ? { documentIds: newIds } : {}) },
+      );
+      if (!result.ok) { this.saveStatus.set('error'); return; }
+    }
+    for (const docId of newIds) this.attachedToServer.add(docId);
+    this.saveStatus.set('saved');
+  }
+
+  /** The explicit "Save & Exit" button — the same save, just awaited and immediate rather than fired on step navigation. */
+  protected async saveAndExit(): Promise<void> {
+    await this.autoSave();
+    this.router.navigate(['/applications']);
   }
 
   async submit(): Promise<void> {
@@ -976,13 +1165,16 @@ export class ApplicationWizardPage {
         this.applicationStore.attachDocument(
           record.id, d.id, d.label, a.file, a.fileType, a.supersedesDocumentId ?? null,
         );
-      } else {
+      } else if (a.kind === 'reused') {
         // A reused document is a REFERENCE to one the office already holds. It
         // is flagged as reused and carries the date it was certified, because
         // the ruling leaves the judgement to the officer and that is the fact
         // they need in front of them.
         this.applicationStore.reuseDocument(record.id, d.id, d.label, a);
       }
+      // 'attached' never occurs here: it is only ever produced by
+      // resumeDraft(), which requires `api.configured` and so never runs
+      // this demo-only path.
     }
     this.applicationStore.submit(record.id);
     // F-14: not "submitted successfully". Nothing was sent to the Municipality,
@@ -1023,31 +1215,42 @@ export class ApplicationWizardPage {
     this.submitting.set(true);
     try {
       const ids = this.uploadedDocumentIds();
-      const result = await this.applicationStore.fileReal({
-        permitType: this.isGeneric ? 'Business Permit' : this.permitType!,
-        applicationAction: this.applicationAction,
-        renewsPermitNumber: this.relatedPermitNumber,
-        priorPermitClaim: this.priorPermitClaim,
-        businessId: this.businessId,
-        location: this.projectAddress,
-        documentIds: Object.values(ids),
-        form: {
-          scopeOfWork: this.scopeOfWork,
-          professionalName: this.professionalName || null,
-          prcNumber: this.prcNumber || null,
-        },
-      });
-      if (!result.ok) {
-        this.error.set(result.error);
-        return;
+      const request = this.buildRequest();
+      const draftId = this.draftId();
+
+      let applicationId: string;
+      if (draftId !== null) {
+        // The normal path: every step advance already autosaved this
+        // application into existence as a Draft. One last sync catches
+        // anything changed since (a document picked on this very step,
+        // Review's own two checkboxes are declarations, not saved fields),
+        // then the Draft is finalized through the transition engine —
+        // `POST /applications` is not called again, which would file a
+        // SECOND application.
+        const newIds = this.newlyUploadedIds();
+        const synced = await this.applicationStore.updateDraftReal(
+          draftId, { ...request, ...(newIds.length > 0 ? { documentIds: newIds } : {}) },
+        );
+        if (!synced.ok) { this.error.set(synced.error); return; }
+        const finalized = await this.applicationStore.submitDraftReal(draftId);
+        if (!finalized.ok) { this.error.set(finalized.error); return; }
+        applicationId = draftId;
+      } else {
+        // Autosave never landed (offline for a moment, or a transient
+        // error) — fall back to filing directly, exactly as before this
+        // feature existed, rather than blocking the citizen on a retry.
+        const result = await this.applicationStore.fileReal({ ...request, documentIds: Object.values(ids) });
+        if (!result.ok) { this.error.set(result.error); return; }
+        applicationId = result.id;
       }
+
       const notSent = this.documents.filter((d) => this.attached[d.id] && !ids[d.id]).map((d) => d.label);
       this.toast.success(
         notSent.length > 0
           ? `Application filed. These documents were NOT sent — reuse-from-file isn’t connected yet: ${notSent.join(', ')}.`
           : 'Application filed, with your attached documents.',
       );
-      this.router.navigate(['/applications', result.id]);
+      this.router.navigate(['/applications', applicationId]);
     } finally {
       this.submitting.set(false);
     }

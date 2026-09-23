@@ -33,6 +33,8 @@ export interface ApplicationRecord {
    */
   priorPermitClaim: string | null;
   dateSubmitted: string | null;
+  /** When this row last changed — a Draft's own "Started" date, since it has no dateSubmitted yet. */
+  updatedAt: string;
   lifecycleStatus: ApplicationLifecycleStatus;
   /**
    * The server's own citizen-facing status and "waiting on you" flag, when the
