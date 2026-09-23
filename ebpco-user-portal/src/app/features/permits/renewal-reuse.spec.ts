@@ -182,7 +182,7 @@ describe('Renewal and amendment reuse (Municipal ruling)', () => {
 
     const record = store.createDraft({
       businessId: 'biz-1', businessName: 'Test', permitType: 'Zoning / Locational Clearance',
-      applicationAction: 'Renewal', relatedPermitNumber: page.relatedPermitNumber,
+      applicationAction: 'Renewal', relatedPermitNumber: page.relatedPermitNumber, priorPermitClaim: null,
     });
     const slot = page.attached[reqId];
     if (slot.kind !== 'upload') throw new Error('expected an upload slot');
@@ -200,7 +200,7 @@ describe('Renewal and amendment reuse (Municipal ruling)', () => {
     const record = store.createDraft({
       businessId: 'biz-1', businessName: 'Test',
       permitType: 'Zoning / Locational Clearance',
-      applicationAction: 'Renewal', relatedPermitNumber: page.relatedPermitNumber,
+      applicationAction: 'Renewal', relatedPermitNumber: page.relatedPermitNumber, priorPermitClaim: null,
     });
     const slot = Object.entries(page.attached).find(([, a]) => a.kind === 'reused');
     expect(slot).toBeTruthy();

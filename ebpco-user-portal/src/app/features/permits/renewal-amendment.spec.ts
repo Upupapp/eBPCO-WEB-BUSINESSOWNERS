@@ -46,6 +46,7 @@ describe('A Renewal or Amendment names the permit it acts on', () => {
     businessId: 'biz-1',
     businessName: 'Test',
     permitType: 'Zoning / Locational Clearance' as const,
+    priorPermitClaim: null,
   };
 
   it('the store REFUSES a Renewal that names no permit', () => {
@@ -71,6 +72,7 @@ describe('A Renewal or Amendment names the permit it acts on', () => {
       ...base,
       applicationAction: 'Renewal',
       relatedPermitNumber: 'BP-2025-00042',
+      priorPermitClaim: null,
     });
     // Read back through the store, not from the returned object: a value the
     // creator holds but the store drops is the defect this whole file is about.
@@ -133,5 +135,69 @@ describe('A Renewal or Amendment names the permit it acts on', () => {
     expect(actionReferenceIsComplete('Renewal', 'BP-1')).toBe(true);
     expect(actionReferenceIsComplete('Amendment', null)).toBe(false);
     expect(actionReferenceIsComplete('Amendment', 'BP-1')).toBe(true);
+  });
+});
+
+/**
+ * A permit eBPCO never issued — 053. Most real renewals launch into this:
+ * the Municipality's paper permits predate the system, so `renewablePermits()`
+ * is empty for them, not fraudulent. The claim path is the honest alternative
+ * to blocking them outright or lying and filing as 'New'.
+ */
+describe('a Renewal/Amendment claiming a permit eBPCO has no record of', () => {
+  let store: ApplicationStore;
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+    store = TestBed.inject(ApplicationStore);
+  });
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('the predicate accepts a claim in place of a matched permit, and refuses both at once', () => {
+    expect(actionReferenceIsComplete('Renewal', null, 'OLD-BP-1998-042')).toBe(true);
+    expect(actionReferenceIsComplete('Renewal', 'BP-2025-00042', 'OLD-BP-1998-042')).toBe(false);
+    expect(actionReferenceIsComplete('New', null, 'OLD-BP-1998-042')).toBe(false);
+  });
+
+  it('the wizard advances on a claim alone, with no matched permit selected', () => {
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    const page = fixture.componentInstance;
+    page.businessId = 'biz-1';
+    page.applicationAction = 'Renewal';
+    page.relatedPermitNumber = null;
+    page.priorPermitClaim = 'OLD-BP-1998-042';
+
+    page.toStep(2);
+
+    expect(page.step()).toBe(2);
+    expect(page.error()).toBeNull();
+  });
+
+  it('the store keeps the claim on the record, verified path untouched', () => {
+    const record = store.createDraft({
+      businessId: 'biz-1', businessName: 'Test', permitType: 'Zoning / Locational Clearance',
+      applicationAction: 'Renewal', relatedPermitNumber: null, priorPermitClaim: 'OLD-BP-1998-042',
+    });
+
+    expect(store.applicationById(record.id)?.priorPermitClaim).toBe('OLD-BP-1998-042');
+    expect(store.applicationById(record.id)?.relatedPermitNumber).toBeNull();
+  });
+
+  it('the proof document is required on the claim path even though the catalog marks it optional', () => {
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    const page = fixture.componentInstance;
+    page.documents = [{ id: 'prior-permit-proof', label: 'Copy of your existing/prior permit', required: false }];
+
+    expect(page['isRequired'](page.documents[0])).toBe(false);
+    page.priorPermitClaim = 'OLD-BP-1998-042';
+    expect(page['isRequired'](page.documents[0])).toBe(true);
   });
 });

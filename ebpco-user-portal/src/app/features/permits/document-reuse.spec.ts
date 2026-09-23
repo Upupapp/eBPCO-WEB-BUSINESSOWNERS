@@ -115,6 +115,7 @@ describe('Reusing a document already on file', () => {
     const app = store.createDraft({
       businessId: 'biz-1', businessName: 'Test',
       permitType: 'Zoning / Locational Clearance', applicationAction: 'New', relatedPermitNumber: null,
+      priorPermitClaim: null,
     });
     const a = page.attached['req-1'];
     if (a.kind !== 'upload') throw new Error('expected an upload slot');

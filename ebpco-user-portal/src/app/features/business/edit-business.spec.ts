@@ -76,6 +76,7 @@ describe('Editing a business', () => {
       permitType: 'Zoning / Locational Clearance',
       applicationAction: 'New',
       relatedPermitNumber: null,
+      priorPermitClaim: null,
     });
     applications.submit(app.id);
     const filedName = applications.applicationById(app.id)!.businessName;

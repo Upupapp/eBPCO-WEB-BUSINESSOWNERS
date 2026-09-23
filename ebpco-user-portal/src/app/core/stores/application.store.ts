@@ -25,8 +25,10 @@ export interface CreateApplicationInput {
   businessName: string;
   permitType: PublishedPermitType;
   applicationAction: ApplicationAction;
-  /** The permit being renewed or amended. Null for a 'New' application; required otherwise. */
+  /** The permit being renewed or amended. Null for a 'New' application; required otherwise unless `priorPermitClaim` is set instead. */
   relatedPermitNumber: string | null;
+  /** The unverified alternative to `relatedPermitNumber`, for a permit that predates eBPCO. See `actionReferenceIsComplete`. */
+  priorPermitClaim: string | null;
 }
 
 let appSeq = 3000;
@@ -71,6 +73,7 @@ function fromServerSummary(row: ApplicationSummary, applicantId: string): Applic
     permitType: row.permitType as PublishedPermitType,
     applicationAction: row.applicationAction as ApplicationAction,
     relatedPermitNumber: null,
+    priorPermitClaim: null,
     dateSubmitted: row.dateSubmitted,
     lifecycleStatus: row.lifecycleStatus as ApplicationLifecycleStatus,
     applicantStatus: row.applicantStatus,
@@ -194,6 +197,7 @@ export class ApplicationStore {
       permitType: 'Building Permit',
       applicationAction: 'New',
       relatedPermitNumber: null,
+      priorPermitClaim: null,
       dateSubmitted: '2026-08-10T08:00:00.000Z',
       lifecycleStatus: 'Under Evaluation',
       evaluationStage: 'OBO',
@@ -214,6 +218,7 @@ export class ApplicationStore {
       permitType: 'Zoning / Locational Clearance',
       applicationAction: 'New',
       relatedPermitNumber: null,
+      priorPermitClaim: null,
       dateSubmitted: '2026-07-15T08:00:00.000Z',
       lifecycleStatus: 'Ready for Release',
       evaluationStage: 'Final Approval',
@@ -634,7 +639,7 @@ export class ApplicationStore {
     const uid = this.auth.currentUser()!.id;
     // The form blocks this too, but a rule enforced only in the template is
     // enforced only for callers who go through the template.
-    if (!actionReferenceIsComplete(input.applicationAction, input.relatedPermitNumber)) {
+    if (!actionReferenceIsComplete(input.applicationAction, input.relatedPermitNumber, input.priorPermitClaim)) {
       throw new Error(
         `A ${input.applicationAction} application must name the permit it acts on.`,
       );
@@ -649,6 +654,7 @@ export class ApplicationStore {
       permitType: input.permitType,
       applicationAction: input.applicationAction,
       relatedPermitNumber: input.relatedPermitNumber,
+      priorPermitClaim: input.priorPermitClaim,
       dateSubmitted: null,
       lifecycleStatus: 'Draft',
       evaluationStage: 'Initial',

@@ -50,7 +50,7 @@ describe('Attachments carry the file, not just its name', () => {
     const file = sample();
     const app = store.createDraft({
       businessId: 'biz-1', businessName: 'Test', permitType: 'Zoning / Locational Clearance',
-      applicationAction: 'New', relatedPermitNumber: null,
+      applicationAction: 'New', relatedPermitNumber: null, priorPermitClaim: null,
     });
     store.attachDocument(app.id, 'req-1', 'Survey Plan', file, 'pdf');
 
@@ -73,7 +73,7 @@ describe('Attachments carry the file, not just its name', () => {
   it('every document a citizen attached has a file — a name alone is not enough', () => {
     const app = store.createDraft({
       businessId: 'biz-1', businessName: 'Test', permitType: 'Zoning / Locational Clearance',
-      applicationAction: 'New', relatedPermitNumber: null,
+      applicationAction: 'New', relatedPermitNumber: null, priorPermitClaim: null,
     });
     for (const [id, label] of [['req-1', 'Survey Plan'], ['req-2', 'Valid ID']]) {
       store.attachDocument(app.id, id, label, sample(), 'pdf');
@@ -133,6 +133,7 @@ describe('Attachments carry the file, not just its name', () => {
     const app = appStore.createDraft({
       businessId: 'biz-1', businessName: 'Test',
       permitType: 'Zoning / Locational Clearance', applicationAction: 'New', relatedPermitNumber: null,
+      priorPermitClaim: null,
     });
     appStore.attachDocument(app.id, requirement.id, requirement.label,
                             slot.file, 'pdf');

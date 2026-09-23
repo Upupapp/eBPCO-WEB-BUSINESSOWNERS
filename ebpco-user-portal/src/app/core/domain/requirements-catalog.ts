@@ -52,10 +52,15 @@ const COMMON_DOCS_NO_LOCATIONAL: RequirementDocument[] = COMMON_DOCS.filter((d) 
 const PENDING_NOTE =
   "Documentary requirements follow the generic national-law/reference format (PD 1096 for building-related permits, RA 9514 for fire-safety permits); the Municipality of Castilla's own confirmed checklist for this specific permit type is still pending verification with the OBO — confirm before production launch.";
 
+// `prior-permit-proof`'s id and wording match the backend's own seed (053)
+// exactly, on both these lists — the wizard's `isRequired()` override keys
+// on this literal id to make it required specifically on the claim path
+// (eBPCO has no matching permit on file for this citizen), the same as the
+// live, staff-published checklist already does.
 const RENOVATION_ALTERATION_DOCS: RequirementDocument[] = [
   ...COMMON_DOCS,
   doc('renovation-plan', 'Renovation/Alteration Plans (signed and sealed)', true),
-  doc('renovation-existing-permit', 'Copy of Original Building Permit (if available)', false),
+  doc('prior-permit-proof', 'Copy of your existing/prior permit', false),
   doc('renovation-bom', 'Bill of Materials and Specifications', true),
   doc('renovation-prc', 'PRC License and PTR of Engineer/Architect of Record', true),
 ];
@@ -63,6 +68,7 @@ const RENOVATION_ALTERATION_DOCS: RequirementDocument[] = [
 const ADDITION_EXTENSION_DOCS: RequirementDocument[] = [
   ...COMMON_DOCS,
   doc('addition-plan', 'Addition / Extension Plans (signed and sealed)', true),
+  doc('prior-permit-proof', 'Copy of your existing/prior permit', false),
   doc('addition-struct-plan', 'Structural Analysis for the added load (signed and sealed)', true),
   doc('addition-bom', 'Bill of Materials and Specifications', true),
   doc('addition-prc', 'PRC License and PTR of Engineer/Architect of Record', true),

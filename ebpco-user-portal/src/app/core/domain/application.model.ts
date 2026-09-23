@@ -25,6 +25,13 @@ export interface ApplicationRecord {
    * and the citizen both recognise, and it is what appears on the permit.
    */
   relatedPermitNumber: string | null;
+  /**
+   * The permit this renews/amends, when it predates eBPCO and so has no
+   * record to select instead — self-reported, never verified. Mutually
+   * exclusive with `relatedPermitNumber`: an application carries at most
+   * one of the two. See `actionReferenceIsComplete`.
+   */
+  priorPermitClaim: string | null;
   dateSubmitted: string | null;
   lifecycleStatus: ApplicationLifecycleStatus;
   /**
@@ -70,8 +77,13 @@ export interface StatusTimelineEntry {
 export function actionReferenceIsComplete(
   action: ApplicationAction,
   relatedPermitNumber: string | null,
+  priorPermitClaim: string | null = null,
 ): boolean {
-  return action === 'New' ? relatedPermitNumber === null : !!relatedPermitNumber;
+  if (action === 'New') return relatedPermitNumber === null && priorPermitClaim === null;
+  // Exactly one reference, never both — a verified permit on file, or an
+  // unverified claim about one that predates eBPCO. Two references means the
+  // form has not settled on which one this application is actually about.
+  return !!relatedPermitNumber !== !!priorPermitClaim;
 }
 
 /** Whether this action must name an existing permit. Drives the wizard's extra step. */

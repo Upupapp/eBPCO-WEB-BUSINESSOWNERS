@@ -336,8 +336,10 @@ export interface SubmitPaymentResult {
 export interface SubmitApplicationRequest {
   permitType: string;
   applicationAction: 'New' | 'Renewal' | 'Amendment';
-  /** The permit this renews/amends, as printed on the applicant's copy. Required for Renewal/Amendment. */
+  /** The permit this renews/amends, as printed on the applicant's copy. Must already be on file — the server resolves it against issued permits. Use this OR priorPermitClaim, never both. */
   renewsPermitNumber?: string | null;
+  /** The permit this renews/amends, when it predates eBPCO and so is not on file. Self-reported, never verified — requires a `prior-permit-proof` document attached. */
+  priorPermitClaim?: string | null;
   /** A real business UUID. Null until businesses are wired for real (connection plan Stage 8). */
   businessId?: string | null;
   location?: string | null;
