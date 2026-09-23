@@ -281,6 +281,45 @@ a:hover { text-decoration: underline; }
 }
 .input.invalid { border-color: var(--danger-500); }
 
+// A bare `<input type="file">` renders as raw OS chrome — a system-styled
+// "Choose File" button glued to "No file chosen" text, sized and fonted by
+// the browser, not this page — sitting next to every other `.input` on the
+// same form. Restyled via `::file-selector-button` (not swapped for a
+// hidden-input-plus-label trick) so it keeps its native keyboard/
+// screen-reader behaviour — Tab focus, Enter/Space to open the picker, drag
+// and drop, the "no file chosen" announcement — and only its APPEARANCE
+// changes. Global, not scoped to one page: the same bare input is used for
+// every document/photo upload across the portal (the application wizard,
+// My Documents, Profile, business/document resubmission, payment proof),
+// and restyling one without the rest would just move the inconsistency
+// instead of fixing it.
+input[type='file'] {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--gray-500);
+  padding: 6px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+input[type='file']::file-selector-button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-700);
+  padding: 7px 14px;
+  margin-right: 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background var(--ease-base), border-color var(--ease-base);
+}
+input[type='file']::file-selector-button:hover { background: var(--gray-50); border-color: var(--gray-300); }
+input[type='file']:focus-visible { outline: none; border-color: var(--primary-500); box-shadow: 0 0 0 3px var(--primary-100); }
+
 // Dropdowns draw their own disclosure arrow, on every pointer type. The
 // browser's native menulist puts its chevron hard against the right border
 // with no way to inset it (author padding does not move it), which reads as
