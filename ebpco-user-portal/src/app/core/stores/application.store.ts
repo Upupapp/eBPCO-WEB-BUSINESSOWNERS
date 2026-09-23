@@ -480,6 +480,7 @@ export class ApplicationStore {
         applicationId: a.id,
         permitNumber: a.permitNumber!,
         permitType: a.permitType,
+        businessId: a.businessId,
         businessName: a.businessName,
         issuedDate: a.issuedDate,
         expiryDate: a.expiryDate,

@@ -129,7 +129,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           </div>
           <div class="field">
             <label for="application-wizard-application-type-2">Application Type<span class="required">*</span></label>
-            <select id="application-wizard-application-type-2" class="input" [(ngModel)]="applicationAction">
+            <select id="application-wizard-application-type-2" class="input" [(ngModel)]="applicationAction" (ngModelChange)="onApplicationActionChange()">
               <option value="New">New Permit</option>
               <option value="Renewal">Renewal</option>
               <option value="Amendment">Amendment</option>
@@ -138,40 +138,31 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           @if (needsExistingPermit()) {
             <div class="field">
               <label for="application-wizard-related-permit">{{ existingPermitPrompt(applicationAction) }}<span class="required">*</span></label>
-              @if (!claimingPriorPermit) {
-                @if (matchingRenewablePermits().length > 0) {
-                  <select id="application-wizard-related-permit" class="input" [(ngModel)]="relatedPermitNumber">
-                    <option [ngValue]="null" disabled>Select a permit</option>
-                    @for (p of matchingRenewablePermits(); track p.permitNumber) {
-                      <option [value]="p.permitNumber">
-                        {{ p.permitNumber }} — {{ p.permitType }}{{ p.businessName ? ' · ' + p.businessName : '' }}
-                      </option>
-                    }
-                  </select>
-                  <div class="hint">
-                    The office needs to know which permit this application acts on. Only permits already
-                    issued to you through eBPCO are listed.
-                  </div>
-                } @else {
-                  <div class="hint">
-                    eBPCO has no permit of this type on file for you, so there is nothing to select. If the
-                    Municipality issued you one before this system existed,
-                    <button type="button" class="link-button" (click)="claimingPriorPermit = true">
-                      claim it as an existing permit
-                    </button>
-                    instead — otherwise choose <strong>New Permit</strong> above.
-                  </div>
-                }
+              @if (matchingRenewablePermits().length > 0) {
+                <select id="application-wizard-related-permit" class="input" [(ngModel)]="relatedPermitNumber">
+                  <option [ngValue]="null" disabled>Select a permit</option>
+                  @for (p of matchingRenewablePermits(); track p.permitNumber) {
+                    <option [value]="p.permitNumber">
+                      {{ p.permitNumber }} — {{ p.permitType }}{{ p.businessName ? ' · ' + p.businessName : '' }}
+                    </option>
+                  }
+                </select>
+                <div class="hint">
+                  The office needs to know which permit this application acts on. Only permits already
+                  issued to you through eBPCO, for this business, are listed.
+                </div>
               } @else {
                 <!--
                   eBPCO launched into a Municipality with decades of paper
                   permits already outstanding — most real renewals have no
-                  generated_permits row to select above. This is that path:
-                  self-reported, never verified by the system, and judged by
-                  staff from the proof this citizen must attach in the
-                  Documents step (requirement code prior-permit-proof).
+                  generated_permits row to select above. Automatic, not a
+                  click-through: the moment eBPCO has no matching permit on
+                  file for this business, the claim + proof upload appear
+                  right here. Self-reported, never verified by the system,
+                  and judged by staff from the attached proof (requirement
+                  code prior-permit-proof).
                 -->
-                @if (isGeneric) {
+                @if (isGeneric && !permitType) {
                   <label for="application-wizard-claim-permit-type" style="margin-top:10px; display:block;">
                     Permit Type<span class="required">*</span>
                   </label>
@@ -179,19 +170,47 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                     <option [ngValue]="null" disabled>Select a permit type</option>
                     @for (t of allPermitTypes; track t) { <option [value]="t">{{ t }}</option> }
                   </select>
+                } @else {
+                  <div class="hint" style="margin-bottom:8px;">
+                    eBPCO has no permit of this type on file for this business, so there is nothing to
+                    select — it may have been issued before this system existed.
+                  </div>
+                  <input
+                    id="application-wizard-prior-permit-claim" class="input"
+                    [(ngModel)]="priorPermitClaim"
+                    placeholder="e.g. BP-1998-000042, as printed on the permit"
+                  />
+                  @if (priorPermitProofRequirement(); as proofReq) {
+                    <div style="margin-top:10px;">
+                      <label [for]="'claim-proof-' + proofReq.id" style="display:block; margin-bottom:6px;">
+                        Upload a photo or scan of the permit<span class="required">*</span>
+                      </label>
+                      @if (uploadingRequirementId() === proofReq.id) {
+                        <span class="badge">Sending…</span>
+                      } @else if (attached[proofReq.id]; as slot) {
+                        <button
+                          type="button" class="badge badge-green"
+                          style="border:none; cursor:pointer; font:inherit; margin-right:8px;"
+                          [disabled]="previewingId() === proofReq.id"
+                          [attr.aria-label]="'View ' + slot.fileName"
+                          (click)="previewAttached(proofReq)"
+                        >
+                          {{ previewingId() === proofReq.id ? 'Opening…' : slot.fileName }}
+                        </button>
+                        <button class="btn btn-ghost btn-sm" (click)="removeAttachment(proofReq)">Remove</button>
+                      } @else {
+                        <input
+                          [id]="'claim-proof-' + proofReq.id"
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          [attr.aria-label]="'Attach ' + proofReq.label"
+                          (change)="onFileSelected($event, proofReq)"
+                        />
+                      }
+                      <div class="hint">eBPCO cannot verify this permit automatically — the office confirms it from this photo/scan.</div>
+                    </div>
+                  }
                 }
-                <input
-                  id="application-wizard-prior-permit-claim" class="input" style="margin-top:10px;"
-                  [(ngModel)]="priorPermitClaim"
-                  placeholder="e.g. BP-1998-000042, as printed on the permit"
-                />
-                <div class="hint">
-                  eBPCO has no record of this permit, so it cannot be verified automatically. Attach a
-                  photo or scan of it in the Documents step so the office can confirm it.
-                  <button type="button" class="link-button" (click)="claimingPriorPermit = false; priorPermitClaim = null">
-                    I have an eBPCO-issued permit instead
-                  </button>
-                </div>
               }
             </div>
           }
@@ -505,27 +524,49 @@ export class ApplicationWizardPage {
    * `relatedPermitNumber`.
    */
   priorPermitClaim: string | null = null;
-  /** Whether Step 1 is showing the claim fields instead of the matched-permit dropdown. */
-  claimingPriorPermit = false;
   protected readonly allPermitTypes = ALL_PERMIT_TYPES;
 
   protected readonly existingPermitPrompt = existingPermitPrompt;
   protected readonly actionReferenceIsComplete = actionReferenceIsComplete;
   protected readonly renewablePermits = computed(() => this.applicationStore.renewablePermits());
   /**
-   * `renewablePermits()` narrowed to the type this form is actually for — a
-   * Fencing Permit must never appear while renewing a Building Permit. Only
-   * meaningful once a type is known: the generic flow (no route `type`) has
-   * no type to match against yet, so it still offers every permit, exactly
-   * as `carryOverDocuments()` below already lets a chosen permit DECIDE the
-   * type for that flow.
+   * `renewablePermits()` narrowed to what THIS application could actually be
+   * about: the same business (a permit belongs to one business, never a
+   * shared pool across all of a citizen's businesses), and — once a type is
+   * known — the same permit type, since a Fencing Permit must never appear
+   * while renewing a Building Permit. Not a `computed()`: it reads plain
+   * `businessId`/`permitType` properties, not signals, so Angular's default
+   * change detection is what keeps it live — see the constructor's own
+   * pattern. This is what makes the switch between "select a permit" and
+   * "claim one" fully automatic: the moment a business (and, once relevant,
+   * a permit type) is chosen, this re-evaluates with no click required.
    */
   protected matchingRenewablePermits() {
-    if (this.isGeneric) return this.renewablePermits();
-    return this.renewablePermits().filter((p) => p.permitType === this.permitType);
+    return this.renewablePermits().filter((p) =>
+      (this.businessId === null || p.businessId === this.businessId)
+      && (this.isGeneric || p.permitType === this.permitType));
   }
   protected needsExistingPermit(): boolean {
     return actionNeedsExistingPermit(this.applicationAction);
+  }
+  /**
+   * Reloads the document checklist for the newly chosen action — Building
+   * Permit's varies by action (migration 047), and `prior-permit-proof`
+   * (053) only exists on the Renewal/Amendment entries, so without this the
+   * claim path's own proof-upload field could never find its requirement.
+   * Also clears both permit references when switching back to New, which
+   * asserts a relationship the citizen never claimed otherwise.
+   */
+  protected onApplicationActionChange(): void {
+    if (this.applicationAction === 'New') {
+      this.relatedPermitNumber = null;
+      this.priorPermitClaim = null;
+    }
+    if (!this.isGeneric && this.permitType) {
+      this.documents = this.applicationStore.requiredDocumentsFor(this.permitType, this.applicationAction);
+      this.usingRealRequirementCodes = false;
+      this.loadRealDocuments(this.permitType, this.applicationAction);
+    }
   }
   /** The generic flow has no permit type until either a matched permit or this picker supplies one. */
   protected onClaimPermitTypeChosen(): void {
@@ -534,6 +575,10 @@ export class ApplicationWizardPage {
     this.documents = this.applicationStore.requiredDocumentsFor(this.permitType, this.applicationAction);
     this.usingRealRequirementCodes = false;
     this.loadRealDocuments(this.permitType, this.applicationAction);
+  }
+  /** The claim path's own upload target, once the checklist for this type/action actually carries it (see `onApplicationActionChange`/`onClaimPermitTypeChosen`). */
+  protected priorPermitProofRequirement(): RequirementDocument | undefined {
+    return this.documents.find((d) => d.id === 'prior-permit-proof');
   }
   /**
    * `d.required` is the catalog's own answer — a pure function of permit
@@ -862,13 +907,24 @@ export class ApplicationWizardPage {
       && !actionReferenceIsComplete(this.applicationAction, this.relatedPermitNumber, this.priorPermitClaim)
     ) {
       this.error.set(
-        this.claimingPriorPermit
+        this.needsExistingPermit() && this.matchingRenewablePermits().length === 0
           ? (this.isGeneric && !this.permitType
               ? 'Please select which permit type this is.'
               : `Please enter the permit number being ${this.applicationAction === 'Renewal' ? 'renewed' : 'amended'}.`)
-          : `Please select the permit being ${this.applicationAction === 'Renewal' ? 'renewed' : 'amended'}, or claim one eBPCO has no record of.`,
+          : `Please select the permit being ${this.applicationAction === 'Renewal' ? 'renewed' : 'amended'}.`,
       );
       return;
+    }
+    // Caught here rather than left for Step 4's blanket "required documents"
+    // check — the upload sits right next to the claim field in Step 1 now,
+    // so the citizen should hear about it before clicking through two more
+    // steps to be told something they filled in three screens ago is missing.
+    if (next === 2 && this.priorPermitClaim) {
+      const proof = this.priorPermitProofRequirement();
+      if (proof && !this.attached[proof.id]) {
+        this.error.set('Please attach a photo or scan of the permit.');
+        return;
+      }
     }
     if (next === 3 && (!this.projectAddress || !this.scopeOfWork)) {
       this.error.set('Please complete the project address and scope of work.');

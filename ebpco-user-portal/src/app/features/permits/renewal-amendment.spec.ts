@@ -102,6 +102,12 @@ describe('A Renewal or Amendment names the permit it acts on', () => {
     const fixture = TestBed.createComponent(ApplicationWizardPage);
     const page = fixture.componentInstance;
     page.businessId = 'biz-1';
+    // A known type, not the bare generic flow — otherwise the automatic
+    // claim path asks for a permit TYPE first (see the "switches to the
+    // claim path automatically" tests below), which is a different,
+    // earlier refusal than the one this test means to exercise.
+    page.isGeneric = false;
+    page.permitType = 'Zoning / Locational Clearance';
     page.applicationAction = 'Renewal';
     page.relatedPermitNumber = null;
 
@@ -199,5 +205,57 @@ describe('a Renewal/Amendment claiming a permit eBPCO has no record of', () => {
     expect(page['isRequired'](page.documents[0])).toBe(false);
     page.priorPermitClaim = 'OLD-BP-1998-042';
     expect(page['isRequired'](page.documents[0])).toBe(true);
+  });
+
+  it('switches to the claim path automatically — no manual toggle to click', () => {
+    // The dropdown/claim split used to be a click-through ("claim it as an
+    // existing permit"). It is now purely a function of what's on file: a
+    // business with no matching permit shows the claim fields the moment
+    // both are known, with nothing in between to click.
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    const page = fixture.componentInstance;
+    page.businessId = 'a-business-with-no-real-permits-at-all';
+    page.applicationAction = 'Renewal';
+
+    expect(page['matchingRenewablePermits']().length).toBe(0);
+  });
+
+  it('narrows renewablePermits() by business, not just permit type', () => {
+    const real = store.renewablePermits();
+    if (real.length === 0) return; // nothing seeded to prove the positive case against
+    const owned = real[0];
+
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    const page = fixture.componentInstance;
+    page.isGeneric = false;
+    page.permitType = owned.permitType as any;
+    page.businessId = owned.businessId;
+    expect(page['matchingRenewablePermits']().some((p: any) => p.permitNumber === owned.permitNumber)).toBe(true);
+
+    page.businessId = 'a-different-business-entirely';
+    expect(page['matchingRenewablePermits']().some((p: any) => p.permitNumber === owned.permitNumber)).toBe(false);
+  });
+
+  it('refuses to advance past Step 1 while the claim path has no proof attached, once the checklist carries one', () => {
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    const page = fixture.componentInstance;
+    page.businessId = 'biz-1';
+    page.applicationAction = 'Renewal';
+    page.priorPermitClaim = 'OLD-BP-1998-042';
+    page.documents = [{ id: 'prior-permit-proof', label: 'Copy of your existing/prior permit', required: false }];
+
+    page.toStep(2);
+
+    expect(page.step()).toBe(1);
+    expect(page.error()).toMatch(/photo or scan/i);
+
+    page.attached = {
+      ...page.attached,
+      'prior-permit-proof': {
+        kind: 'upload', file: new File(['x'], 'permit.pdf'), fileName: 'permit.pdf', fileType: 'pdf',
+      },
+    };
+    page.toStep(2);
+    expect(page.step()).toBe(2);
   });
 });
