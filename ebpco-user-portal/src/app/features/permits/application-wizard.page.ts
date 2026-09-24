@@ -153,10 +153,14 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
             <label for="application-wizard-business-1">Business<span class="required">*</span></label>
             <select id="application-wizard-business-1" class="input" [(ngModel)]="businessId">
               <option [ngValue]="null" disabled>Select a business</option>
-              @for (b of businesses.myBusinesses(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+              @for (b of activeBusinesses(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
             </select>
-            @if (businesses.myBusinesses().length === 0) {
-              <div class="hint">No businesses yet — <a routerLink="/businesses/register">register one first</a>.</div>
+            @if (activeBusinesses().length === 0) {
+              @if (businesses.myBusinesses().length === 0) {
+                <div class="hint">No businesses yet — <a routerLink="/businesses/register">register one first</a>.</div>
+              } @else {
+                <div class="hint">None of your businesses are active — reactivate one to apply for a permit.</div>
+              }
             }
           </div>
           <div class="field">
@@ -460,6 +464,18 @@ export class ApplicationWizardPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   protected readonly businesses = inject(BusinessStore);
+  /**
+   * Step 1's own choices, not `businesses.myBusinesses()` directly — an
+   * inactive business has nothing behind it to apply on, and letting it
+   * stay pickable here is how an application ended up filed against one.
+   * Businesses list/dashboard/permit-catalog all show or count every
+   * business regardless of status on purpose (managing or reactivating one
+   * is a different act from applying for a NEW permit with it); this is the
+   * one place that specifically means "choose a business to file against".
+   */
+  protected activeBusinesses() {
+    return this.businesses.myBusinesses().filter((b) => b.status === 'Active');
+  }
   private readonly applicationStore = inject(ApplicationStore);
   private readonly documentLibrary = inject(DocumentLibraryStore);
   private readonly toast = inject(ToastService);
@@ -1024,6 +1040,15 @@ export class ApplicationWizardPage {
   toStep(next: Step): void {
     if (next === 2 && !this.businessId) {
       this.error.set('Please select a business.');
+      return;
+    }
+    // The dropdown already excludes an inactive business — this only
+    // catches ?businessId=<id> naming one directly (e.g. a stale link),
+    // since a resumed draft or a hand-typed URL never goes through the
+    // dropdown at all.
+    if (next === 2 && this.businessId
+      && this.businesses.businessById(this.businessId)?.status !== 'Active') {
+      this.error.set('This business is inactive. Reactivate it before applying for a permit.');
       return;
     }
     // A Renewal or Amendment that names no permit is not a lesser application,

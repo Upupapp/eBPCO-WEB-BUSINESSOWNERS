@@ -35,7 +35,11 @@ import { ToastService } from '../../shared/ui/toast.service';
                 (click)="reactivate(b.id)"
               >{{ changingStatus() ? 'Reactivating…' : 'Reactivate' }}</button>
             }
-            <a [routerLink]="['/permits']" [queryParams]="{ businessId: b.id }" class="btn btn-primary">Apply for Permit</a>
+            @if (b.status === 'Active') {
+              <a [routerLink]="['/permits']" [queryParams]="{ businessId: b.id }" class="btn btn-primary">Apply for Permit</a>
+            } @else {
+              <button type="button" class="btn btn-primary" (click)="applyForInactive()">Apply for Permit</button>
+            }
           </div>
         </div>
 
@@ -104,6 +108,11 @@ export class BusinessDetailsPage {
   appsForBusiness() {
     const id = this.route.snapshot.paramMap.get('id')!;
     return this.applicationStore.myApplications().filter((a) => a.businessId === id);
+  }
+
+  /** Kept as a real button rather than hidden outright, so an inactive business still explains itself rather than the option just vanishing. */
+  protected applyForInactive(): void {
+    this.toast.error('This business is inactive. Reactivate it before applying for a permit.');
   }
 
   protected async deactivate(id: string): Promise<void> {

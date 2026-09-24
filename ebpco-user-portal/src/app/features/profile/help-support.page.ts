@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import {
   INQUIRY_TURNAROUND,
   MUNICIPAL_ENGINEER,
@@ -6,6 +6,7 @@ import {
   PLANNING_AND_DEVELOPMENT,
 } from '../../core/domain/lgu-contact';
 import { PRIVACY_POLICY_TEXT } from '../../core/domain/legal-copy';
+import { ToastService } from '../../shared/ui/toast.service';
 
 interface Faq {
   q: string;
@@ -53,18 +54,20 @@ interface Faq {
               <div class="small"><strong>Mobile:</strong> {{ office.mobile }}</div>
             }
             <div class="small">
-              <strong>Email:</strong> <a [href]="'mailto:' + office.email">{{ office.email }}</a>
+              <strong>Email:</strong>
+              <button type="button" class="link-button" (click)="copyEmail(office.email)">{{ office.email }}</button>
             </div>
           </div>
         }
 
         <p class="small muted" style="margin-top:10px;">{{ turnaround }}</p>
-        <button class="btn btn-primary btn-sm" (click)="contact()">Email the {{ engineer.shortName }}</button>
+        <button class="btn btn-primary btn-sm" (click)="copyEmail(engineer.email)">Email the {{ engineer.shortName }}</button>
       </div>
     </div>
   `,
 })
 export class HelpSupportPage {
+  private readonly toast = inject(ToastService);
   readonly open = signal<string | null>(null);
   protected readonly offices = [MUNICIPAL_ENGINEER, PLANNING_AND_DEVELOPMENT];
   protected readonly engineer = MUNICIPAL_ENGINEER;
@@ -82,7 +85,20 @@ export class HelpSupportPage {
     this.open.set(this.open() === q ? null : q);
   }
 
-  contact(): void {
-    window.location.href = `mailto:${MUNICIPAL_ENGINEER.email}`;
+  /**
+   * `mailto:` used to sit here — it only does anything on a machine with a
+   * desktop mail client set to handle that protocol, which most citizens
+   * signed in through a browser (webmail, a phone) do not have. Clicking it
+   * opened a blank browser tab and nothing else happened, which reads as
+   * broken rather than as "nothing to open it with". Copying the address
+   * works everywhere a citizen already has an email tab of their own open.
+   */
+  async copyEmail(email: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(email);
+      this.toast.success(`${email} copied to your clipboard.`);
+    } catch {
+      this.toast.error(`Could not copy automatically — the address is ${email}.`);
+    }
   }
 }

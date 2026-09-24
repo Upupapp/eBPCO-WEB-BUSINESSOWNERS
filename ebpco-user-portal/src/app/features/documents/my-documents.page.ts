@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { SAVED_DOCUMENT_CATEGORY_LABELS, SavedDocument, SavedDocumentCategory, SavedDocumentFileType } from '../../core/domain/document.model';
 import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
@@ -38,7 +39,7 @@ interface RealPreview {
  */
 @Component({
   selector: 'app-my-documents',
-  imports: [DocumentPreviewComponent, ConfirmModalComponent],
+  imports: [FormsModule, DocumentPreviewComponent, ConfirmModalComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -60,8 +61,30 @@ interface RealPreview {
         } @else if (realDocuments().length === 0) {
           <div class="card empty-state">No documents uploaded yet.</div>
         } @else {
+          <div class="doc-toolbar">
+            <input
+              class="input doc-search"
+              type="text"
+              aria-label="Search your documents by name"
+              placeholder="Search by file or document name"
+              [ngModel]="searchTerm()"
+              (ngModelChange)="searchTerm.set($event)"
+            />
+            <label class="sort-field">
+              <span>Sort by</span>
+              <select class="input" [ngModel]="sortBy()" (ngModelChange)="sortBy.set($event)">
+                <option value="newest">Date added (newest first)</option>
+                <option value="oldest">Date added (oldest first)</option>
+                <option value="name">Name (A&ndash;Z)</option>
+              </select>
+            </label>
+          </div>
+
+          @if (visibleRealDocuments().length === 0) {
+            <div class="card empty-state">No documents match &ldquo;{{ searchTerm() }}&rdquo;.</div>
+          } @else {
           <div class="doc-grid">
-            @for (d of realDocuments(); track d.id) {
+            @for (d of visibleRealDocuments(); track d.id) {
               <div class="doc-card">
                 <div class="doc-card-top">
                   <span class="doc-type-chip" [class.doc-type-chip--image]="fileTypeOf(d) !== 'pdf'">
@@ -95,6 +118,7 @@ interface RealPreview {
               </div>
             }
           </div>
+          }
         }
       } @else {
         <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
@@ -164,6 +188,28 @@ interface RealPreview {
     </div>
   `,
   styles: [`
+    .doc-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .doc-search {
+      flex: 1 1 260px;
+      min-width: 200px;
+    }
+    .sort-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--gray-500, #6b7080);
+      white-space: nowrap;
+    }
+    .sort-field select {
+      width: auto;
+    }
     .doc-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -289,6 +335,28 @@ export class MyDocumentsPage {
 
   protected readonly realChecked = signal(false);
   protected readonly realDocuments = signal<DocumentHistoryEntry[]>([]);
+  /** Matches file name or label — the two things a citizen actually recognises a document by, not its internal id. */
+  protected readonly searchTerm = signal('');
+  protected readonly sortBy = signal<'newest' | 'oldest' | 'name'>('newest');
+  /** What the grid actually renders — realDocuments() filtered by searchTerm() and ordered by sortBy(). */
+  protected readonly visibleRealDocuments = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    const matched = term
+      ? this.realDocuments().filter((d) =>
+          d.fileName.toLowerCase().includes(term) || d.label.toLowerCase().includes(term))
+      : this.realDocuments();
+    const sorted = [...matched];
+    const sort = this.sortBy();
+    if (sort === 'name') {
+      sorted.sort((a, b) => a.fileName.localeCompare(b.fileName));
+    } else {
+      sorted.sort((a, b) => {
+        const diff = new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
+        return sort === 'newest' ? -diff : diff;
+      });
+    }
+    return sorted;
+  });
   protected readonly viewingId = signal<string | null>(null);
   protected readonly downloadingId = signal<string | null>(null);
   protected readonly deletingId = signal<string | null>(null);

@@ -5,7 +5,18 @@ import { AppShellComponent } from './shared/layout/app-shell.component';
 export const routes: Routes = [
   { path: '', loadComponent: () => import('./features/splash/splash.page').then((m) => m.SplashPage) },
   { path: 'onboarding', loadComponent: () => import('./features/onboarding/onboarding.page').then((m) => m.OnboardingPage) },
-  { path: 'landing', loadComponent: () => import('./features/landing/landing.page').then((m) => m.LandingPage) },
+  {
+    // guestGuard, not left open: a still-authenticated visitor landing here
+    // (back button, a bookmark, a stale tab) saw Log In/Register as if
+    // signed out, and clicking Log In just fell through to their own
+    // dashboard anyway — the session was real the whole time. Same guard
+    // already used for /login and /register; splash.page.ts already never
+    // routes a signed-in visitor here on its own, so this only catches the
+    // direct-navigation case those don't.
+    path: 'landing',
+    canActivate: [guestGuard],
+    loadComponent: () => import('./features/landing/landing.page').then((m) => m.LandingPage),
+  },
   { path: 'how-it-works', loadComponent: () => import('./features/how-it-works/how-it-works.page').then((m) => m.HowItWorksPage) },
   { path: 'terms', loadComponent: () => import('./features/legal/terms.page').then((m) => m.TermsPage) },
   { path: 'privacy', loadComponent: () => import('./features/legal/privacy.page').then((m) => m.PrivacyPage) },
