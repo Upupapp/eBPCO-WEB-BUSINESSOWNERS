@@ -384,6 +384,21 @@ export class MyDocumentsPage {
     const file = input.files?.[0];
     if (!file) return;
 
+    // Case-insensitive: a filesystem-level rename ("Barangay Clearance.pdf"
+    // vs "barangay clearance.pdf") is the same document to a citizen
+    // re-uploading it, not two different ones — and the reused-document list
+    // below is itself matched by name, so two "identical" entries that only
+    // differ in case would silently collide there too.
+    const existingNames = new Set(
+      (this.api.configured ? this.realDocuments() : this.store.myDocuments())
+        .map((d) => d.fileName.trim().toLowerCase()),
+    );
+    if (existingNames.has(file.name.trim().toLowerCase())) {
+      this.toast.error(`A document named "${file.name}" already exists in My Documents.`);
+      input.value = '';
+      return;
+    }
+
     if (this.api.configured) {
       this.uploading.set(true);
       try {
