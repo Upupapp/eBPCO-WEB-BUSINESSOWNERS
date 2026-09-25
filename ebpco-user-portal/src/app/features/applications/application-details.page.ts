@@ -3,7 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { ApplicationLifecycleStatus, LIFECYCLE_SEQUENCE, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
+import { ApplicationLifecycleStatus, LIFECYCLE_SEQUENCE, applicantStatusLabel, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -50,7 +50,7 @@ interface PreviewableDocument {
               </div>
             }
           </div>
-          <app-status-pill [label]="applicantStatusOf(a.lifecycleStatus)" />
+          <app-status-pill [label]="applicantStatusLabel(a.lifecycleStatus)" />
         </div>
 
         <div class="card">
@@ -208,6 +208,7 @@ export class ApplicationDetailsPage {
   private readonly api = inject(CitizenApiClient);
 
   protected readonly applicantStatusOf = applicantStatusOf;
+  protected readonly applicantStatusLabel = applicantStatusLabel;
   protected readonly formatDate = formatDate;
   protected readonly formatDateTime = formatDateTime;
   protected readonly pesos = pesos;

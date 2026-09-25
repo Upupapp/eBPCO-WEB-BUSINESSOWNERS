@@ -5,7 +5,7 @@ import { BusinessStore } from '../../core/stores/business.store';
 import { NotificationStore } from '../../core/stores/notification.store';
 import { AuthService } from '../../core/session/auth.service';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { applicantStatusOf } from '../../core/domain/status.model';
+import { applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
 import { fullName } from '../../core/domain/user.model';
 import { formatDate } from '../../core/utils/ids';
 import { permitVisual } from '../../core/domain/permit-visual';
@@ -61,7 +61,7 @@ export class DashboardPage {
   }
 
   statusLabel(status: Parameters<typeof applicantStatusOf>[0]): string {
-    return applicantStatusOf(status);
+    return applicantStatusLabel(status);
   }
 
   /**

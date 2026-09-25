@@ -90,6 +90,23 @@ export function applicantStatusOf(status: ApplicationLifecycleStatus): Applicant
   return LIFECYCLE_TO_APPLICANT_STATUS[status];
 }
 
+/**
+ * The word shown ON SCREEN for a status, as distinct from `applicantStatusOf`
+ * — which stays the categorization every other caller needs (My Applications'
+ * own "Rejected" filter tab, the dashboard's counts) and stays identical to
+ * ebpco-mobile's ApplicationStatus, per this file's own module comment. Only
+ * the text a citizen reads changes: withdrawing your OWN application and
+ * having the LGU refuse it are the same "nothing more to do here" bucket for
+ * filtering, but they are not the same sentence — "Rejected" on an
+ * application the citizen cancelled themselves reads as the Municipality
+ * having turned them down, which is not what happened (found live
+ * 2026-09-25). Every other status's label is unchanged.
+ */
+export function applicantStatusLabel(status: ApplicationLifecycleStatus): string {
+  if (status === 'Cancelled') return 'Cancelled';
+  return applicantStatusOf(status);
+}
+
 /** Plain-language "what happens next" line for the Application Details screen, keyed by the internal lifecycle status. */
 export const NEXT_STEP_TEXT: Record<ApplicationLifecycleStatus, string> = {
   Draft: 'Finish your application and submit it when ready.',

@@ -3,7 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BusinessStore } from '../../core/stores/business.store';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { applicantStatusOf } from '../../core/domain/status.model';
+import { applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
 import { formatDate } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
 
@@ -69,7 +69,7 @@ import { ToastService } from '../../shared/ui/toast.service';
                       <a [routerLink]="['/applications', app.id]" class="table-cell-clip" [title]="app.applicationNumber">{{ app.applicationNumber }}</a>
                     </td>
                     <td><span class="table-cell-clip" [title]="app.permitType">{{ app.permitType }}</span></td>
-                    <td><app-status-pill [label]="applicantStatusOf(app.lifecycleStatus)" /></td>
+                    <td><app-status-pill [label]="applicantStatusLabel(app.lifecycleStatus)" /></td>
                     <td>{{ formatDate(app.dateSubmitted) }}</td>
                   </tr>
                 }
@@ -96,6 +96,7 @@ export class BusinessDetailsPage {
 
   protected readonly formatDate = formatDate;
   protected readonly applicantStatusOf = applicantStatusOf;
+  protected readonly applicantStatusLabel = applicantStatusLabel;
 
   protected readonly changingStatus = signal(false);
   protected readonly statusError = signal<string | null>(null);

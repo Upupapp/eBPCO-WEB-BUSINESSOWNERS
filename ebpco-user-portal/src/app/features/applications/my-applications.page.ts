@@ -2,7 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { ApplicantStatus, applicantStatusOf } from '../../core/domain/status.model';
+import { ApplicantStatus, applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
 import { formatDate } from '../../core/utils/ids';
 
 const FILTERS: (ApplicantStatus | 'All')[] = ['All', 'Draft', 'Submitted', 'Under Review', 'Payment Verification', 'Approved', 'Ready for Release', 'Rejected'];
@@ -38,7 +38,7 @@ const FILTERS: (ApplicantStatus | 'All')[] = ['All', 'Draft', 'Submitted', 'Unde
                   <td>{{ app.applicationNumber }}</td>
                   <td>{{ app.permitType }}</td>
                   <td>{{ app.businessName }}</td>
-                  <td><app-status-pill [label]="applicantStatusOf(app.lifecycleStatus)" /></td>
+                  <td><app-status-pill [label]="applicantStatusLabel(app.lifecycleStatus)" /></td>
                   <td>
                     @if (app.lifecycleStatus === 'Draft') {
                       Started {{ formatDate(app.updatedAt) }}
@@ -66,6 +66,7 @@ export class MyApplicationsPage {
   private readonly store = inject(ApplicationStore);
   protected readonly formatDate = formatDate;
   protected readonly applicantStatusOf = applicantStatusOf;
+  protected readonly applicantStatusLabel = applicantStatusLabel;
   protected readonly filters = FILTERS;
   readonly filter = signal<ApplicantStatus | 'All'>('All');
 
