@@ -201,7 +201,11 @@ export class PaymentFlowPage {
    * transfer proof is uploaded for real first (same `POST /documents` path
    * as the application wizard's attachments — Stage 6), and its real id is
    * what travels as `proofDocumentId`; Onsite carries none, matching the
-   * existing UI (no file picker shown for that method).
+   * existing UI (no file picker shown for that method). `applicationId` goes
+   * on the upload itself too — omitted until 2026-09-25, which meant a
+   * verifying officer had no way to actually see the proof they were asked
+   * to verify: it never appeared as one of the application's own documents
+   * anywhere in the Admin Portal, only its bare id sat on the payment row.
    */
   private async submitReal(applicationId: string): Promise<void> {
     const real = this.realOrderOfPayment()!;
@@ -219,7 +223,9 @@ export class PaymentFlowPage {
         try {
           const contentBase64 = await toBase64(this.proofFile);
           const uploaded = await firstValueFrom(
-            this.api.uploadDocument({ fileName: this.proofFile.name, label: 'Proof of Payment', contentBase64 }),
+            this.api.uploadDocument({
+              fileName: this.proofFile.name, label: 'Proof of Payment', contentBase64, applicationId,
+            }),
           );
           proofDocumentId = uploaded.documentId;
         } catch (error) {
