@@ -15,13 +15,14 @@ import { firstValueFrom } from 'rxjs';
 import { formatDateTime } from '../../core/utils/ids';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
 import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
+import { ConfirmModalComponent } from '../../shared/ui/confirm-modal.component';
 import { CASTILLA_BARANGAYS } from '../../core/domain/ph-reference-data';
 
 type Tab = 'profile' | 'password' | 'notifications' | 'privacy' | 'legal';
 
 @Component({
   selector: 'app-profile',
-  imports: [FormsModule, CapitalizeNameDirective, LegalModalComponent],
+  imports: [FormsModule, CapitalizeNameDirective, LegalModalComponent, ConfirmModalComponent],
   templateUrl: './profile.page.html',
   styleUrl: './profile.page.scss',
 })
@@ -439,15 +440,39 @@ export class ProfilePage {
   protected readonly deleteBusy = signal(false);
   protected readonly deleteError = signal<string | null>(null);
   protected readonly deleteReceipt = signal<ErasureReceipt | null>(null);
+  /** Gates the actual call — see requestEraseAccount()'s own comment for why this exists on top of the typed word. */
+  protected readonly showDeleteConfirm = signal(false);
 
-  protected async eraseAccount(): Promise<void> {
-    // Typed confirmation, not a single click: this is the one action on this
-    // whole page that cannot be undone by saving something different
-    // afterward.
+  protected readonly deleteWarning =
+    "This cannot be undone. Once your account is erased:\n"
+    + '• You will not be able to sign back in — your email, mobile number, and password are permanently deleted.\n'
+    + '• Any application still awaiting payment will be automatically cancelled, since you will not be able to finish it afterward.\n'
+    + '• Any payment you have already made will NOT be refunded — payments, Official Receipts, and Orders of Payment are kept '
+    + 'for treasury and audit records and are not reversed by deleting your account.\n'
+    + '• Any permit already issued to you remains valid and on file — a permit stays proof a structure was lawfully authorised, '
+    + 'even after your account is gone.\n\n'
+    + 'If you still expect a refund, or have an application already assessed or paid for, contact the Municipality before deleting your account.';
+
+  /**
+   * Typing DELETE is the intent gate; this popup is the consequences gate —
+   * a person who has typed the word may still not know a pending
+   * application gets auto-cancelled or that a payment is not refunded, and
+   * `window.confirm()` cannot say any of that (it cannot even be reached in
+   * this portal's styled modal layer — see ConfirmModalComponent's own
+   * comment). Nothing is called yet here; `eraseAccount()` below is the one
+   * that actually reaches the API, only once this popup is answered "yes".
+   */
+  protected requestEraseAccount(): void {
     if (this.deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
       this.deleteError.set('Type DELETE (in capital letters) to confirm.');
       return;
     }
+    this.deleteError.set(null);
+    this.showDeleteConfirm.set(true);
+  }
+
+  protected async eraseAccount(): Promise<void> {
+    this.showDeleteConfirm.set(false);
     this.deleteBusy.set(true);
     this.deleteError.set(null);
     try {

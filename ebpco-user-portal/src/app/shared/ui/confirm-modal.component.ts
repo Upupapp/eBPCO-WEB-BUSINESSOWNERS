@@ -63,6 +63,9 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, inject, input, output 
       color: var(--gray-600, #565c6b);
       font-size: 14px;
       line-height: 1.55;
+      /* A few callers (account deletion) pass several distinct warnings as
+         one string, one per line — plain text stays plain text otherwise. */
+      white-space: pre-line;
     }
     .confirm-modal-actions {
       display: flex; justify-content: flex-end; gap: 10px;

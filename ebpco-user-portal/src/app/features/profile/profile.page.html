@@ -312,9 +312,20 @@
                 <input id="profile-delete-confirm-14" class="input" [(ngModel)]="deleteConfirmText" />
               </div>
               @if (deleteError(); as err) { <div class="field error">{{ err }}</div> }
-              <button class="btn btn-danger" [disabled]="deleteBusy()" (click)="eraseAccount()">
+              <button class="btn btn-danger" [disabled]="deleteBusy()" (click)="requestEraseAccount()">
                 {{ deleteBusy() ? 'Deleting…' : 'Permanently Delete My Account' }}
               </button>
+              @if (showDeleteConfirm()) {
+                <app-confirm-modal
+                  title="Delete your account?"
+                  [message]="deleteWarning"
+                  confirmLabel="Yes, Delete My Account"
+                  cancelLabel="Cancel"
+                  tone="danger"
+                  (confirm)="eraseAccount()"
+                  (cancel)="showDeleteConfirm.set(false)"
+                />
+              }
             }
           </div>
         }
