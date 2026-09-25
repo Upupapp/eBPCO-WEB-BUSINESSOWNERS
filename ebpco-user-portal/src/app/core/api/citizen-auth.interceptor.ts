@@ -48,7 +48,17 @@ export const citizenAuthInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(authorised).pipe(
     catchError((error: unknown) => {
-      if (token !== null && error instanceof HttpErrorResponse && error.status === 401) {
+      // `POST /auth/password/change` is the one authenticated route where a
+      // 401 does not mean the bearer token is bad — auth.controller.ts's own
+      // `changePassword` deliberately answers 401 "That is not your current
+      // password" on an otherwise-valid, authenticated request, because the
+      // route separately verifies a second secret. Treating it the same as
+      // every other 401 signed the citizen out and bounced them to
+      // /login?reason=session-expired on a simple typo in their CURRENT
+      // password, discarding profile.page.ts's own "show it on the form and
+      // let them retry" handling before it ever ran (found live 2026-09-25).
+      const isPasswordChange = req.url.endsWith('/auth/password/change');
+      if (!isPasswordChange && token !== null && error instanceof HttpErrorResponse && error.status === 401) {
         // The API answers 401 for expired, revoked and disabled alike, on
         // purpose — from here they are all the same thing: this token no
         // longer works.

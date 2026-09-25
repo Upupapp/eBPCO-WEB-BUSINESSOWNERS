@@ -128,6 +128,14 @@ export class RegisterBusinessPage {
       this.error.set('Please complete all required fields.');
       return;
     }
+    // A DTI/SEC/CDA registration cannot predate its own issuance — accepted
+    // a date years in the future with no check at all until now (found live
+    // 2026-09-25). Same reasoning register.page.ts's own DOB check already
+    // applies to a citizen's date of birth.
+    if (new Date(this.dateRegistered) > new Date()) {
+      this.error.set('Date Registered cannot be in the future.');
+      return;
+    }
     this.submitting.set(true);
     try {
       const result = await this.store.registerReal({

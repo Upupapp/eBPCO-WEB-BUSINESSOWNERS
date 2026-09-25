@@ -156,7 +156,18 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               @for (b of activeBusinesses(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
             </select>
             @if (activeBusinesses().length === 0) {
-              @if (businesses.myBusinesses().length === 0) {
+              @if (!businesses.usingReal()) {
+                <!--
+                  myBusinesses() reads an empty list the instant this page
+                  mounts — BusinessStore's real list starts as "not fetched"
+                  and only becomes the source of truth once its own
+                  refreshMine() HTTP call resolves, a beat later. Without this
+                  branch, a citizen who already has an active business saw
+                  "No businesses yet — register one first" flash on screen
+                  before the real list ever arrived (found live 2026-09-25).
+                -->
+                <div class="hint">Loading your businesses…</div>
+              } @else if (businesses.myBusinesses().length === 0) {
                 <div class="hint">No businesses yet — <a routerLink="/businesses/register">register one first</a>.</div>
               } @else {
                 <div class="hint">None of your businesses are active — reactivate one to apply for a permit.</div>

@@ -20,7 +20,14 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
         <a routerLink="/permits/apply" [queryParams]="{ type: 'generic' }" class="btn btn-secondary">Start Generic Application</a>
       </div>
 
-      @if (businesses.myBusinesses().length === 0) {
+      @if (businesses.usingReal() && businesses.myBusinesses().length === 0) {
+        <!--
+          Gated on usingReal(), not just an empty list: myBusinesses() reads
+          an empty list the instant this page mounts, before BusinessStore's
+          own refreshMine() HTTP call has resolved — a citizen who already
+          had a business saw this banner flash on screen right after
+          registering one (found live 2026-09-25).
+        -->
         <div class="card" style="background:var(--warning-100); border:none; margin-bottom:16px;">
           <p class="small" style="color:var(--warning-text); margin:0;">
             You need to <a routerLink="/businesses/register">register a business</a> before you can apply for a permit.

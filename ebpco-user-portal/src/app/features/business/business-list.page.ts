@@ -52,7 +52,17 @@ const ICONS = {
         <a routerLink="/businesses/register" class="btn btn-primary">+ Register Business</a>
       </div>
 
-      @if (store.myBusinesses().length === 0) {
+      @if (!store.usingReal()) {
+        <!--
+          myBusinesses() reads an empty list the instant this page mounts,
+          before BusinessStore's own refreshMine() HTTP call resolves —
+          without this branch, a citizen with real businesses saw "You
+          haven't registered a business yet" flash on screen on every fresh
+          load (found live 2026-09-25, alongside the same bug on Permit
+          Services and the application wizard's own Business dropdown).
+        -->
+        <div class="card empty-state">Loading your businesses…</div>
+      } @else if (store.myBusinesses().length === 0) {
         <div class="card empty-state">
           You haven't registered a business yet.
           <div style="margin-top:12px;"><a routerLink="/businesses/register" class="btn btn-primary">Register Your First Business</a></div>
