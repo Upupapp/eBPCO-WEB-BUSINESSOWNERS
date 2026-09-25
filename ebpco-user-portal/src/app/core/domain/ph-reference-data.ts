@@ -5,14 +5,24 @@
 // `barangay`/`city` are all plain free-text columns, no reference table),
 // and inventing one would be exactly the "plausible-looking invented
 // figure" this codebase's other reference data (e.g. the fee schedule)
-// deliberately refuses to ship. City/Municipality is the exception: PSGC
-// (below) is a real, current, externally-sourced list, not an invented
-// one, so it's safe to hardcode. Barangay stays free text on the citizen's
-// own personal address (they could live anywhere in the Philippines), but
-// `CASTILLA_BARANGAYS` below is the exception to the exception: a business
-// filed with eBPCO must be located within Castilla specifically (see
-// `register-business.page.ts`), so PSGC's own 34-barangay list for that one
-// municipality is exactly the right size and specificity to hardcode too.
+// deliberately refuses to ship. `CITIES`/`PH_PROVINCES` below are the PSGC
+// exception: a real, current, externally-sourced nationwide list, not an
+// invented one, so it's safe to hardcode.
+//
+// This comment used to say Barangay stays free text on a citizen's own
+// personal address, since they could live anywhere in the Philippines, and
+// that `CASTILLA_BARANGAYS` was the exception to that, for a business's
+// address specifically. That was never actually true of `register.page.ts`:
+// its City/Municipality and Province fields are each a single hardcoded
+// option ("Castilla"/"Sorsogon"), not `CITIES`/`PH_PROVINCES` — so a citizen
+// registering here could never have entered an out-of-Castilla address
+// regardless of what Barangay allowed, and `CASTILLA_BARANGAYS` there is
+// consistent with the other two fields, not an exception to a promise the
+// form never kept. Corrected 2026-09-25 rather than left to mislead the next
+// reader the way it did a research pass this session. Whether personal
+// registration SHOULD open up to `CITIES`/`PH_PROVINCES` (both of which
+// exist and are otherwise unused) is a real, open product question, not
+// resolved by this comment fix.
 
 /** Alphabetical, so "Filipino" sits at its own F position rather than being pulled out of order — the default shown on load is set separately, in `register.page.ts`'s `nationality` field, and doesn't depend on list order. "Other" stays last, paired with a free-text fallback in the UI rather than silently rejecting an uncommon answer. */
 export const NATIONALITIES: readonly string[] = [
