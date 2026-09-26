@@ -456,6 +456,24 @@ export interface RequirementsChecklistResponse {
 }
 
 /** `GET /requirements/{permitType}` — the live checklist, before an application even exists: what a permit type currently asks for, as the LGU has it configured right now (`requirements.controller.ts`'s "applicant's copy" route). */
+/**
+ * `GET /applications/renewal-check` — whether a typed permit number may be
+ * renewed or amended on this filing: issued by eBPCO to this citizen, for the
+ * selected business, and (when one is given) of the same permit type. A
+ * mismatch is a 200 with `valid: false`; `message` is written for the citizen
+ * and shown under the field as-is. Filing re-checks on the server regardless.
+ */
+export type RenewalCheckResponse =
+  | {
+      valid: true;
+      permit: { permitNumber: string; permitType: string; businessName: string | null; issuedDate: string };
+    }
+  | {
+      valid: false;
+      reason: 'permit-not-found' | 'permit-business-mismatch' | 'permit-type-mismatch' | string;
+      message: string;
+    };
+
 export interface PermitRequirementsResponse {
   permitType: string;
   documents: ReadonlyArray<{

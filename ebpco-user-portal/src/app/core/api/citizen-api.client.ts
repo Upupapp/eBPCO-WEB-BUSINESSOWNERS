@@ -21,6 +21,7 @@ import {
   NotificationPreferencesResponse,
   PaymentHistoryEntry,
   PermitRequirementsResponse,
+  RenewalCheckResponse,
   PermitResponse,
   RequirementsChecklistResponse,
   ResubmitRequest,
@@ -190,6 +191,21 @@ export class CitizenApiClient {
   ): Observable<PermitRequirementsResponse> {
     const query = applicationAction === undefined ? '' : `?applicationAction=${encodeURIComponent(applicationAction)}`;
     return this.get<PermitRequirementsResponse>(`/requirements/${encodeURIComponent(permitType)}${query}`);
+  }
+
+  /**
+   * `GET /applications/renewal-check` — see `RenewalCheckResponse`. The
+   * wizard asks before leaving step 1, so a wrong permit number is caught
+   * under its own field rather than at the final submit. `permitType` is
+   * omitted by the generic flow, which learns the type FROM the permit.
+   */
+  checkRenewalPermit(query: {
+    permitNumber: string; permitType: string | null; businessId: string | null;
+  }): Observable<RenewalCheckResponse> {
+    const params = new URLSearchParams({ permitNumber: query.permitNumber });
+    if (query.permitType !== null) params.set('permitType', query.permitType);
+    if (query.businessId !== null) params.set('businessId', query.businessId);
+    return this.get<RenewalCheckResponse>(`/applications/renewal-check?${params.toString()}`);
   }
 
   /**

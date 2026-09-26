@@ -151,7 +151,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
         <div class="card">
           <div class="field">
             <label for="application-wizard-business-1">Business<span class="required">*</span></label>
-            <select id="application-wizard-business-1" class="input" [(ngModel)]="businessId">
+            <select id="application-wizard-business-1" class="input" [(ngModel)]="businessId" (ngModelChange)="invalidatePermitCheck()">
               <option [ngValue]="null" disabled>Select a business</option>
               @for (b of activeBusinesses(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
             </select>
@@ -184,30 +184,62 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           </div>
           @if (needsExistingPermit()) {
             <div class="field">
-              <label for="application-wizard-related-permit">{{ existingPermitPrompt(applicationAction) }}<span class="required">*</span></label>
-              @if (matchingRenewablePermits().length > 0) {
-                <select id="application-wizard-related-permit" class="input" [(ngModel)]="relatedPermitNumber">
-                  <option [ngValue]="null" disabled>Select a permit</option>
-                  @for (p of matchingRenewablePermits(); track p.permitNumber) {
-                    <option [value]="p.permitNumber">
-                      {{ p.permitNumber }} — {{ p.permitType }}{{ p.businessName ? ' · ' + p.businessName : '' }}
-                    </option>
-                  }
-                </select>
-                <div class="hint">
-                  The office needs to know which permit this application acts on. Only permits already
-                  issued to you through eBPCO, for this business, are listed.
-                </div>
-              } @else {
+              <label for="application-wizard-related-permit">
+                {{ paperPermit ? 'Paper permit number' : existingPermitPrompt(applicationAction) }}<span class="required">*</span>
+              </label>
+              @if (!paperPermit) {
                 <!--
-                  eBPCO launched into a Municipality with decades of paper
-                  permits already outstanding — most real renewals have no
-                  generated_permits row to select above. Automatic, not a
-                  click-through: the moment eBPCO has no matching permit on
-                  file for this business, the claim + proof upload appear
-                  right here. Self-reported, never verified by the system,
-                  and judged by staff from the attached proof (requirement
-                  code prior-permit-proof).
+                  Typed, then checked by the server (GET /applications/renewal-check)
+                  before Continue lets the citizen past: the number must be a permit
+                  eBPCO issued to them, for the business selected above, of this
+                  permit type. The permits already on file are offered as
+                  suggestions, but a suggestion is never the check.
+                -->
+                <input
+                  id="application-wizard-related-permit" class="input"
+                  [class.invalid]="!!permitNumberError()"
+                  [attr.aria-invalid]="!!permitNumberError()"
+                  aria-describedby="application-wizard-related-permit-message"
+                  [attr.list]="matchingRenewablePermits().length > 0 ? 'application-wizard-permit-suggestions' : null"
+                  [(ngModel)]="permitNumberInput"
+                  (ngModelChange)="invalidatePermitCheck()"
+                  placeholder="e.g. BP-2025-000042, as printed on the permit"
+                  autocomplete="off"
+                />
+                @if (matchingRenewablePermits().length > 0) {
+                  <datalist id="application-wizard-permit-suggestions">
+                    @for (p of matchingRenewablePermits(); track p.permitNumber) {
+                      <option [value]="p.permitNumber">{{ p.permitType }}{{ p.businessName ? ' · ' + p.businessName : '' }}</option>
+                    }
+                  </datalist>
+                }
+                @if (permitNumberError(); as message) {
+                  <div id="application-wizard-related-permit-message" class="hint" role="alert" style="color: var(--danger-text);">
+                    {{ message }}
+                  </div>
+                } @else if (verifiedPermit(); as permit) {
+                  <div id="application-wizard-related-permit-message" class="hint" style="color: var(--success-text);">
+                    ✓ Permit found{{ verifiedPermitSummary(permit) }}
+                  </div>
+                } @else {
+                  <div id="application-wizard-related-permit-message" class="hint">
+                    Checked against the permits eBPCO issued to you for the selected business before you can continue.
+                  </div>
+                }
+              }
+              <label class="checkbox-row" style="margin-top:10px;">
+                <input type="checkbox" [(ngModel)]="paperPermit" (ngModelChange)="onPaperPermitChange()" />
+                <span>
+                  My permit was issued on paper before eBPCO
+                  <span class="hint" style="display:block; margin-top:2px;">It will not be found in the system. You will need to upload a copy of it.</span>
+                </span>
+              </label>
+              @if (paperPermit) {
+                <!--
+                  A permit the Municipality issued before eBPCO existed has no
+                  generated_permits row to check against. Self-reported, never
+                  verified by the system, and judged by staff from the attached
+                  proof (requirement code prior-permit-proof).
                 -->
                 @if (isGeneric && !permitType) {
                   <label for="application-wizard-claim-permit-type" style="margin-top:10px; display:block;">
@@ -218,12 +250,9 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                     @for (t of allPermitTypes; track t) { <option [value]="t">{{ t }}</option> }
                   </select>
                 } @else {
-                  <div class="hint" style="margin-bottom:8px;">
-                    eBPCO has no permit of this type on file for this business, so there is nothing to
-                    select — it may have been issued before this system existed.
-                  </div>
                   <input
-                    id="application-wizard-prior-permit-claim" class="input"
+                    id="application-wizard-prior-permit-claim" class="input" style="margin-top:10px;"
+                    aria-label="Paper permit number"
                     [(ngModel)]="priorPermitClaim"
                     placeholder="e.g. BP-1998-000042, as printed on the permit"
                   />
@@ -262,7 +291,9 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
             </div>
           }
           @if (error()) { <div class="field error">{{ error() }}</div> }
-          <button class="btn btn-primary" (click)="toStep(2)">Continue</button>
+          <button class="btn btn-primary" [disabled]="checkingPermit()" (click)="toStep(2)">
+            {{ checkingPermit() ? 'Checking permit…' : 'Continue' }}
+          </button>
         </div>
       }
 
@@ -598,6 +629,22 @@ export class ApplicationWizardPage {
    * `relatedPermitNumber`.
    */
   priorPermitClaim: string | null = null;
+  /**
+   * What the citizen typed into the permit number field. Deliberately NOT
+   * `relatedPermitNumber`: that one holds only a number the server has
+   * confirmed (see `verifyPermitThenContinue()`), so nothing unchecked can
+   * reach a draft or a filing. Every edit clears the confirmation.
+   */
+  permitNumberInput = '';
+  /** The explicit paper-permit path — see the template's own comment. */
+  paperPermit = false;
+  /** Shown under the permit number field: why the server refused it, or a missing-number prompt. */
+  protected readonly permitNumberError = signal<string | null>(null);
+  /** What the last successful check matched, shown back to the citizen as confirmation. */
+  protected readonly verifiedPermit = signal<
+    { permitNumber: string; permitType?: string; businessName?: string | null; issuedDate?: string } | null
+  >(null);
+  protected readonly checkingPermit = signal(false);
   protected readonly allPermitTypes = ALL_PERMIT_TYPES;
 
   protected readonly existingPermitPrompt = existingPermitPrompt;
@@ -620,6 +667,89 @@ export class ApplicationWizardPage {
       (this.businessId === null || p.businessId === this.businessId)
       && (this.isGeneric || p.permitType === this.permitType));
   }
+  /** Anything that changes what the typed number must match makes the last check stale. */
+  protected invalidatePermitCheck(): void {
+    if (this.paperPermit) return;
+    this.relatedPermitNumber = null;
+    this.verifiedPermit.set(null);
+    this.permitNumberError.set(null);
+  }
+  /** Leaving one path clears the other's reference: an application names at most one. */
+  protected onPaperPermitChange(): void {
+    this.permitNumberError.set(null);
+    if (this.paperPermit) {
+      this.relatedPermitNumber = null;
+      this.verifiedPermit.set(null);
+    } else {
+      this.priorPermitClaim = null;
+    }
+  }
+  protected verifiedPermitSummary(permit: { permitType?: string; businessName?: string | null; issuedDate?: string }): string {
+    const parts = [
+      permit.permitType,
+      permit.businessName ?? undefined,
+      permit.issuedDate ? `issued ${formatDate(permit.issuedDate)}` : undefined,
+    ].filter((part): part is string => !!part);
+    return parts.length === 0 ? '.' : `: ${parts.join(' · ')}`;
+  }
+  /**
+   * Asks the server whether the typed number may be renewed/amended here,
+   * and continues to step 2 only if it may. The server is the only judge —
+   * the suggestions list is a convenience, and without a configured API
+   * there is nothing that could honestly confirm a number, so the local
+   * record of issued permits stands in only for the demo build.
+   */
+  private async verifyPermitThenContinue(typed: string): Promise<void> {
+    this.checkingPermit.set(true);
+    this.permitNumberError.set(null);
+    try {
+      if (!this.api.configured) {
+        const local = this.matchingRenewablePermits().find((p) => p.permitNumber.toUpperCase() === typed);
+        if (!local) {
+          this.permitNumberError.set(`Permit number "${typed}" does not exist under your account for the selected business.`);
+          return;
+        }
+        this.acceptVerifiedPermit({ permitNumber: local.permitNumber, permitType: local.permitType, businessName: local.businessName });
+      } else {
+        const result = await firstValueFrom(this.api.checkRenewalPermit({
+          permitNumber: typed,
+          permitType: this.isGeneric ? null : this.permitType,
+          businessId: this.businessId,
+        }));
+        if (!result.valid) {
+          this.permitNumberError.set(result.message);
+          return;
+        }
+        this.acceptVerifiedPermit(result.permit);
+      }
+    } catch (e) {
+      this.permitNumberError.set(
+        e instanceof ApiError ? e.citizenMessage : 'The permit number could not be checked. Try again.',
+      );
+      return;
+    } finally {
+      this.checkingPermit.set(false);
+    }
+    this.toStep(2);
+  }
+  private acceptVerifiedPermit(permit: {
+    permitNumber: string; permitType?: string; businessName?: string | null; issuedDate?: string;
+  }): void {
+    this.relatedPermitNumber = permit.permitNumber;
+    this.permitNumberInput = permit.permitNumber;
+    this.verifiedPermit.set(permit);
+    // A renewal is of the SAME permit type as the permit it acts on — the
+    // same rule carryOverDocuments() applies, applied here so the generic
+    // flow's checklist is the right one from step 2 on.
+    if (this.isGeneric && permit.permitType && permit.permitType !== 'Business Permit'
+      && isValidPermitType(permit.permitType)) {
+      this.isGeneric = false;
+      this.permitType = permit.permitType;
+      this.documents = this.applicationStore.requiredDocumentsFor(permit.permitType, this.applicationAction);
+      this.usingRealRequirementCodes = false;
+      this.loadRealDocuments(permit.permitType, this.applicationAction);
+    }
+  }
   protected needsExistingPermit(): boolean {
     return actionNeedsExistingPermit(this.applicationAction);
   }
@@ -635,7 +765,10 @@ export class ApplicationWizardPage {
     if (this.applicationAction === 'New') {
       this.relatedPermitNumber = null;
       this.priorPermitClaim = null;
+      this.permitNumberInput = '';
+      this.paperPermit = false;
     }
+    this.invalidatePermitCheck();
     if (!this.isGeneric && this.permitType) {
       this.documents = this.applicationStore.requiredDocumentsFor(this.permitType, this.applicationAction);
       this.usingRealRequirementCodes = false;
@@ -783,6 +916,10 @@ export class ApplicationWizardPage {
     this.applicationAction = (application.applicationAction as ApplicationAction) ?? 'New';
     this.relatedPermitNumber = application.renewsPermitNumber;
     this.priorPermitClaim = application.priorPermitClaim;
+    // A saved renewsPermitNumber was already accepted by the server.
+    this.permitNumberInput = application.renewsPermitNumber ?? '';
+    this.paperPermit = application.renewsPermitNumber === null && application.priorPermitClaim !== null;
+    this.verifiedPermit.set(application.renewsPermitNumber ? { permitNumber: application.renewsPermitNumber } : null);
     this.projectAddress = application.location ?? '';
     const form = application.form ?? {};
     this.scopeOfWork = typeof form['scopeOfWork'] === 'string' ? form['scopeOfWork'] : '';
@@ -1065,16 +1202,31 @@ export class ApplicationWizardPage {
     // A Renewal or Amendment that names no permit is not a lesser application,
     // it is an unanswerable one: the office is told an existing permit is
     // involved and never told which. Blocked here AND refused by the store.
+    //
+    // A typed number is not a reference until the server has confirmed it:
+    // `relatedPermitNumber` stays null until then, and the check itself is
+    // what continues to step 2 (verifyPermitThenContinue).
+    const verb = this.applicationAction === 'Renewal' ? 'renewed' : 'amended';
+    if (next === 2 && this.needsExistingPermit() && !this.paperPermit
+      && this.relatedPermitNumber === null && this.priorPermitClaim === null) {
+      const typed = this.permitNumberInput.trim().toUpperCase();
+      if (!typed) {
+        this.error.set(null);
+        this.permitNumberError.set(`Please enter the permit number being ${verb}.`);
+        return;
+      }
+      this.error.set(null);
+      void this.verifyPermitThenContinue(typed);
+      return;
+    }
     if (
       next === 2
       && !actionReferenceIsComplete(this.applicationAction, this.relatedPermitNumber, this.priorPermitClaim)
     ) {
       this.error.set(
-        this.needsExistingPermit() && this.matchingRenewablePermits().length === 0
-          ? (this.isGeneric && !this.permitType
-              ? 'Please select which permit type this is.'
-              : `Please enter the permit number being ${this.applicationAction === 'Renewal' ? 'renewed' : 'amended'}.`)
-          : `Please select the permit being ${this.applicationAction === 'Renewal' ? 'renewed' : 'amended'}.`,
+        this.paperPermit && this.isGeneric && !this.permitType
+          ? 'Please select which permit type this is.'
+          : `Please enter the permit number being ${verb}.`,
       );
       return;
     }

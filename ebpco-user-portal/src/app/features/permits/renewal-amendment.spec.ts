@@ -114,7 +114,9 @@ describe('A Renewal or Amendment names the permit it acts on', () => {
     page.toStep(2);
 
     expect(page.step()).toBe(1);
-    expect(page.error()).toMatch(/renew/i);
+    // Under the permit number field itself, where the citizen is looking —
+    // see renewal-permit-check.spec.ts.
+    expect(page['permitNumberError']()).toMatch(/renew/i);
   });
 
   it('the wizard advances once the permit is named', () => {
@@ -207,17 +209,18 @@ describe('a Renewal/Amendment claiming a permit eBPCO has no record of', () => {
     expect(page['isRequired'](page.documents[0])).toBe(true);
   });
 
-  it('switches to the claim path automatically — no manual toggle to click', () => {
-    // The dropdown/claim split used to be a click-through ("claim it as an
-    // existing permit"). It is now purely a function of what's on file: a
-    // business with no matching permit shows the claim fields the moment
-    // both are known, with nothing in between to click.
+  it('offers no suggestions for a business with nothing on file — and does not switch to the claim path for it', () => {
+    // This used to switch to the unverified claim box automatically, which is
+    // how "BP" typed into it carried a citizen on to step 2. The paper path
+    // is now an explicit checkbox; an empty suggestion list changes nothing
+    // but the suggestions (see renewal-permit-check.spec.ts).
     const fixture = TestBed.createComponent(ApplicationWizardPage);
     const page = fixture.componentInstance;
     page.businessId = 'a-business-with-no-real-permits-at-all';
     page.applicationAction = 'Renewal';
 
     expect(page['matchingRenewablePermits']().length).toBe(0);
+    expect(page.paperPermit).toBe(false);
   });
 
   it('narrows renewablePermits() by business, not just permit type', () => {
