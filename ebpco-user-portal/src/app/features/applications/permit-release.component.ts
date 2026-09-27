@@ -1,6 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 import { PermitRelease } from '../../core/api/citizen-api.models';
 import { MUNICIPAL_ENGINEER, MUNICIPAL_HALL_ADDRESS } from '../../core/domain/lgu-contact';
+import { formatDate } from '../../core/utils/ids';
 
 /**
  * The permit number, and whether it can be collected.
@@ -91,7 +92,7 @@ export class PermitReleaseComponent {
           : 'Collect this in person.';
       case 'Released':
         return r.releasedAt
-          ? `Released on ${new Date(r.releasedAt).toLocaleDateString()}.`
+          ? `Released on ${formatDate(r.releasedAt)}.`
           : 'This permit has been released.';
       default:
         return 'The office has not finished preparing this permit for collection.';

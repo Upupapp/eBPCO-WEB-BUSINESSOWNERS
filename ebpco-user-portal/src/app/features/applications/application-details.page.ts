@@ -132,7 +132,7 @@ interface PreviewableDocument {
               <tbody>
                 <tr><td class="muted">Permit Number</td><td><strong>{{ p.permitNumber }}</strong></td></tr>
                 <tr><td class="muted">Issued</td><td>{{ formatDate(p.issuedDate) }}</td></tr>
-                <tr><td class="muted">Expiry</td><td>{{ p.expiryDate ? formatDate(p.expiryDate) : 'No fixed expiry' }}</td></tr>
+                <tr><td class="muted">Valid Until</td><td>{{ p.expiryDate ? formatDate(p.expiryDate) : 'Not recorded by the office' }}</td></tr>
                 <tr><td class="muted">Approving Office</td><td>{{ p.approvingOffice ?? 'Not on file' }}</td></tr>
               </tbody>
             </table>

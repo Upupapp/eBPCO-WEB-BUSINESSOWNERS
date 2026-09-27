@@ -38,8 +38,8 @@ import { RouterLink } from '@angular/router';
           than imply a step the citizen should go looking for.
         -->
         <p class="small muted">
-          If you confirmed the code sent to your email during sign-up, your address shows as
-          Verified on your Profile. Your mobile number is kept on file and is not verified.
+          Your email address is verified. Your mobile number is kept on file and is not
+          verified.
         </p>
         <a routerLink="/login" class="btn btn-primary btn-block" style="margin-top:12px;">Continue to Log In</a>
       </div>

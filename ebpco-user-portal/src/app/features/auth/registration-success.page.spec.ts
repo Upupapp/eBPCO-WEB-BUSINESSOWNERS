@@ -33,9 +33,12 @@ describe('RegistrationSuccessPage (F-16: no instruction without a control)', () 
     // Sign-up confirms the email address with a real code since 2026-09-20,
     // so "not available yet" stopped being true. Mobile numbers are kept on
     // file and never verified — by decision, not as a gap — and the page
-    // must not send anyone looking for a step that does not exist.
+    // must not send anyone looking for a step that does not exist. Since
+    // 2026-09-27 no one reaches this page without confirming the code, so it
+    // no longer hedges with "If you confirmed".
     const text = (render().nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('confirmed the code sent to your email during sign-up');
+    expect(text).toContain('Your email address is verified');
+    expect(text).not.toContain('If you confirmed');
     expect(text).toContain('mobile number is kept on file and is not verified');
     expect(text).not.toContain('not available yet');
     expect(text).not.toMatch(/verify your mobile/i);
