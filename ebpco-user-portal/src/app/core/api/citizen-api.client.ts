@@ -365,6 +365,20 @@ export class CitizenApiClient {
   }
 
   /**
+   * `POST /applications/{id}/resubmit` — send an application the office
+   * returned for changes back to it (`Revision Required -> Under
+   * Evaluation`). Refused (422) while any returned document has no
+   * replacement; the refusal's detail says so in the citizen's words.
+   */
+  sendBackToOffice(applicationId: string, idempotencyKey: string): Observable<{ status: string; version: number }> {
+    return this.post<{ status: string; version: number }>(
+      `/applications/${encodeURIComponent(applicationId)}/resubmit`,
+      {},
+      idempotencyKey,
+    );
+  }
+
+  /**
    * `POST /applications/{id}/cancel` — withdraw an application.
    *
    * Only accepted before an Order of Payment exists (E-4) — the server

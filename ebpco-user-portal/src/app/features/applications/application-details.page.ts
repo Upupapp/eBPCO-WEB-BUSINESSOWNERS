@@ -67,6 +67,25 @@ interface PreviewableDocument {
             <button class="btn btn-secondary btn-sm" (click)="advance(a.id)">Demo: Simulate Office Update</button>
             <span class="small muted" style="margin-left:8px;">No backend exists yet — this simulates the reviewing office advancing your application.</span>
           }
+          @if (a.lifecycleStatus === 'Revision Required' && api.configured) {
+            <div role="region" aria-label="Send back to the office"
+                 style="margin-top:12px; padding:12px 14px; border-radius:10px; border:1px solid var(--gray-200);"
+                 [style.background]="returnedNotReplaced().length === 0 ? 'var(--success-100)' : 'var(--warning-100)'">
+              @if (returnedNotReplaced().length === 0) {
+                <strong>Ready to send back</strong>
+                <p class="small">Every returned document has been replaced. Send the application back so the office can continue evaluating it.</p>
+              } @else {
+                <strong>The office returned this application</strong>
+                <p class="small">
+                  Replace {{ returnedNotReplaced().length === 1 ? 'the returned document' : 'the ' + returnedNotReplaced().length + ' returned documents' }}
+                  below ({{ returnedNotReplacedNames() }}), then send the application back to the office.
+                </p>
+              }
+              <button class="btn btn-primary btn-sm" [disabled]="sendingBack() || returnedNotReplaced().length > 0" (click)="sendBack(a.id)">
+                {{ sendingBack() ? 'Sending…' : 'Send Back to the Office' }}
+              </button>
+            </div>
+          }
           @if (canCancel(a)) {
             <div style="margin-top:10px;">
               <button class="btn btn-danger btn-sm" [disabled]="cancelling()" (click)="cancel(a.id)">
@@ -205,7 +224,7 @@ export class ApplicationDetailsPage {
   protected readonly store = inject(ApplicationStore);
   private readonly toast = inject(ToastService);
   private readonly resubmission = inject(DocumentResubmissionService);
-  private readonly api = inject(CitizenApiClient);
+  protected readonly api = inject(CitizenApiClient);
 
   protected readonly applicantStatusOf = applicantStatusOf;
   protected readonly applicantStatusLabel = applicantStatusLabel;
@@ -245,6 +264,46 @@ export class ApplicationDetailsPage {
    * yet" rather than "this view was never wired to the real endpoint."
    */
   private readonly realTimeline = signal<TimelineEntryResponse[] | null>(null);
+
+  /**
+   * Documents the office returned (Revision Required or Rejected) that no
+   * newer upload replaces yet — the same test the server's
+   * `returned-documents-replaced` precondition applies before it lets the
+   * application go back.
+   */
+  protected returnedNotReplaced(): ApplicationDocumentResponse[] {
+    return (this.realDocuments() ?? []).filter((d) =>
+      (d.reviewStatus === 'Revision Required' || d.reviewStatus === 'Rejected') && d.supersededByDocumentId === null);
+  }
+  protected returnedNotReplacedNames(): string {
+    return this.returnedNotReplaced().map((d) => d.label).join(', ');
+  }
+
+  protected readonly sendingBack = signal(false);
+
+  async sendBack(id: string): Promise<void> {
+    this.sendingBack.set(true);
+    try {
+      const result = await this.store.sendBackReal(id);
+      if (!result.ok) {
+        this.toast.error(result.error);
+        return;
+      }
+      this.refreshTimeline();
+      this.refreshDocuments();
+      this.toast.success('Sent back to the office for evaluation.');
+    } finally {
+      this.sendingBack.set(false);
+    }
+  }
+
+  /** Re-fetches the document list after a write that changes it (a replacement, a send-back). */
+  private refreshDocuments(): void {
+    this.api.listDocuments(this.id()).subscribe({
+      next: (docs) => this.realDocuments.set(docs),
+      error: () => {},
+    });
+  }
 
   constructor() {
     if (this.api.configured) {
@@ -438,6 +497,9 @@ export class ApplicationDetailsPage {
             ? ` ${result.removedMetadata.join(', ')} was removed from the file.`
             : '';
           this.toast.success(`Replacement sent for "${doc.label}".${stripped}`);
+          // Without this the list kept showing the returned file as current
+          // until a reload, so "Send Back to the Office" stayed disabled.
+          this.refreshDocuments();
         },
         error: (e) => this.toast.error(this.resubmission.explain(e)),
       });

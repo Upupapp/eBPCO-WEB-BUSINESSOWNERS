@@ -89,3 +89,82 @@ describe('ApplicationDetailsPage — previewing a real, backend-uploaded documen
     expect(toasts.toasts().some((t) => t.kind === 'error')).toBe(true);
   });
 });
+
+/**
+ * An application the office returned for changes can go back to it.
+ *
+ * It used to sit at Revision Required for good: the only way back was
+ * answering a Letter of Instruction, which the backend never issues, and
+ * replacing the returned document changed nothing on its own.
+ */
+describe('ApplicationDetailsPage — sending a returned application back to the office', () => {
+  const doc = (over: Partial<ApplicationDocumentResponse>): ApplicationDocumentResponse => ({
+    id: 'doc', label: 'Survey Plan', fileName: 'plan.pdf', contentType: 'application/pdf', byteSize: '11',
+    sha256: 'x', uploadedAt: '2026-09-27T00:00:00.000Z', expiresOn: null, reviewStatus: null, reviewedAt: null,
+    reviewReason: null, supersedesDocumentId: null, supersededByDocumentId: null, ...over,
+  } as ApplicationDocumentResponse);
+
+  const RETURNED = doc({ id: 'returned', reviewStatus: 'Revision Required' });
+  const REPLACED_ORIGINAL = doc({ id: 'returned', reviewStatus: 'Revision Required', supersededByDocumentId: 'new' });
+  const REPLACEMENT = doc({ id: 'new', supersedesDocumentId: 'returned' });
+  const ACCEPTED = doc({ id: 'title', label: 'Land Title', reviewStatus: 'Accepted' });
+
+  interface Testable {
+    returnedNotReplaced(): ApplicationDocumentResponse[];
+    returnedNotReplacedNames(): string;
+    sendBack(id: string): Promise<void>;
+  }
+
+  function render(docs: ApplicationDocumentResponse[], extra: Partial<CitizenApiClient> = {}) {
+    TestBed.configureTestingModule({
+      imports: [ApplicationDetailsPage],
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: 'app-real-1' }) } } },
+        {
+          provide: CitizenApiClient,
+          useValue: {
+            configured: true,
+            listDocuments: () => of(docs),
+            getTimeline: () => EMPTY,
+            getPermit: () => EMPTY,
+            getRequirementsForPermitType: () => EMPTY,
+            listApplications: () => of({ data: [], nextCursor: null }),
+            ...extra,
+          } as Partial<CitizenApiClient>,
+        },
+      ],
+    });
+    return TestBed.createComponent(ApplicationDetailsPage).componentInstance as unknown as Testable;
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('names the returned document that still needs replacing', () => {
+    const page = render([RETURNED, ACCEPTED]);
+
+    expect(page.returnedNotReplaced().map((d) => d.id)).toEqual(['returned']);
+    expect(page.returnedNotReplacedNames()).toBe('Survey Plan');
+  });
+
+  it('counts nothing outstanding once the returned document has a replacement', () => {
+    const page = render([REPLACED_ORIGINAL, REPLACEMENT, ACCEPTED]);
+
+    expect(page.returnedNotReplaced()).toEqual([]);
+  });
+
+  it('sends it back through POST /applications/{id}/resubmit and says so', async () => {
+    const calls: string[] = [];
+    const page = render([REPLACED_ORIGINAL, REPLACEMENT], {
+      sendBackToOffice: (id: string) => { calls.push(id); return of({ status: 'Under Evaluation', version: 7 }); },
+    });
+    const toast = TestBed.inject(ToastService);
+    const said: string[] = [];
+    toast.success = (m: string) => { said.push(m); };
+
+    await page.sendBack('app-real-1');
+
+    expect(calls).toEqual(['app-real-1']);
+    expect(said.join(' ')).toMatch(/sent back to the office/i);
+  });
+});
