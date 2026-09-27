@@ -8,6 +8,7 @@ import { MUNICIPAL_ENGINEER, MUNICIPAL_HALL_ADDRESS } from '../../core/domain/lg
 import { pesos } from '../../core/domain/assessment.model';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { ApplicationSummary } from '../../core/api/citizen-api.models';
 import { UploadLimitsService } from '../../core/api/upload-limits.service';
 import { toBase64 } from '../../core/api/document-resubmission.service';
 import { ApiError } from '../../core/api/problem';
@@ -27,6 +28,15 @@ import { ApiError } from '../../core/api/problem';
 
         @if (assessment(); as asmt) {
           <div class="card">
+            @if (feeLines().length > 0) {
+              <table class="table" style="margin-bottom:10px;">
+                <tbody>
+                  @for (line of feeLines(); track line.name) {
+                    <tr><td>{{ line.name }}</td><td style="text-align:right;">{{ pesos(line.amountCentavos) }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            }
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="muted">Total Assessment</span><strong>{{ pesos(asmt.totalCentavos) }}</strong></div>
             <div style="display:flex; justify-content:space-between;"><span class="muted">Balance Due</span><strong style="color:var(--danger-text)">{{ pesos(asmt.balanceCentavos) }}</strong></div>
           </div>
@@ -125,7 +135,21 @@ export class PaymentFlowPage {
    * request just hasn't come back yet."
    */
   private readonly realChecked = signal(false);
-  private readonly realOrderOfPayment = signal<{ totalCentavos: number } | null>(null);
+  private readonly realOrderOfPayment = signal<ApplicationSummary['payment']['orderOfPayment'] | null>(null);
+
+  /** The Order of Payment's own lines, so the citizen sees what the total is made of before paying it. */
+  protected feeLines(): { name: string; amountCentavos: number }[] {
+    const real = this.realOrderOfPayment();
+    if (!real) return [];
+    return [
+      { name: 'Filing Fee', amountCentavos: real.fees.filing },
+      { name: 'Processing Fee', amountCentavos: real.fees.processing },
+      { name: 'Architectural Fee', amountCentavos: real.fees.architectural },
+      { name: 'Structural Fee', amountCentavos: real.fees.structural },
+      { name: 'Electrical Fee', amountCentavos: real.fees.electrical },
+      { name: 'Other Fees', amountCentavos: real.fees.others },
+    ].filter((line) => line.amountCentavos > 0);
+  }
 
   constructor() {
     if (this.api.configured) {

@@ -33,6 +33,27 @@ export interface PermitRelease {
   status: 'Not Ready' | 'Ready for Release' | 'Released';
   method: 'Physical Claim' | 'Authorized Representative' | null;
   releasedAt: string | null;
+  /** Where, when and with what to collect it — as the Releasing Officer typed them. Absent from an older server; null when not given. */
+  claimLocation?: string | null;
+  officeHours?: string | null;
+  bringWithYou?: readonly string[];
+}
+
+/** `GET /applications/{id}/instructions` — what the office asked for when it returned the application. */
+export interface InstructionLetter {
+  letterId: string;
+  issuedAt: string;
+  items: ReadonlyArray<{ id: string; subject: string; remark: string; resolvedAt: string | null }>;
+}
+
+/** `GET /public/permits/{number}` — the no-login check behind the permit's QR code. Never the owner's details. */
+export interface PublicPermitRecord {
+  permitNumber: string;
+  permitType: string;
+  businessName: string | null;
+  issuedDate: string;
+  released: boolean;
+  releasedAt: string | null;
 }
 
 export interface PermitResponse {

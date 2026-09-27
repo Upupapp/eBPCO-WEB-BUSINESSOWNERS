@@ -1,20 +1,28 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { ApplicationStore } from '../../core/stores/application.store';
-import { BusinessStore } from '../../core/stores/business.store';
-import { requirementsFor } from '../../core/domain/requirements-catalog';
-import { PermitStanding, isPermitStanding } from '../../core/domain/permit.model';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { PublicPermitRecord } from '../../core/api/citizen-api.models';
+import { requirementsFor, REQUIREMENTS_CATALOG } from '../../core/domain/requirements-catalog';
+import { PermitType } from '../../core/domain/permit.model';
+import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { formatDate } from '../../core/utils/ids';
 
-/**
- * 'Unverified' is the default for anything this page cannot positively confirm.
- * A verification surface must fail CLOSED: the cost of showing "Valid" for a
- * permit that is not is far higher than the cost of showing "Unverified" for
- * one that is. Do not add a branch that returns 'Valid' by fallthrough.
- */
-type PublicStatus = PermitStanding | 'Expired' | 'Unverified';
+type LookupState = 'loading' | 'found' | 'not-found' | 'unavailable';
 
-/** Public, no-login verification page — the destination the QR block on every generated permit points to. The token is simply the permit's own real, system-generated number. */
+/**
+ * Public, no-login verification page — the destination the QR block on every
+ * generated permit points to. The token is the permit's own number.
+ *
+ * Asks the Municipality's server (`GET /public/permits/{number}`). It used to
+ * look the number up in the VISITOR's own browser data, so a stranger scanning
+ * a genuine permit was told "No record for this permit number" (found live
+ * 2026-09-27).
+ *
+ * FAILS CLOSED, and never says "Valid": the system records no revocation or
+ * suspension, so it cannot know a permit is still in force. It says only what
+ * is true — the Municipality issued this number, on this date, for this
+ * project — and sends the reader to the office for standing.
+ */
 @Component({
   selector: 'app-verify-permit',
   template: `
@@ -26,72 +34,66 @@ type PublicStatus = PermitStanding | 'Expired' | 'Unverified';
           Municipality of Castilla, Sorsogon — Electronic Building Permit and Certificate of Occupancy
         </p>
 
-        @if (permit(); as p) {
-          <div class="badge" [class]="badgeClass()" style="margin-bottom:16px; font-size:14px; padding:6px 16px;">
-            {{ status() }}
-          </div>
-          <dl style="text-align:left; display:flex; flex-direction:column; gap:8px; margin:0;">
-            <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
-              <dt class="small muted">Permit Type</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px;">{{ app()?.permitType }}</dd>
-            </div>
-            <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
-              <dt class="small muted">Document</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px;">{{ documentTitle() }}</dd>
-            </div>
-            <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
-              <dt class="small muted">Permit No.</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px;">{{ p.permitNumber }}</dd>
-            </div>
-            <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
-              <dt class="small muted">Project / Establishment</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px;">{{ businessLabel() }}</dd>
-            </div>
-            <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
-              <dt class="small muted">Issue Date</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px;">{{ formatDate(p.issuedDate) }}</dd>
-            </div>
-            <div style="display:flex; justify-content:space-between; gap:12px;">
-              <dt class="small muted">Issuing Office</dt>
-              <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ p.approvingOffice ?? 'Not on file' }}</dd>
-            </div>
-          </dl>
-          @if (status() === 'Unverified') {
-            <p class="small" style="margin-top:16px; text-align:left; font-weight:600;">
-              This record is demonstration data, not an issued permit. It does not confirm that any
-              permit exists.
+        @switch (state()) {
+          @case ('loading') {
+            <p class="muted">Checking the Municipality’s records…</p>
+          }
+          @case ('found') {
+            @if (record(); as r) {
+              <div class="badge badge-green" style="margin-bottom:16px; font-size:14px; padding:6px 16px;">
+                On record — issued by the Municipality
+              </div>
+              <dl style="text-align:left; display:flex; flex-direction:column; gap:8px; margin:0;">
+                <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
+                  <dt class="small muted">Permit Type</dt>
+                  <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ r.permitType }}</dd>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
+                  <dt class="small muted">Permit No.</dt>
+                  <dd style="margin:0; font-weight:700; font-size:14px;">{{ r.permitNumber }}</dd>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
+                  <dt class="small muted">Project / Establishment</dt>
+                  <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ r.businessName ?? 'Not on file' }}</dd>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
+                  <dt class="small muted">Issue Date</dt>
+                  <dd style="margin:0; font-weight:700; font-size:14px;">{{ formatDate(r.issuedDate) }}</dd>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
+                  <dt class="small muted">Issuing Office</dt>
+                  <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ issuingOffice() }}</dd>
+                </div>
+                <div style="display:flex; justify-content:space-between; gap:12px;">
+                  <dt class="small muted">Released to the holder</dt>
+                  <dd style="margin:0; font-weight:700; font-size:14px;">{{ r.released ? (r.releasedAt ? formatDate(r.releasedAt) : 'Yes') : 'Not yet' }}</dd>
+                </div>
+              </dl>
+            }
+          }
+          @case ('not-found') {
+            <p class="muted" style="font-weight:600;">No permit with this number is on record.</p>
+            <p class="small muted" style="margin-top:8px; text-align:left;">
+              <strong>This does not by itself mean the permit is invalid.</strong> Check the number against the
+              paper permit, and confirm with the office below — permits issued on paper before eBPCO are not in
+              this system.
             </p>
           }
-        } @else {
-          <p class="muted" style="font-weight:600;">No record for this permit number.</p>
-          <p class="small muted" style="margin-top:8px; text-align:left;">
-            <strong>This does not mean the permit is invalid.</strong> A genuine permit issued by the
-            Municipality will not be found here either — see the notice below.
-          </p>
+          @case ('unavailable') {
+            <p class="muted" style="font-weight:600;">The Municipality’s records could not be reached just now.</p>
+            <p class="small muted" style="margin-top:8px; text-align:left;">Try again in a moment, or confirm with the office below.</p>
+          }
         }
 
-        <!--
-          F-3: this is the only screen a member of the public reaches without an
-          account, and it is the destination of the QR printed on every permit.
-          It must therefore carry the demo disclosure the four signed-in screens
-          already carry, on BOTH the found and not-found paths. Without it, a
-          bank or barangay official checking a real permit number reads "not
-          found" as "this permit is forged".
-        -->
-        <div
-          class="card"
-          style="margin-top:20px; text-align:left; background:var(--warning-100, #fff4e5); border:1px solid var(--warning-text, #a15c00);"
-        >
-          <div class="card-title" style="margin-bottom:6px;">This portal cannot yet verify permits</div>
+        <div class="card" style="margin-top:20px; text-align:left; background:var(--warning-100, #fff4e5); border:1px solid var(--warning-text, #a15c00);">
+          <div class="card-title" style="margin-bottom:6px;">What this page can and cannot tell you</div>
           <p class="small" style="margin:0 0 8px;">
-            eBPCO is a demonstration build. It holds no real permit records, so
-            <strong>no permit issued by the Municipality of Castilla can be confirmed here</strong> —
-            whether or not this page found a match.
+            It confirms only that the Municipality issued a permit with this number. It does not show whether the
+            permit is still in force, or who holds it.
           </p>
           <p class="small" style="margin:0;">
-            To verify a permit, contact the Office of the Municipal Engineer, Municipality of Castilla,
-            Sorsogon — <strong>09054818572</strong> or
-            <a href="mailto:meocastilla&#64;gmail.com">meocastilla&#64;gmail.com</a>.
+            To confirm a permit’s standing, contact the {{ engineer.name }}, Municipality of Castilla,
+            Sorsogon — <strong>{{ engineer.mobile }}</strong> or <strong>{{ engineer.email }}</strong>.
           </p>
         </div>
       </div>
@@ -100,72 +102,30 @@ type PublicStatus = PermitStanding | 'Expired' | 'Unverified';
 })
 export class VerifyPermitPage {
   private readonly route = inject(ActivatedRoute);
-  private readonly store = inject(ApplicationStore);
-  private readonly businessStore = inject(BusinessStore);
+  private readonly api = inject(CitizenApiClient);
 
   protected readonly formatDate = formatDate;
+  protected readonly engineer = MUNICIPAL_ENGINEER;
 
-  protected readonly permit = computed(() => {
-    const number = this.route.snapshot.paramMap.get('permitNumber');
-    return number ? this.store.permitByNumber(number) : undefined;
+  protected readonly state = signal<LookupState>('loading');
+  protected readonly record = signal<PublicPermitRecord | null>(null);
+
+  /** From this portal's own catalogue of which office issues which permit type; generic when the type is unknown here. */
+  protected readonly issuingOffice = computed(() => {
+    const type = this.record()?.permitType;
+    if (type && type in REQUIREMENTS_CATALOG) return requirementsFor(type as PermitType).reviewingOffice;
+    return 'Municipality of Castilla, Sorsogon';
   });
 
-  protected readonly app = computed(() => {
-    const p = this.permit();
-    return p ? this.store.applicationById(p.applicationId) : undefined;
-  });
-
-  protected readonly business = computed(() => {
-    const a = this.app();
-    return a ? this.businessStore.businessById(a.businessId) : undefined;
-  });
-
-  protected readonly businessLabel = computed(() => this.business()?.name || this.app()?.businessName || 'Not provided');
-
-  protected readonly documentTitle = computed(() => {
-    const a = this.app();
-    if (!a || a.permitType === 'Business Permit') return a?.permitType ?? '';
-    return requirementsFor(a.permitType).requiredForm;
-  });
-
-  protected readonly status = computed<PublicStatus>(() => {
-    const p = this.permit();
-
-    // Fail closed, in three steps, and note that NONE of them derives 'Valid'.
-    //
-    // This page used to end `return 'Valid'` — if a permit was issued and had
-    // not expired, it said Valid. That derivation has no term for revocation,
-    // so a permit the Municipality had REVOKED would have been reported to the
-    // public as Valid the moment a backend set provenance: 'issued'. Nobody
-    // would have had to make a mistake; it was the default.
-    //
-    // A verification surface cannot COMPUTE validity. It can only relay what
-    // the issuing office says, and say so plainly when the office has not said
-    // anything. See PermitStanding.
-    if (!p) return 'Unverified';
-    if (p.provenance !== 'issued') return 'Unverified';
-    if (!isPermitStanding(p.standing)) return 'Unverified';
-
-    // Expiry is applied ON TOP of the office's answer, never instead of it: a
-    // permit can be both current in the register and out of date.
-    if (p.expiryDateValue && p.expiryDateValue.getTime() < Date.now()) return 'Expired';
-    return p.standing;
-  });
-
-  protected readonly badgeClass = computed(() => {
-    switch (this.status()) {
-      case 'Valid':
-        return 'badge-green';
-      case 'Expired':
-        return 'badge-amber';
-      case 'Revoked':
-      case 'Suspended':
-      case 'Cancelled':
-        // Withdrawn standings read as a REFUSAL, not a caution. Someone is
-        // being shown this permit by its holder.
-        return 'badge-red';
-      default:
-        return 'badge-gray';
+  constructor() {
+    const number = this.route.snapshot.paramMap.get('permitNumber')?.trim();
+    if (!number || !this.api.configured) {
+      this.state.set(number ? 'unavailable' : 'not-found');
+      return;
     }
-  });
+    this.api.verifyPermit(number).subscribe({
+      next: (r) => { this.record.set(r); this.state.set('found'); },
+      error: (e: { status?: number }) => this.state.set(e?.status === 404 ? 'not-found' : 'unavailable'),
+    });
+  }
 }

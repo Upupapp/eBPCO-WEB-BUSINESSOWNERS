@@ -49,6 +49,7 @@ describe('ApplicationDetailsPage — previewing a real, backend-uploaded documen
     configured: true,
     listDocuments: () => of([REAL_DOC]),
     getTimeline: () => EMPTY,
+    getInstructions: () => of([]),
     getPermit: () => EMPTY,
     getRequirementsForPermitType: () => EMPTY,
   } as Partial<CitizenApiClient>;

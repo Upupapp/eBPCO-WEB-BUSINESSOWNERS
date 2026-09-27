@@ -12,7 +12,7 @@ import { fullName } from '../../core/domain/user.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
 
-type WatermarkText = 'SAMPLE — NOT AN OFFICIAL RECEIPT';
+type WatermarkText = 'ELECTRONIC COPY' | 'NOT YET VERIFIED';
 
 /** The fields the template actually reads off a payment, real or demo alike — not the full `PaymentTransaction`, which the real path has no honest way to fill in completely (no `assessmentId`, no `proofFileName` on the wire). */
 interface ReceiptPayment {
@@ -74,7 +74,7 @@ const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['pay
 
         @if (payment(); as tx) {
           <article class="doc-generated-page">
-            <div class="doc-generated-watermark" aria-hidden="true">{{ watermarkText }}</div>
+            <div class="doc-generated-watermark" aria-hidden="true">{{ watermarkText() }}</div>
 
             <div class="doc-generated-header">
               <img src="logo.png" alt="" aria-hidden="true" />
@@ -204,7 +204,7 @@ const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['pay
                       <td><strong>{{ pesos(tx.amountCentavos) }}</strong></td>
                     </tr>
                     <tr>
-                      <td>Remaining Balance</td>
+                      <td>{{ gateCleared() ? 'Remaining Balance' : 'Remaining Balance (once verified)' }}</td>
                       <td>{{ pesos(amt.balanceCentavos) }}</td>
                     </tr>
                   </tbody>
@@ -229,7 +229,10 @@ const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['pay
 
             <footer class="doc-generated-footer">
               @if (gateCleared()) {
-                <p>This is a system-generated Official Receipt issued by the Municipality of Castilla, Sorsogon.</p>
+                <p>
+                  This is an electronic copy of an Official Receipt recorded by the Municipality of Castilla,
+                  Sorsogon. The stamped paper receipt from the Municipal Treasurer's Office is the original.
+                </p>
               } @else {
                 <p>
                   This is a system-generated <strong>preview</strong> produced by the eBPCO portal. It is not an
@@ -319,9 +322,14 @@ export class PaymentReceiptPage {
         })),
         // Pay-in-full, not instalments — the real backend has no partial-payment
         // concept (PaymentService.checkSettles is a binary "does this amount
-        // clear the Order", never a running balance). Paid means zero owed;
-        // anything else means the whole total is still owed.
-        balanceCentavos: this.payment()?.status === 'Paid' ? 0 : real.totalCentavos,
+        // clear the Order", never a running balance). Paid means zero owed.
+        // A payment still awaiting verification is shown as what the balance
+        // WILL be once it is verified (labelled so) — showing the full total
+        // under "Amount Paid ₱X" read as the payment not counting at all
+        // (found live 2026-09-27). A rejected payment clears nothing.
+        balanceCentavos: this.payment()?.status === 'Paid'
+          ? 0
+          : Math.max(0, real.totalCentavos - (this.payment()?.rejectionReason ? 0 : this.payment()?.amountCentavos ?? 0)),
       };
     }
     const a = this.store.assessmentFor(this.id());
@@ -392,7 +400,16 @@ export class PaymentReceiptPage {
     return agencyHeaderFor(reviewingOffice);
   });
 
-  protected readonly watermarkText: WatermarkText = 'SAMPLE — NOT AN OFFICIAL RECEIPT';
+  /**
+   * Always present, never "SAMPLE": a verified receipt carried an "OFFICIAL
+   * RECEIPT" title under a "SAMPLE — NOT AN OFFICIAL RECEIPT" banner (found
+   * live 2026-09-27). A verified payment's receipt is an electronic COPY of a
+   * real Official Receipt (the stamped paper is the original); before
+   * verification it is not a receipt at all.
+   */
+  protected watermarkText(): WatermarkText {
+    return this.gateCleared() ? 'ELECTRONIC COPY' : 'NOT YET VERIFIED';
+  }
 
   /**
    * Earned the same way `watermarkText` used to gate itself: a genuinely

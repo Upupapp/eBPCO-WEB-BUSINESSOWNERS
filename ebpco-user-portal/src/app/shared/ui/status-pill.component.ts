@@ -10,7 +10,7 @@ import { DocumentStatus } from '../../core/domain/document.model';
  * falling through to the `?? 'badge-gray'` default below (which would have
  * been the right color by accident, not by a decision recorded anywhere).
  */
-const APPLICANT_STATUS_CLASS: Record<ApplicantStatus | 'Cancelled', string> = {
+const APPLICANT_STATUS_CLASS: Record<ApplicantStatus | 'Cancelled' | 'Released' | 'Completed', string> = {
   Draft: 'badge-gray',
   Submitted: 'badge-blue',
   'Under Review': 'badge-primary',
@@ -19,6 +19,8 @@ const APPLICANT_STATUS_CLASS: Record<ApplicantStatus | 'Cancelled', string> = {
   'Ready for Release': 'badge-green',
   Rejected: 'badge-red',
   Cancelled: 'badge-gray',
+  Released: 'badge-green',
+  Completed: 'badge-green',
 };
 
 const DOCUMENT_STATUS_CLASS: Record<DocumentStatus, string> = {
@@ -42,6 +44,6 @@ export class StatusPillComponent {
 
   get cssClass(): string {
     if (this.kind === 'document') return DOCUMENT_STATUS_CLASS[this.label as DocumentStatus] ?? 'badge-gray';
-    return APPLICANT_STATUS_CLASS[this.label as ApplicantStatus | 'Cancelled'] ?? 'badge-gray';
+    return APPLICANT_STATUS_CLASS[this.label as keyof typeof APPLICANT_STATUS_CLASS] ?? 'badge-gray';
   }
 }

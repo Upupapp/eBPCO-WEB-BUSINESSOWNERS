@@ -112,16 +112,17 @@ describe('PaymentReceiptPage (task 11: cleared is earned, not inherited)', () =>
     });
     const fixture = TestBed.createComponent(PaymentReceiptPage);
     fixture.detectChanges();
-    return fixture.componentInstance as unknown as { gateCleared(): boolean; watermarkText: string };
+    return fixture.componentInstance as unknown as { gateCleared(): boolean; watermarkText(): string };
   }
   afterEach(() => TestBed.resetTestingModule());
 
   it('is NOT cleared when there is no payment at all', () => {
     const page = gate(false);
     expect(page.gateCleared()).toBe(false);
-    // The watermark is a fixed constant now (never data-derived), so this
-    // is really asserting it is still wired into the template at all.
-    expect(page.watermarkText).toBe('SAMPLE — NOT AN OFFICIAL RECEIPT');
+    // Never "SAMPLE" (that sat under an "OFFICIAL RECEIPT" title once a
+    // payment was verified, found live 2026-09-27): an unverified payment's
+    // page is marked NOT YET VERIFIED.
+    expect(page.watermarkText()).toBe('NOT YET VERIFIED');
   });
 
   it('is not cleared for a payment with no OR number — only a cashier assigns one', () => {

@@ -62,7 +62,8 @@ describe('The payments list never invites a second payment', () => {
     const id = payable();
     const row = page.rows().find((r) => r.applicationId === id)!;
     expect(row.canPay).toBe(true);
-    expect(row.label).toBe('Not Yet Available');
+    // An issued Order with nothing paid reads as what it is (found live 2026-09-27).
+    expect(row.label).toBe('Awaiting Payment');
   });
 
   it('STOPS offering Pay Now once a payment is awaiting verification', () => {

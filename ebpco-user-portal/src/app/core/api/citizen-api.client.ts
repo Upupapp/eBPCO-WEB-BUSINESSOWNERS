@@ -17,6 +17,8 @@ import {
   ExportStatusResult,
   LimitsResponse,
   DocumentHistoryEntry,
+  InstructionLetter,
+  PublicPermitRecord,
   NotificationFeedResponse,
   NotificationPreferencesResponse,
   PaymentHistoryEntry,
@@ -75,6 +77,28 @@ export class CitizenApiClient {
    */
   getPermit(applicationId: string): Observable<PermitResponse> {
     return this.get<PermitResponse>(`/applications/${encodeURIComponent(applicationId)}/permit`);
+  }
+
+  /** `GET /applications/{id}/instructions` — the open Letters of Instruction; an empty array when nothing is outstanding. */
+  getInstructions(applicationId: string): Observable<InstructionLetter[]> {
+    return this.get<InstructionLetter[]>(`/applications/${encodeURIComponent(applicationId)}/instructions`);
+  }
+
+  /**
+   * `POST /applications/{id}/instructions/{letterId}/resubmit` — hands the
+   * returned application back to the office (Revision Required → Under
+   * Evaluation). No body: sending the corrected documents IS the response.
+   */
+  resubmitInstructions(applicationId: string, letterId: string, idempotencyKey: string): Observable<{ status?: string }> {
+    return this.post<{ status?: string }>(
+      `/applications/${encodeURIComponent(applicationId)}/instructions/${encodeURIComponent(letterId)}/resubmit`,
+      {}, idempotencyKey,
+    );
+  }
+
+  /** `GET /public/permits/{number}` — public, no sign-in; what the permit's QR code opens. */
+  verifyPermit(permitNumber: string): Observable<PublicPermitRecord> {
+    return this.get<PublicPermitRecord>(`/public/permits/${encodeURIComponent(permitNumber)}`);
   }
 
   /**

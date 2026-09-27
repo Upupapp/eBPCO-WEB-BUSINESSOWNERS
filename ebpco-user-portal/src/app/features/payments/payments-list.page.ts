@@ -8,7 +8,8 @@ interface PaymentRow {
   applicationId: string;
   applicationNumber: string;
   totalCentavos: number;
-  label: PaymentStatus;
+  /** The server's status, except an issued-but-unpaid Order reads "Awaiting Payment". */
+  label: PaymentStatus | 'Awaiting Payment';
   tone: 'green' | 'amber' | 'red';
   canPay: boolean;
 }
@@ -84,7 +85,10 @@ export class PaymentsListPage {
         applicationId: a.id,
         applicationNumber: a.applicationNumber,
         totalCentavos: a.assessedAmountCentavos!,
-        label: a.paymentStatus,
+        // The server says "Not Yet Available" for both "no Order yet" and
+        // "Order issued, nothing paid". This list only shows rows WITH an
+        // Order, so here it always means the fee is waiting to be paid.
+        label: a.paymentStatus === 'Not Yet Available' ? 'Awaiting Payment' : a.paymentStatus,
         tone: TONE[a.paymentStatus],
         // The only state that offers to take a payment is one the Municipality
         // is still owed for. 'Pending Verification' does not offer it again —

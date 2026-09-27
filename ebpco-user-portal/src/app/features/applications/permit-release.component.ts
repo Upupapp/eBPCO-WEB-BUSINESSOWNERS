@@ -36,11 +36,25 @@ import { MUNICIPAL_ENGINEER, MUNICIPAL_HALL_ADDRESS } from '../../core/domain/lg
         <p class="small" style="margin:4px 0 0;">{{ detail() }}</p>
       </div>
 
-      @if (release()?.status === 'Ready for Release') {
-        <p class="small muted" style="margin-top:10px;">
-          Collect from the {{ engineer.name }}, {{ hallAddress }}.
-          Bring a valid ID{{ release()?.method === 'Authorized Representative' ? ' and a letter of authorisation' : '' }}.
-        </p>
+      @if (release(); as r) {
+        @if (r.status === 'Ready for Release') {
+          <div class="small" style="margin-top:10px; display:grid; gap:4px;">
+            <div><span class="muted">Where:</span> {{ r.claimLocation || ('the ' + engineer.name + ', ' + hallAddress) }}</div>
+            @if (r.officeHours) {
+              <div><span class="muted">When:</span> {{ r.officeHours }}</div>
+            }
+            <div>
+              <span class="muted">Bring:</span>
+              @if ((r.bringWithYou ?? []).length > 0) {
+                <ul style="margin:4px 0 0; padding-left:18px;">
+                  @for (item of r.bringWithYou; track item) { <li>{{ item }}</li> }
+                </ul>
+              } @else {
+                a valid ID{{ r.method === 'Authorized Representative' ? ' and a letter of authorisation' : '' }}.
+              }
+            </div>
+          </div>
+        }
       }
     </div>
   `,

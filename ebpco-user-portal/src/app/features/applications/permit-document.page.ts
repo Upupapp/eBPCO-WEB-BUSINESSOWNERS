@@ -77,7 +77,7 @@ interface QrCell {
               <div class="num-dates">
                 <span>Application No.: <strong>{{ a.applicationNumber }}</strong></span>
                 <span>Date Issued: <strong>{{ permit()?.issuedDate ? formatDate(permit()!.issuedDate) : 'Not yet assigned' }}</strong></span>
-                <span>Valid Until: <strong>{{ permit()?.expiryDate ? formatDate(permit()!.expiryDate!) : (permit() ? 'No fixed expiry' : 'Not yet assigned') }}</strong></span>
+                <span>Valid Until: <strong>{{ permit()?.expiryDate ? formatDate(permit()!.expiryDate!) : (permit() ? 'Not recorded by the office' : 'Not yet assigned') }}</strong></span>
               </div>
             </div>
 
@@ -149,6 +149,12 @@ interface QrCell {
                   <dt>Date Applied</dt>
                   <dd>{{ a.dateSubmitted ? formatDate(a.dateSubmitted) : 'Pending' }}</dd>
                 </div>
+                @if (scope(); as sc) {
+                  <div style="grid-column: 1 / -1;">
+                    <dt>Scope</dt>
+                    <dd>{{ sc }}</dd>
+                  </div>
+                }
               </dl>
             </section>
 
@@ -231,12 +237,9 @@ interface QrCell {
               what it is: our reading of the permit's validity period, not the
               office's conditions.
             -->
-            @if (requirements()?.validityRules; as validity) {
-              <section class="doc-generated-section">
-                <h2>Validity</h2>
-                <p>{{ validity }}</p>
-              </section>
-            }
+            <!-- Removed 2026-09-27: the "Validity" paragraph was this portal's own
+                 catalogue sentence (e.g. "Valid for six (6) months from issuance"),
+                 not the office's, and it contradicted "Valid Until" above. -->
 
             <section class="doc-generated-section doc-generated-signature">
               <h2 style="text-align:left; border:none;">Approval</h2>
@@ -333,6 +336,8 @@ export class PermitDocumentPage {
     return a ? this.businessStore.businessById(a.businessId) : undefined;
   });
   protected readonly permit = computed(() => this.store.permitFor(this.id()));
+  /** What the Building Official wrote the permit covers when generating it. */
+  protected readonly scope = computed(() => this.store.permitScopeFor(this.id()));
   private readonly demoAssessment = computed(() => this.store.assessmentFor(this.id()));
   /**
    * `assessedAmountCentavos`/`paymentStatus` on `app()` are already real for

@@ -1,138 +1,77 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { Observable, of, throwError } from 'rxjs';
 import { VerifyPermitPage } from './verify-permit.page';
-import { ApplicationStore } from '../../core/stores/application.store';
-import { isPermitStanding } from '../../core/domain/permit.model';
+import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { PublicPermitRecord } from '../../core/api/citizen-api.models';
 
 /**
- * Guards F-3: the public, no-login verification page must fail CLOSED and must
- * never present demo data as a confirmed permit.
+ * The public, no-login page the permit's QR code opens.
  *
- * These assertions are the reason the provenance check exists. If someone
- * reintroduces a `return 'Valid'` fallthrough, or drops the disclosure, these
- * fail — which is the whole point, so do not relax them to make them pass.
+ * Guards two things. It asks the Municipality's server, not the visitor's own
+ * browser data (a stranger scanning a genuine permit used to be told "No
+ * record", found live 2026-09-27). And it never says "Valid": the system
+ * records no revocation, so standing is the office's to confirm — do not relax
+ * that to make a test pass.
  */
-function renderFor(permitNumber: string | null) {
+function render(permitNumber: string, answer: () => Observable<PublicPermitRecord>) {
+  const calls: string[] = [];
   TestBed.configureTestingModule({
     imports: [VerifyPermitPage],
     providers: [
-      {
-        provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap(permitNumber ? { permitNumber } : {}) } },
-      },
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ permitNumber }) } } },
+      { provide: CitizenApiClient, useValue: {
+          configured: true,
+          verifyPermit: (n: string) => { calls.push(n); return answer(); },
+        } },
     ],
   });
   const fixture = TestBed.createComponent(VerifyPermitPage);
   fixture.detectChanges();
-  return fixture;
+  return { text: (fixture.nativeElement as HTMLElement).textContent ?? '', calls };
 }
 
-describe('VerifyPermitPage (F-3: public verification fails closed)', () => {
+const ISSUED: PublicPermitRecord = {
+  permitNumber: 'FP-2026-000003', permitType: 'Fencing Permit', businessName: 'Dela Cruz Sari-Sari Store',
+  issuedDate: '2026-09-27T03:41:57.323Z', released: true, releasedAt: '2026-09-27T03:44:00.000Z',
+};
+
+describe('VerifyPermitPage', () => {
   afterEach(() => TestBed.resetTestingModule());
 
-  it('never reports Valid for a permit number it holds no record of', () => {
-    const text = (renderFor('BP-2026-99999').nativeElement as HTMLElement).textContent ?? '';
+  it('asks the server for the scanned number and shows what is on record', () => {
+    const { text, calls } = render('FP-2026-000003', () => of(ISSUED));
+    expect(calls).toEqual(['FP-2026-000003']);
+    expect(text).toContain('On record');
+    expect(text).toContain('Dela Cruz Sari-Sari Store');
+    expect(text).toContain('Fencing Permit');
+    expect(text).toContain('Office of the Building Official');
+  });
+
+  it('never reports Valid, even for a permit on record', () => {
+    const { text } = render('FP-2026-000003', () => of(ISSUED));
     expect(text).not.toContain('Valid');
   });
 
-  it('never reports Valid for a seeded demo permit', () => {
-    // The seeded record is deliberately 'demo' provenance. Before the fix this
-    // rendered a green "Valid" badge for a fabricated establishment.
-    const fixture = renderFor('ZLC-2026-0231');
-    const seeded = TestBed.inject(ApplicationStore).permitByNumber('ZLC-2026-0231');
-    expect(seeded).toBeTruthy();
-    expect(seeded!.provenance).toBe('demo');
-
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Unverified');
-    expect(text).toContain('demonstration data');
+  it('says a missing record does not by itself mean the permit is invalid', () => {
+    const { text } = render('FP-1999-000001', () => throwError(() => ({ status: 404 })));
+    expect(text).toContain('No permit with this number is on record');
+    expect(text).toContain('does not by itself mean the permit is invalid');
+    expect(text).not.toContain('Valid');
   });
 
-  it('tells the reader that a missing record does not mean the permit is invalid', () => {
-    const text = (renderFor('BP-2026-99999').nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('does not mean the permit is invalid');
+  it('tells the reader the records could not be reached rather than calling the permit unknown', () => {
+    const { text } = render('FP-2026-000003', () => throwError(() => ({ status: 503 })));
+    expect(text).toContain('could not be reached');
+    expect(text).not.toContain('No permit with this number');
   });
 
-  it('carries the demo disclosure and the real MEO contact on every path', () => {
-    for (const number of ['ZLC-2026-0231', 'BP-2026-99999']) {
-      const text = (renderFor(number).nativeElement as HTMLElement).textContent ?? '';
-      expect(text).toContain('demonstration build');
+  it('gives the real MEO contact on every path', () => {
+    for (const answer of [() => of(ISSUED), () => throwError(() => ({ status: 404 }))]) {
+      const { text } = render('FP-2026-000003', answer as () => Observable<PublicPermitRecord>);
       expect(text).toContain('09054818572');
       expect(text).toContain('meocastilla@gmail.com');
       TestBed.resetTestingModule();
-    }
-  });
-});
-
-describe('VerifyPermitPage (L-2: revocation cannot fall through to Valid)', () => {
-  afterEach(() => TestBed.resetTestingModule());
-
-  // Renders the PAGE against a stubbed store, not the pure type-guard. An
-  // earlier version of these tests only exercised isPermitStanding(), so
-  // restoring the old `return 'Valid'` derivation still passed 44/44 - a test
-  // that cannot fail is not a guard.
-  //
-  // Nothing sets `standing` in the app today, so this guards the SEAM: the day
-  // a backend sets provenance:'issued', a revoked permit must not be reported
-  // to the public as Valid.
-  function renderWithPermit(standing: unknown) {
-    const permit = {
-      applicationId: 'app-x', permitNumber: 'BP-2026-0001',
-      provenance: 'issued', standing,
-      issuedDateValue: new Date('2026-01-01'), issuedDate: '2026-01-01T00:00:00.000Z',
-      expiryDateValue: new Date('2099-01-01'), expiryDate: '2099-01-01T00:00:00.000Z',
-      approvingOfficial: 'Engr. X', approvingOffice: 'Office of the Municipal Engineer',
-    };
-    TestBed.configureTestingModule({
-      imports: [VerifyPermitPage],
-      providers: [
-        { provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ permitNumber: 'BP-2026-0001' }) } } },
-        { provide: ApplicationStore, useValue: {
-            permitByNumber: () => permit,
-            applicationById: () => ({ id: 'app-x', permitType: 'Building Permit',
-                                      businessId: 'biz-1', businessName: 'Test' }),
-          } },
-      ],
-    });
-    const fixture = TestBed.createComponent(VerifyPermitPage);
-    fixture.detectChanges();
-    return (fixture.nativeElement as HTMLElement).textContent ?? '';
-  }
-
-  it('reports a REVOKED permit as revoked, never as Valid', () => {
-    const text = renderWithPermit('Revoked');
-    expect(text).toContain('Revoked');
-    expect(text).not.toContain('Valid');
-  });
-
-  it('does the same for Suspended and Cancelled', () => {
-    for (const s of ['Suspended', 'Cancelled']) {
-      expect(renderWithPermit(s)).toContain(s);
-      TestBed.resetTestingModule();
-    }
-  });
-
-  it('an issued permit the office has said nothing about is Unverified, not Valid', () => {
-    const text = renderWithPermit(null);
-    expect(text).toContain('Unverified');
-    expect(text).not.toContain('Valid');
-  });
-
-  it('a standing the portal has never heard of is Unverified, not Valid', () => {
-    // The failure this guards: the backend adds a state, the portal has not been
-    // updated, and the public sees a green Valid badge for it.
-    const text = renderWithPermit('Lapsed');
-    expect(text).toContain('Unverified');
-    expect(text).not.toContain('Valid');
-  });
-
-  it('only relays standings it can render', () => {
-    for (const s of [null, undefined, '', 'Lapsed', 'valid', 0, {}]) {
-      expect(isPermitStanding(s)).toBe(false);
-    }
-    for (const s of ['Valid', 'Revoked', 'Suspended', 'Cancelled']) {
-      expect(isPermitStanding(s)).toBe(true);
     }
   });
 });

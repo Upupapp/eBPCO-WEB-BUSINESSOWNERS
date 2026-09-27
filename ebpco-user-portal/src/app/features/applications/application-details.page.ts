@@ -16,7 +16,7 @@ import { DocumentResubmissionService, toBase64 } from '../../core/api/document-r
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import { toContractShape } from './demo-document.adapter';
-import { ApplicationDocumentResponse, TimelineEntryResponse } from '../../core/api/citizen-api.models';
+import { ApplicationDocumentResponse, InstructionLetter, TimelineEntryResponse } from '../../core/api/citizen-api.models';
 
 /** Same extension-sniffing fallback as my-documents.page.ts / application-wizard.page.ts. */
 function fileTypeFromName(name: string): SavedDocumentFileType {
@@ -69,12 +69,25 @@ interface PreviewableDocument {
           }
           @if (canCancel(a)) {
             <div style="margin-top:10px;">
-              <button class="btn btn-danger btn-sm" [disabled]="cancelling()" (click)="cancel(a.id)">
-                {{ cancelling() ? 'Withdrawing…' : 'Withdraw Application' }}
-              </button>
-              <span class="small muted" style="margin-left:8px;">
-                Allowed only before an Order of Payment has been issued.
-              </span>
+              @if (!confirmingCancel()) {
+                <button class="btn btn-danger btn-sm" (click)="confirmingCancel.set(true)">Withdraw Application</button>
+                <span class="small muted" style="margin-left:8px;">
+                  Available while your application waits to be received, or while it is returned to you for changes.
+                </span>
+              } @else {
+                <div style="border:1px solid var(--danger-200, #f5c2c7); background:var(--danger-50, #fff5f5); border-radius:8px; padding:10px 12px;">
+                  <strong class="small">Withdraw {{ a.applicationNumber }}?</strong>
+                  <p class="small muted" style="margin:4px 0 8px;">
+                    The Municipality stops processing it and this cannot be undone. You would need to file a new application.
+                  </p>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-danger btn-sm" [disabled]="cancelling()" (click)="cancel(a.id)">
+                      {{ cancelling() ? 'Withdrawing…' : 'Yes, withdraw it' }}
+                    </button>
+                    <button class="btn btn-secondary btn-sm" [disabled]="cancelling()" (click)="confirmingCancel.set(false)">Keep my application</button>
+                  </div>
+                </div>
+              }
             </div>
           }
         </div>
@@ -96,9 +109,9 @@ interface PreviewableDocument {
           </div>
         }
 
-        @if (assessment(); as asmt) {
+        @if (fees(); as asmt) {
           <div class="card">
-            <div class="card-title">Assessment (Order of Payment)</div>
+            <div class="card-title">Assessment (Order of Payment){{ asmt.opsNumber ? ' · ' + asmt.opsNumber : '' }}</div>
             <table class="table">
               <thead><tr><th>Fee</th><th>Amount</th></tr></thead>
               <tbody>
@@ -110,8 +123,10 @@ interface PreviewableDocument {
             <hr class="divider" />
             <div style="display:flex; justify-content:space-between;"><strong>Total</strong><strong>{{ pesos(asmt.totalCentavos) }}</strong></div>
             <div style="display:flex; justify-content:space-between;" class="small muted"><span>Balance</span><span>{{ pesos(asmt.balanceCentavos) }}</span></div>
-            @if (asmt.balanceCentavos > 0) {
+            @if (asmt.canPay) {
               <a class="btn btn-primary btn-sm" style="margin-top:10px;" [routerLink]="['/payments', a.id]">Pay Now</a>
+            } @else if (asmt.pendingVerification) {
+              <p class="small muted" style="margin-top:10px;">Your payment is waiting for the Cashier to verify it.</p>
             }
           </div>
         }
@@ -122,16 +137,49 @@ interface PreviewableDocument {
           [release]="release()"
         />
 
+        @if (a.lifecycleStatus === 'Revision Required') {
+          <div class="card" style="border:1px solid var(--warning-text, #a15c00); background:var(--warning-100, #fff4e5);">
+            <div class="card-title">What the office needs from you</div>
+            @if (!lettersLoaded()) {
+              <p class="small muted">Loading the office’s request…</p>
+            } @else if (letters().length === 0) {
+              <p class="small">
+                The office returned this application. Read their note in the Status Timeline below, and contact the
+                Office of the Municipal Engineer if it is unclear.
+              </p>
+            } @else {
+              @for (letter of letters(); track letter.letterId) {
+                @for (item of letter.items; track item.id) {
+                  <div style="padding:8px 0; border-bottom:1px solid var(--border-light);">
+                    <div style="font-weight:700;">{{ item.subject }}</div>
+                    <p style="margin:4px 0 0; white-space:pre-line;">{{ item.remark }}</p>
+                    <div class="small muted" style="margin-top:4px;">Sent {{ formatDateTime(letter.issuedAt) }}</div>
+                  </div>
+                }
+              }
+              <p class="small muted" style="margin:10px 0;">
+                Replace any document marked <strong>Revision Required</strong> below and add anything missing, then
+                click <strong>Resubmit Application</strong> to send it back to the office.
+              </p>
+              <button class="btn btn-primary" [disabled]="resubmitting()" (click)="resubmitToOffice()">
+                {{ resubmitting() ? 'Sending…' : 'Resubmit Application' }}
+              </button>
+            }
+          </div>
+        }
+
         @if (missingRequired().length > 0) {
           <div class="card" style="border:1px solid var(--danger-200, #f5c2c7); background:var(--danger-50, #fff5f5);">
-            <div class="card-title">Missing Required Documents</div>
+            <div class="card-title">{{ a.lifecycleStatus === 'Revision Required' ? 'Add a Document' : 'Missing Required Documents' }}</div>
             <p class="small muted" style="margin-top:-4px;">
-              The Municipality still needs these to continue reviewing your application.
+              {{ a.lifecycleStatus === 'Revision Required'
+                ? 'Documents not yet on this application. Add any the office asked for.'
+                : 'The Municipality still needs these to continue reviewing your application.' }}
             </p>
             <ul style="list-style:none; padding:0; margin:0;">
               @for (req of missingRequired(); track req.id) {
                 <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-light);">
-                  <span>{{ req.label }}</span>
+                  <span>{{ req.label }}@if (!req.required) { <span class="small muted"> (optional)</span> }</span>
                   <span>
                     <input
                       type="file"
@@ -257,6 +305,7 @@ export class ApplicationDetailsPage {
       });
       this.refreshTimeline();
       this.store.fetchPermit(this.id());
+      this.refreshLetters();
     }
     // Side-effecting on purpose (writes the store's real-checklist cache) —
     // must live in an effect(), never inside `missingRequired` itself,
@@ -268,6 +317,91 @@ export class ApplicationDetailsPage {
         this.store.ensureRequiredDocumentsLoaded(permitType);
       }
     });
+  }
+
+  /** The open Letters of Instruction, read while the application is in Revision Required. */
+  protected readonly letters = signal<InstructionLetter[]>([]);
+  protected readonly lettersLoaded = signal(false);
+  protected readonly resubmitting = signal(false);
+  protected readonly confirmingCancel = signal(false);
+  private resubmitKey: string | null = null;
+
+  private refreshLetters(): void {
+    if (!this.api.configured) return;
+    this.api.getInstructions(this.id()).subscribe({
+      next: (letters) => { this.letters.set(letters); this.lettersLoaded.set(true); },
+      error: () => this.lettersLoaded.set(true),
+    });
+  }
+
+  private refreshDocuments(): void {
+    this.api.listDocuments(this.id()).subscribe({
+      next: (docs) => this.realDocuments.set(docs),
+      error: () => {},
+    });
+  }
+
+  /**
+   * Hands the returned application back to the office. Found live
+   * 2026-09-27: the citizen was told to "resubmit the requested items" and
+   * had no button to do it with, so a returned application was stuck.
+   */
+  protected async resubmitToOffice(): Promise<void> {
+    const letter = this.letters()[0];
+    if (!letter || this.resubmitting()) return;
+    this.resubmitting.set(true);
+    this.resubmitKey ??= crypto.randomUUID();
+    try {
+      await firstValueFrom(this.api.resubmitInstructions(this.id(), letter.letterId, this.resubmitKey));
+      this.resubmitKey = null;
+      await this.store.refreshMine();
+      this.refreshTimeline();
+      this.refreshLetters();
+      this.toast.success('Sent back to the office. They will continue reviewing your application.');
+    } catch (e) {
+      this.toast.error(this.resubmission.explain(e));
+    } finally {
+      this.resubmitting.set(false);
+    }
+  }
+
+  /**
+   * The fee card, from the real Order of Payment (`GET /applications`'s
+   * `payment.orderOfPayment`). It used to read only the local demo store, so
+   * a real application said "Please view your assessment" with nothing to
+   * view (found live 2026-09-27). Falls back to the demo store for a demo id.
+   */
+  protected fees(): {
+    lineItems: { code: string; name: string; amountCentavos: number | null }[];
+    totalCentavos: number; balanceCentavos: number; opsNumber: string | null;
+    canPay: boolean; pendingVerification: boolean;
+  } | null {
+    const a = this.app();
+    const real = this.store.orderOfPaymentFor(this.id());
+    if (a && real) {
+      const paid = a.paymentStatus === 'Paid';
+      return {
+        lineItems: [
+          { code: 'filing', name: 'Filing Fee', amountCentavos: real.fees.filing },
+          { code: 'processing', name: 'Processing Fee', amountCentavos: real.fees.processing },
+          { code: 'architectural', name: 'Architectural Fee', amountCentavos: real.fees.architectural },
+          { code: 'structural', name: 'Structural Fee', amountCentavos: real.fees.structural },
+          { code: 'electrical', name: 'Electrical Fee', amountCentavos: real.fees.electrical },
+          { code: 'others', name: 'Other Fees', amountCentavos: real.fees.others },
+        ],
+        totalCentavos: real.totalCentavos,
+        balanceCentavos: paid ? 0 : real.totalCentavos,
+        opsNumber: real.number,
+        canPay: a.paymentStatus === 'Not Yet Available' || a.paymentStatus === 'Overdue',
+        pendingVerification: a.paymentStatus === 'Pending Verification',
+      };
+    }
+    const demo = this.assessment();
+    if (!demo) return null;
+    return {
+      lineItems: demo.lineItems, totalCentavos: demo.totalCentavos, balanceCentavos: demo.balanceCentavos,
+      opsNumber: demo.opsNumber, canPay: demo.balanceCentavos > 0, pendingVerification: false,
+    };
   }
 
   /** Re-fetches `realTimeline` after a real write on this application (e.g. `cancel()`) — otherwise the Status Timeline kept showing its pre-write history until the next full page reload. */
@@ -355,9 +489,13 @@ export class ApplicationDetailsPage {
     // own carry-over logic (application-wizard.page.ts) guards against it
     // before ever calling `requiredDocumentsFor`.
     if (!a || a.permitType === 'Business Permit') return [];
-    const required = this.store.requiredDocumentsFor(a.permitType).filter((d) => d.required);
+    // While the office has the application returned, optional documents are
+    // offered too: "add the lot owner's written consent" is an optional
+    // requirement the office can still ask for (found live 2026-09-27).
+    const revising = a.lifecycleStatus === 'Revision Required';
+    const wanted = this.store.requiredDocumentsFor(a.permitType).filter((d) => d.required || revising);
     const haveLabels = new Set(this.contractDocs().map((d) => d.label));
-    return required.filter((d) => !haveLabels.has(d.label));
+    return wanted.filter((d) => !haveLabels.has(d.label));
   });
 
   protected readonly uploadingMissingId = signal<string | null>(null);
@@ -438,6 +576,8 @@ export class ApplicationDetailsPage {
             ? ` ${result.removedMetadata.join(', ')} was removed from the file.`
             : '';
           this.toast.success(`Replacement sent for "${doc.label}".${stripped}`);
+          // The list kept showing the old file until a reload (found live 2026-09-27).
+          this.refreshDocuments();
         },
         error: (e) => this.toast.error(this.resubmission.explain(e)),
       });
@@ -470,7 +610,9 @@ export class ApplicationDetailsPage {
   }
 
   progressPct(status: Parameters<typeof applicantStatusOf>[0]): number {
-    const idx = LIFECYCLE_SEQUENCE.indexOf(status);
+    // Revision Required is not on the forward path, so indexOf missed and the
+    // bar read 100% while the application was waiting on the citizen.
+    const idx = LIFECYCLE_SEQUENCE.indexOf(status === 'Revision Required' ? 'Document Verification' : status);
     if (idx < 0) return 100;
     return Math.round((idx / (LIFECYCLE_SEQUENCE.length - 1)) * 100);
   }
@@ -519,6 +661,7 @@ export class ApplicationDetailsPage {
         return;
       }
       this.refreshTimeline();
+      this.confirmingCancel.set(false);
       this.toast.success('Application withdrawn.');
     } finally {
       this.cancelling.set(false);

@@ -104,6 +104,11 @@ export function applicantStatusOf(status: ApplicationLifecycleStatus): Applicant
  */
 export function applicantStatusLabel(status: ApplicationLifecycleStatus): string {
   if (status === 'Cancelled') return 'Cancelled';
+  // Collected is not "ready to collect": the category stays Ready for Release
+  // (filters and counts), but the word on screen says what happened — found
+  // live 2026-09-27, a completed application still read "Ready for Release".
+  if (status === 'Released') return 'Released';
+  if (status === 'Completed') return 'Completed';
   return applicantStatusOf(status);
 }
 
@@ -114,7 +119,7 @@ export const NEXT_STEP_TEXT: Record<ApplicationLifecycleStatus, string> = {
   Received: 'Your application has been received and is queued for review.',
   'Document Verification': 'Your submitted documents are being checked for completeness.',
   'Under Evaluation': 'Your application is under technical evaluation by the reviewing office.',
-  'Revision Required': 'Please review the remarks on your application and resubmit the requested items.',
+  'Revision Required': 'The office returned your application. Read what they need below, fix it, then click Resubmit Application.',
   Assessed: 'An Order of Payment has been issued. Please view your assessment and proceed to payment.',
   'Payment Submitted': 'Your payment has been submitted and is awaiting verification.',
   'Payment Under Verification': 'Your payment is being verified by the collecting office.',

@@ -135,6 +135,18 @@ export class ApplicationStore {
    * over the local demo seed in `applications`.
    */
   private readonly realApplications = signal<ApplicationRecord[] | null>(null);
+  /** Each real application's Order of Payment, as the server sent it — the fee lines `fromServerSummary` flattens to a total. */
+  private readonly realOrders = signal<Record<string, ApplicationSummary['payment']['orderOfPayment'] | null>>({});
+
+  /** The real Order of Payment for one application, or null when none is issued (or the id is a local demo one). */
+  orderOfPaymentFor(applicationId: string): ApplicationSummary['payment']['orderOfPayment'] | null {
+    return this.realOrders()[applicationId] ?? null;
+  }
+
+  /** What the office wrote the permit covers — `GET /applications/{id}/permit`'s `scope`, null when none was recorded. */
+  permitScopeFor(applicationId: string): string | null {
+    return this.realPermitResponses()[applicationId]?.scope ?? null;
+  }
 
   /**
    * Raw `GET /applications/{id}/permit` responses, keyed by application id.
@@ -191,6 +203,7 @@ export class ApplicationStore {
       const response = await firstValueFrom(this.api.listApplications());
       const applicantId = this.auth.currentUser()?.id ?? '';
       this.realApplications.set(response.data.map((row) => fromServerSummary(row, applicantId)));
+      this.realOrders.set(Object.fromEntries(response.data.map((row) => [row.id, row.payment.orderOfPayment ?? null])));
     } catch {
       // See doc comment above.
     }

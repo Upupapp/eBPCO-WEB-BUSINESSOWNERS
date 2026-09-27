@@ -67,6 +67,9 @@ export const routes: Routes = [
       { path: 'permits/apply', loadComponent: () => import('./features/permits/application-wizard.page').then((m) => m.ApplicationWizardPage) },
       { path: 'applications', loadComponent: () => import('./features/applications/my-applications.page').then((m) => m.MyApplicationsPage) },
       { path: 'applications/:id', loadComponent: () => import('./features/applications/application-details.page').then((m) => m.ApplicationDetailsPage) },
+      // Where a "Revision required" / "Letter of Instruction" notification
+      // links. The letter is shown on the application page itself.
+      { path: 'applications/:id/instructions', redirectTo: 'applications/:id' },
       { path: 'applications/:id/permit', loadComponent: () => import('./features/applications/permit-document.page').then((m) => m.PermitDocumentPage) },
       { path: 'documents', loadComponent: () => import('./features/documents/my-documents.page').then((m) => m.MyDocumentsPage) },
       { path: 'payments', loadComponent: () => import('./features/payments/payments-list.page').then((m) => m.PaymentsListPage) },
