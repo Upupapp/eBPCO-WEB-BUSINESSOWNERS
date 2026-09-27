@@ -119,7 +119,7 @@ export const NEXT_STEP_TEXT: Record<ApplicationLifecycleStatus, string> = {
   Received: 'Your application has been received and is queued for review.',
   'Document Verification': 'Your submitted documents are being checked for completeness.',
   'Under Evaluation': 'Your application is under technical evaluation by the reviewing office.',
-  'Revision Required': 'The office returned your application. Read what they need below, fix it, then click Resubmit Application.',
+  'Revision Required': 'The office returned your application. Read what they need below, fix it, then click Send Back to the Office.',
   Assessed: 'An Order of Payment has been issued. Please view your assessment and proceed to payment.',
   'Payment Submitted': 'Your payment has been submitted and is awaiting verification.',
   'Payment Under Verification': 'Your payment is being verified by the collecting office.',

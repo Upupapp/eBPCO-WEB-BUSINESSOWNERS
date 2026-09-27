@@ -805,6 +805,17 @@ export class ApplicationStore {
     }
   }
 
+  /** `POST /applications/{id}/resubmit` for real — see `CitizenApiClient.sendBackToOffice`. */
+  async sendBackReal(applicationId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    try {
+      await firstValueFrom(this.api.sendBackToOffice(applicationId, newIdempotencyKey()));
+      await this.refreshMine();
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, error: describeApplicationError(error) };
+    }
+  }
+
   /**
    * `POST /applications/{id}/payments` for real. `amountCentavos` must be
    * the real Order of Payment's `totalCentavos` — this method does not

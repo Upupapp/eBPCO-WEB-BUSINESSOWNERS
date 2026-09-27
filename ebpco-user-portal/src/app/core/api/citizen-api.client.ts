@@ -84,18 +84,6 @@ export class CitizenApiClient {
     return this.get<InstructionLetter[]>(`/applications/${encodeURIComponent(applicationId)}/instructions`);
   }
 
-  /**
-   * `POST /applications/{id}/instructions/{letterId}/resubmit` — hands the
-   * returned application back to the office (Revision Required → Under
-   * Evaluation). No body: sending the corrected documents IS the response.
-   */
-  resubmitInstructions(applicationId: string, letterId: string, idempotencyKey: string): Observable<{ status?: string }> {
-    return this.post<{ status?: string }>(
-      `/applications/${encodeURIComponent(applicationId)}/instructions/${encodeURIComponent(letterId)}/resubmit`,
-      {}, idempotencyKey,
-    );
-  }
-
   /** `GET /public/permits/{number}` — public, no sign-in; what the permit's QR code opens. */
   verifyPermit(permitNumber: string): Observable<PublicPermitRecord> {
     return this.get<PublicPermitRecord>(`/public/permits/${encodeURIComponent(permitNumber)}`);
@@ -384,6 +372,20 @@ export class CitizenApiClient {
     return this.post<SubmitPaymentResult>(
       `/applications/${encodeURIComponent(applicationId)}/payments`,
       body,
+      idempotencyKey,
+    );
+  }
+
+  /**
+   * `POST /applications/{id}/resubmit` — send an application the office
+   * returned for changes back to it (`Revision Required -> Under
+   * Evaluation`). Refused (422) while any returned document has no
+   * replacement; the refusal's detail says so in the citizen's words.
+   */
+  sendBackToOffice(applicationId: string, idempotencyKey: string): Observable<{ status: string; version: number }> {
+    return this.post<{ status: string; version: number }>(
+      `/applications/${encodeURIComponent(applicationId)}/resubmit`,
+      {},
       idempotencyKey,
     );
   }

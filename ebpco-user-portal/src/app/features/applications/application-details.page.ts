@@ -67,6 +67,39 @@ interface PreviewableDocument {
             <button class="btn btn-secondary btn-sm" (click)="advance(a.id)">Demo: Simulate Office Update</button>
             <span class="small muted" style="margin-left:8px;">No backend exists yet — this simulates the reviewing office advancing your application.</span>
           }
+          @if (a.lifecycleStatus === 'Revision Required' && api.configured) {
+            <div role="region" aria-label="Send back to the office"
+                 style="margin-top:12px; padding:12px 14px; border-radius:10px; border:1px solid var(--gray-200);"
+                 [style.background]="returnedNotReplaced().length === 0 ? 'var(--success-100)' : 'var(--warning-100)'">
+              @if (letters().length > 0) {
+                <strong>What the office needs from you</strong>
+                @for (letter of letters(); track letter.letterId) {
+                  @for (item of letter.items; track item.id) {
+                    <div style="padding:6px 0 8px; border-bottom:1px solid var(--gray-200);">
+                      <p style="margin:4px 0 0; white-space:pre-line;">{{ item.remark }}</p>
+                      <div class="small muted" style="margin-top:4px;">Sent {{ formatDateTime(letter.issuedAt) }}</div>
+                    </div>
+                  }
+                }
+              }
+              @if (returnedNotReplaced().length === 0) {
+                <strong style="display:block; margin-top:8px;">Ready to send back</strong>
+                <p class="small">
+                  When you have made the changes the office asked for (replace or add documents below), send the
+                  application back so the office can continue evaluating it.
+                </p>
+              } @else {
+                <strong style="display:block; margin-top:8px;">The office returned this application</strong>
+                <p class="small">
+                  Replace {{ returnedNotReplaced().length === 1 ? 'the returned document' : 'the ' + returnedNotReplaced().length + ' returned documents' }}
+                  below ({{ returnedNotReplacedNames() }}), then send the application back to the office.
+                </p>
+              }
+              <button class="btn btn-primary btn-sm" [disabled]="sendingBack() || returnedNotReplaced().length > 0" (click)="sendBack(a.id)">
+                {{ sendingBack() ? 'Sending…' : 'Send Back to the Office' }}
+              </button>
+            </div>
+          }
           @if (canCancel(a)) {
             <div style="margin-top:10px;">
               @if (!confirmingCancel()) {
@@ -136,37 +169,6 @@ interface PreviewableDocument {
           [issuedDate]="permit() ? formatDate(permit()!.issuedDate) : null"
           [release]="release()"
         />
-
-        @if (a.lifecycleStatus === 'Revision Required') {
-          <div class="card" style="border:1px solid var(--warning-text, #a15c00); background:var(--warning-100, #fff4e5);">
-            <div class="card-title">What the office needs from you</div>
-            @if (!lettersLoaded()) {
-              <p class="small muted">Loading the office’s request…</p>
-            } @else if (letters().length === 0) {
-              <p class="small">
-                The office returned this application. Read their note in the Status Timeline below, and contact the
-                Office of the Municipal Engineer if it is unclear.
-              </p>
-            } @else {
-              @for (letter of letters(); track letter.letterId) {
-                @for (item of letter.items; track item.id) {
-                  <div style="padding:8px 0; border-bottom:1px solid var(--border-light);">
-                    <div style="font-weight:700;">{{ item.subject }}</div>
-                    <p style="margin:4px 0 0; white-space:pre-line;">{{ item.remark }}</p>
-                    <div class="small muted" style="margin-top:4px;">Sent {{ formatDateTime(letter.issuedAt) }}</div>
-                  </div>
-                }
-              }
-              <p class="small muted" style="margin:10px 0;">
-                Replace any document marked <strong>Revision Required</strong> below and add anything missing, then
-                click <strong>Resubmit Application</strong> to send it back to the office.
-              </p>
-              <button class="btn btn-primary" [disabled]="resubmitting()" (click)="resubmitToOffice()">
-                {{ resubmitting() ? 'Sending…' : 'Resubmit Application' }}
-              </button>
-            }
-          </div>
-        }
 
         @if (missingRequired().length > 0) {
           <div class="card" style="border:1px solid var(--danger-200, #f5c2c7); background:var(--danger-50, #fff5f5);">
@@ -253,7 +255,7 @@ export class ApplicationDetailsPage {
   protected readonly store = inject(ApplicationStore);
   private readonly toast = inject(ToastService);
   private readonly resubmission = inject(DocumentResubmissionService);
-  private readonly api = inject(CitizenApiClient);
+  protected readonly api = inject(CitizenApiClient);
 
   protected readonly applicantStatusOf = applicantStatusOf;
   protected readonly applicantStatusLabel = applicantStatusLabel;
@@ -294,6 +296,47 @@ export class ApplicationDetailsPage {
    */
   private readonly realTimeline = signal<TimelineEntryResponse[] | null>(null);
 
+  /**
+   * Documents the office returned (Revision Required or Rejected) that no
+   * newer upload replaces yet — the same test the server's
+   * `returned-documents-replaced` precondition applies before it lets the
+   * application go back.
+   */
+  protected returnedNotReplaced(): ApplicationDocumentResponse[] {
+    return (this.realDocuments() ?? []).filter((d) =>
+      (d.reviewStatus === 'Revision Required' || d.reviewStatus === 'Rejected') && d.supersededByDocumentId === null);
+  }
+  protected returnedNotReplacedNames(): string {
+    return this.returnedNotReplaced().map((d) => d.label).join(', ');
+  }
+
+  protected readonly sendingBack = signal(false);
+
+  async sendBack(id: string): Promise<void> {
+    this.sendingBack.set(true);
+    try {
+      const result = await this.store.sendBackReal(id);
+      if (!result.ok) {
+        this.toast.error(result.error);
+        return;
+      }
+      this.refreshTimeline();
+      this.refreshDocuments();
+      this.refreshLetters();
+      this.toast.success('Sent back to the office for evaluation.');
+    } finally {
+      this.sendingBack.set(false);
+    }
+  }
+
+  /** Re-fetches the document list after a write that changes it (a replacement, a send-back). */
+  private refreshDocuments(): void {
+    this.api.listDocuments(this.id()).subscribe({
+      next: (docs) => this.realDocuments.set(docs),
+      error: () => {},
+    });
+  }
+
   constructor() {
     if (this.api.configured) {
       this.api.listDocuments(this.id()).subscribe({
@@ -319,50 +362,20 @@ export class ApplicationDetailsPage {
     });
   }
 
-  /** The open Letters of Instruction, read while the application is in Revision Required. */
+  /**
+   * The office's reason for returning the application, from its open Letter
+   * of Instruction (the Return for Revision remark). Shown in the Send Back
+   * card; sending back answers it.
+   */
   protected readonly letters = signal<InstructionLetter[]>([]);
-  protected readonly lettersLoaded = signal(false);
-  protected readonly resubmitting = signal(false);
   protected readonly confirmingCancel = signal(false);
-  private resubmitKey: string | null = null;
 
   private refreshLetters(): void {
     if (!this.api.configured) return;
     this.api.getInstructions(this.id()).subscribe({
-      next: (letters) => { this.letters.set(letters); this.lettersLoaded.set(true); },
-      error: () => this.lettersLoaded.set(true),
-    });
-  }
-
-  private refreshDocuments(): void {
-    this.api.listDocuments(this.id()).subscribe({
-      next: (docs) => this.realDocuments.set(docs),
+      next: (letters) => this.letters.set(letters),
       error: () => {},
     });
-  }
-
-  /**
-   * Hands the returned application back to the office. Found live
-   * 2026-09-27: the citizen was told to "resubmit the requested items" and
-   * had no button to do it with, so a returned application was stuck.
-   */
-  protected async resubmitToOffice(): Promise<void> {
-    const letter = this.letters()[0];
-    if (!letter || this.resubmitting()) return;
-    this.resubmitting.set(true);
-    this.resubmitKey ??= crypto.randomUUID();
-    try {
-      await firstValueFrom(this.api.resubmitInstructions(this.id(), letter.letterId, this.resubmitKey));
-      this.resubmitKey = null;
-      await this.store.refreshMine();
-      this.refreshTimeline();
-      this.refreshLetters();
-      this.toast.success('Sent back to the office. They will continue reviewing your application.');
-    } catch (e) {
-      this.toast.error(this.resubmission.explain(e));
-    } finally {
-      this.resubmitting.set(false);
-    }
   }
 
   /**
@@ -576,7 +589,8 @@ export class ApplicationDetailsPage {
             ? ` ${result.removedMetadata.join(', ')} was removed from the file.`
             : '';
           this.toast.success(`Replacement sent for "${doc.label}".${stripped}`);
-          // The list kept showing the old file until a reload (found live 2026-09-27).
+          // Without this the list kept showing the returned file as current
+          // until a reload, so "Send Back to the Office" stayed disabled.
           this.refreshDocuments();
         },
         error: (e) => this.toast.error(this.resubmission.explain(e)),
