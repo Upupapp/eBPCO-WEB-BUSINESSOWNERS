@@ -110,7 +110,9 @@ type Step = 1 | 2 | 3;
                 @if (codeNotice()) { <p class="small muted" style="margin-top:6px;">{{ codeNotice() }}</p> }
               </div>
             } @else if (skipVerification()) {
-              <p class="small muted" style="margin-top:6px;">{{ skipVerification() }}</p>
+              <div class="field error" style="margin-top:6px;">{{ skipVerification() }}</div>
+            } @else if (!emailVerified()) {
+              <p class="small muted" style="margin-top:6px;">You need to verify your email before you can continue.</p>
             }
           </div>
           <div class="field">
@@ -328,19 +330,17 @@ export class RegisterPage {
         this.codeNotice.set(result.detail);
       } else {
         // 'not-sent' (no provider configured) or 'failed' (a real one that
-        // just failed) — either way, a citizen must not be locked out of
-        // creating an account entirely because of an LGU infrastructure
-        // problem. Falls back to today's behaviour: register, verify later
-        // from Profile.
+        // just failed). Verification is required (see toStep3), so the
+        // citizen is told to try again rather than offered a way around it.
         this.codeSent.set(false);
         this.skipVerification.set(
-          `${result.detail} You can continue without verifying now, and verify this email later from your Profile.`,
+          `${result.detail} Please try Verify Email again in a moment. If it keeps failing, contact the Office of the Municipal Engineer.`,
         );
       }
     } catch {
       this.skipVerification.set(
         'Could not reach the Municipality’s system to send a code. '
-          + 'You can continue without verifying now, and verify this email later from your Profile.',
+          + 'Check your connection and click Verify Email again.',
       );
     } finally {
       this.sendingCode.set(false);
@@ -483,14 +483,18 @@ export class RegisterPage {
       this.error.set('Postal code must be exactly 4 digits.');
       return;
     }
-    // A code was actually sent to this address and never confirmed — do not
-    // let Continue past that silently. `skipVerification()` is the one
-    // deliberate escape hatch (no provider configured, or delivery just
-    // failed): the citizen was already told, on this same step, that they
-    // may proceed unverified, and holding them here anyway would contradict
-    // what was just shown.
-    if (!this.emailVerified() && this.codeSent() && !this.skipVerification()) {
-      this.error.set('Please confirm the code sent to your email, or use Resend Code if it did not arrive.');
+    // Owner decision, 2026-09-27: every account starts with a confirmed email.
+    // There is no longer an "continue unverified" path — not when the code was
+    // never requested, and not when the Municipality's mail could not be sent
+    // (the citizen is told to try again instead). The Municipality writes to
+    // this address about permits and payments; an unconfirmed one is how a
+    // typo silently cuts a citizen off from their own application.
+    if (!this.emailVerified()) {
+      this.emailError.set(
+        this.codeSent()
+          ? 'Enter the 6-digit code sent to your email and click Confirm, or use Resend Code if it did not arrive.'
+          : 'Verify your email address first: click Verify Email and enter the 6-digit code we send you.',
+      );
       return;
     }
     this.error.set(null);
