@@ -109,6 +109,11 @@ export function applicantStatusLabel(status: ApplicationLifecycleStatus): string
   // live 2026-09-27, a completed application still read "Ready for Release".
   if (status === 'Released') return 'Released';
   if (status === 'Completed') return 'Completed';
+  // Same for a verified payment: the Cashier has recorded the Official
+  // Receipt, so "Payment Verification" read as still being checked while the
+  // Admin Portal showed For Approval (found live 2026-09-28). The category
+  // stays Payment Verification for the filter tab and counts.
+  if (status === 'Payment Verified' || status === 'For Approval') return 'Payment Verified';
   return applicantStatusOf(status);
 }
 
