@@ -132,8 +132,9 @@ export class CitizenApiClient {
    * `GET /documents/me` — every document this citizen has ever uploaded,
    * attached or not (broadened; used to return only unattached ones).
    */
-  getMyDocuments(): Observable<DocumentHistoryEntry[]> {
-    return this.get<DocumentHistoryEntry[]>('/documents/me');
+  getMyDocuments(archived = false): Observable<DocumentHistoryEntry[]> {
+    // `?archived=true` (ebpco-api 062): what the citizen archived, to restore.
+    return this.get<DocumentHistoryEntry[]>(archived ? '/documents/me?archived=true' : '/documents/me');
   }
 
   /**
@@ -156,7 +157,14 @@ export class CitizenApiClient {
    * comment (backend repo) for the full reasoning.
    */
   deleteDocument(documentId: string): Observable<void> {
+    // Archives, never deletes (ebpco-api 062): every copy of the file leaves
+    // My Documents and the reuse list, and `restoreDocument` brings it back.
     return this.delete<void>(`/documents/${encodeURIComponent(documentId)}`);
+  }
+
+  /** `POST /documents/{id}/restore` — an archived file back into My Documents. */
+  restoreDocument(documentId: string): Observable<void> {
+    return this.post<void>(`/documents/${encodeURIComponent(documentId)}/restore`, {}, crypto.randomUUID());
   }
 
   /**

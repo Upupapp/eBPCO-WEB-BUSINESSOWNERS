@@ -116,8 +116,11 @@ interface RealPreview {
                     {{ downloadingId() === d.id ? 'Downloading…' : 'Download' }}
                   </button>
                 </div>
-                <button class="btn btn-sm doc-delete" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
-                  {{ deletingId() === d.id ? 'Removing…' : 'Delete' }}
+                <button class="btn btn-sm doc-archive" [disabled]="deletingId() === d.id" (click)="deleteReal(d)">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M3.5 5.5h17v4h-17zM5 9.5v9a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-9M10 13h4" />
+                  </svg>
+                  {{ deletingId() === d.id ? 'Archiving…' : 'Archive' }}
                 </button>
               </div>
             }
@@ -177,13 +180,41 @@ interface RealPreview {
         />
       }
 
+      @if (api.configured && realChecked()) {
+        <div class="archived-section">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="toggleArchived()">
+            {{ showArchived() ? 'Hide archived documents' : 'Show archived documents' }}
+            @if (archivedDocuments().length > 0) {
+              ({{ archivedDocuments().length }})
+            }
+          </button>
+          @if (showArchived()) {
+            @if (archivedDocuments().length === 0) {
+              <p class="small muted">You have not archived any documents.</p>
+            } @else {
+              <ul class="archived-list">
+                @for (d of archivedDocuments(); track d.id) {
+                  <li>
+                    <span class="archived-name">{{ d.fileName }}</span>
+                    <span class="small muted">{{ d.label }}</span>
+                    <button class="btn btn-secondary btn-sm" [disabled]="restoringId() === d.id" (click)="restore(d)">
+                      {{ restoringId() === d.id ? 'Restoring…' : 'Restore' }}
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </div>
+      }
+
       @if (confirmDeleteFor(); as d) {
         <app-confirm-modal
-          title="Remove from My Documents"
+          title="Archive this document?"
           [message]="usedOn(d)
-            ? 'Remove ' + d.fileName + ' from My Documents? It will stay exactly as filed on ' + usedOn(d) + ' — this only stops it being offered for reuse elsewhere.'
-            : 'Remove ' + d.fileName + ' from My Documents? This deletes it.'"
-          confirmLabel="Remove"
+            ? d.fileName + ' leaves My Documents and the list you reuse from. Nothing is deleted: it stays exactly as filed on ' + usedOn(d) + ', and you can restore it any time from Archived documents.'
+            : d.fileName + ' leaves My Documents and the list you reuse from. Nothing is deleted — you can restore it any time from Archived documents.'"
+          confirmLabel="Archive"
           tone="danger"
           (confirm)="confirmDelete()"
           (cancel)="confirmDeleteFor.set(null)"
@@ -312,17 +343,30 @@ interface RealPreview {
     // same border/radius/padding weight as View and Download, just tinted
     // for a destructive action, so it reads as a deliberate part of the
     // card rather than something left unstyled (found live 2026-09-20).
-    .doc-delete {
+    /* Archive: amber, a filing box — kept and restorable, never the red of a delete. */
+    .doc-archive {
       width: 100%;
       margin-top: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       background: transparent;
-      color: var(--danger-text, #a5182a);
-      border: 1px solid var(--danger-100, #fdeceb);
+      color: var(--warning-text, #92400e);
+      border: 1px solid var(--warning-100, #fef3c7);
     }
-    .doc-delete:hover:not(:disabled) {
-      background: var(--danger-100, #fdeceb);
-      border-color: var(--danger-500, #dc2626);
+    .doc-archive:hover:not(:disabled) {
+      background: var(--warning-100, #fef3c7);
+      border-color: var(--warning-500, #d97706);
     }
+    .archived-section { margin-top: 24px; }
+    .archived-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .archived-list li {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 12px; border: 1px solid #e4e8ed; border-radius: 9px;
+    }
+    .archived-name { font-weight: 600; }
+    .archived-list .btn { margin-left: auto; }
   `],
 })
 export class MyDocumentsPage {
@@ -519,12 +563,46 @@ export class MyDocumentsPage {
     this.api.deleteDocument(d.id).subscribe({
       next: () => {
         this.realDocuments.update((docs) => docs.filter((x) => x.id !== d.id));
-        this.toast.success(`${d.fileName} removed from My Documents.`);
+        this.toast.success(`${d.fileName} archived. Restore it any time from Archived documents.`);
         this.deletingId.set(null);
+        if (this.showArchived()) this.loadArchived();
       },
       error: () => {
-        this.toast.error(`Could not remove ${d.fileName}. Try again.`);
+        this.toast.error(`Could not archive ${d.fileName}. Try again.`);
         this.deletingId.set(null);
+      },
+    });
+  }
+
+  // ── Archived documents (ebpco-api 062): kept, and restorable ──────────
+  protected readonly showArchived = signal(false);
+  protected readonly archivedDocuments = signal<DocumentHistoryEntry[]>([]);
+  protected readonly restoringId = signal<string | null>(null);
+
+  protected toggleArchived(): void {
+    this.showArchived.update((shown) => !shown);
+    if (this.showArchived()) this.loadArchived();
+  }
+
+  private loadArchived(): void {
+    this.api.getMyDocuments(true).subscribe({
+      next: (docs) => this.archivedDocuments.set(docs),
+      error: () => this.toast.error('Could not load your archived documents. Try again.'),
+    });
+  }
+
+  protected restore(d: DocumentHistoryEntry): void {
+    this.restoringId.set(d.id);
+    this.api.restoreDocument(d.id).subscribe({
+      next: () => {
+        this.archivedDocuments.update((docs) => docs.filter((x) => x.id !== d.id));
+        this.toast.success(`${d.fileName} is back in My Documents.`);
+        this.restoringId.set(null);
+        this.refreshReal();
+      },
+      error: () => {
+        this.toast.error(`Could not restore ${d.fileName}. Try again.`);
+        this.restoringId.set(null);
       },
     });
   }
