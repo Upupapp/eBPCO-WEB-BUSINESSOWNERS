@@ -11,7 +11,7 @@ import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { ApplicationSummary } from '../../core/api/citizen-api.models';
 import { UploadLimitsService } from '../../core/api/upload-limits.service';
 import { toBase64 } from '../../core/api/document-resubmission.service';
-import { ApiError } from '../../core/api/problem';
+import { ApiError, duplicateOf } from '../../core/api/problem';
 
 @Component({
   selector: 'app-payment-flow',
@@ -246,11 +246,20 @@ export class PaymentFlowPage {
         }
         try {
           const contentBase64 = await toBase64(this.proofFile);
-          const uploaded = await firstValueFrom(
+          const proof = this.proofFile;
+          const send = (reuseOf: string | null) => firstValueFrom(
             this.api.uploadDocument({
-              fileName: this.proofFile.name, label: 'Proof of Payment', contentBase64, applicationId,
+              fileName: proof.name, label: 'Proof of Payment', contentBase64, applicationId, reuseOf,
             }),
           );
+          // A retry after a payment that failed past its upload sends the same
+          // receipt again, which the server refuses as a file already on
+          // record: use that copy rather than stop the payment.
+          const uploaded = await send(null).catch((error: unknown) => {
+            const existing = duplicateOf(error);
+            if (existing === null) throw error;
+            return send(existing.id);
+          });
           proofDocumentId = uploaded.documentId;
         } catch (error) {
           this.error.set(
