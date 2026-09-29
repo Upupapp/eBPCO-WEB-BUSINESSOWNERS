@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
+import { BFP_FSIS_URL, PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
 import { REQUIREMENTS_CATALOG } from '../../core/domain/requirements-catalog';
 import { BusinessStore } from '../../core/stores/business.store';
 import { permitFormAssetFor } from '../../core/domain/permit-form-assets';
@@ -34,6 +34,27 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
           </p>
         </div>
       }
+
+      <!--
+        The FSEC and the FSIC used to be permit types here. The BFP issues both
+        through its own system, BFP-FSIS (MC 2024-024); filing them with the
+        Municipality sent citizens to the wrong office. They are uploaded as
+        documents instead, and the Fire Safety stage verifies them.
+      -->
+      <div class="card bfp-notice">
+        <h3>Fire Safety clearances come from the BFP</h3>
+        <p class="small">
+          The <strong>Fire Safety Evaluation Clearance (FSEC)</strong> for a building permit and the
+          <strong>Fire Safety Inspection Certificate (FSIC)</strong> for occupancy are issued by the Bureau of Fire
+          Protection, not by the Municipality. Apply for them on
+          <a [href]="bfpFsisUrl" target="_blank" rel="noopener noreferrer">BFP-FSIS (fsis.e-bfp.com)</a>
+          or at the Castilla Fire Station. When you receive it, upload it as one of the documents of your
+          Building Permit or Certificate of Occupancy application here, and our Fire Safety officer will check it.
+        </p>
+        <p class="small muted">
+          Permits with nothing for the BFP to check, like a Fencing or Sign Permit, skip the Fire Safety stage.
+        </p>
+      </div>
 
       @for (group of groups; track group.label) {
         <h3 class="permit-group-heading">{{ group.label }}</h3>
@@ -81,6 +102,11 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
   styles: [
     `
     .permit-group-heading { margin-top: 24px; }
+
+    .bfp-notice { background: var(--info-100, #e8f1fb); border: none; }
+    .bfp-notice h3 { margin: 0 0 6px; }
+    .bfp-notice p { margin: 0; }
+    .bfp-notice p + p { margin-top: 6px; }
 
     .permit-grid {
       display: grid;
@@ -159,6 +185,7 @@ export class PermitCatalogPage {
   private readonly router = inject(Router);
 
   protected readonly groups = PERMIT_TYPE_GROUPS;
+  protected readonly bfpFsisUrl = BFP_FSIS_URL;
   protected readonly catalog = REQUIREMENTS_CATALOG;
   protected readonly viewingRequirementsFor = signal<PermitType | null>(null);
 

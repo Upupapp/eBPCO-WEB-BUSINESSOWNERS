@@ -74,11 +74,31 @@ export const PERMIT_TYPE_GROUPS: { label: string; types: PermitType[] }[] = [
   },
   {
     label: 'Certificates',
-    types: ['FSEC for Building Permit (BFP)', 'Certificate of Occupancy', 'FSIC for Occupancy Permit (BFP)'],
+    // Not the FSEC or the FSIC: see RETIRED_PERMIT_TYPES.
+    types: ['Certificate of Occupancy'],
   },
 ];
 
 const ALL_PERMIT_TYPES_SET: ReadonlySet<string> = new Set(ALL_PERMIT_TYPES);
+
+/**
+ * Still recognised on old records, no longer filed through eBPCO (ebpco-api
+ * migration 060, which refuses them). The Bureau of Fire Protection issues the
+ * FSEC and the FSIC itself, through its own online system BFP-FSIS (BFP
+ * Memorandum Circular 2024-024). The citizen gets it there and uploads it with
+ * their Building Permit or Certificate of Occupancy, where the Fire Safety
+ * stage verifies it.
+ */
+export const RETIRED_PERMIT_TYPES: ReadonlySet<PermitType> = new Set<PermitType>([
+  'FSEC for Building Permit (BFP)',
+  'FSIC for Occupancy Permit (BFP)',
+]);
+
+/** What a citizen can apply for today — every list that starts an application. */
+export const FILEABLE_PERMIT_TYPES: PermitType[] = ALL_PERMIT_TYPES.filter((type) => !RETIRED_PERMIT_TYPES.has(type));
+
+/** Where the BFP's own online system is, for every notice that sends a citizen there. */
+export const BFP_FSIS_URL = 'https://fsis.e-bfp.com';
 
 export function isValidPermitType(value: string): value is PermitType {
   return ALL_PERMIT_TYPES_SET.has(value);

@@ -69,3 +69,24 @@ describe('Permit form assets (F-13: bundled forms must be reachable)', () => {
     TestBed.resetTestingModule();
   });
 });
+
+describe('Permit Services: the FSEC and FSIC come from the BFP', () => {
+  it('offers no FSEC or FSIC application, and sends the citizen to BFP-FSIS instead', () => {
+    TestBed.configureTestingModule({
+      imports: [PermitCatalogPage],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(PermitCatalogPage);
+    fixture.detectChanges();
+    const page = fixture.nativeElement as HTMLElement;
+
+    const cardNames = Array.from(page.querySelectorAll('.permit-card__name')).map((h) => h.textContent?.trim());
+    expect(cardNames).not.toContain('FSEC for Building Permit (BFP)');
+    expect(cardNames).not.toContain('FSIC for Occupancy Permit (BFP)');
+    expect(cardNames).toContain('Certificate of Occupancy');
+
+    const link = page.querySelector<HTMLAnchorElement>('.bfp-notice a');
+    expect(link?.href).toBe('https://fsis.e-bfp.com/');
+    expect(link?.rel).toContain('noopener');
+  });
+});

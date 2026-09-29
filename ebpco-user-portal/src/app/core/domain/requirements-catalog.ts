@@ -59,6 +59,7 @@ const PENDING_NOTE =
 // live, staff-published checklist already does.
 const RENOVATION_ALTERATION_DOCS: RequirementDocument[] = [
   ...COMMON_DOCS,
+  doc('fsec', 'Fire Safety Evaluation Clearance (FSEC)', true, 'Issued by the Bureau of Fire Protection, not by the Municipality. Apply online at BFP-FSIS (fsis.e-bfp.com) or at the Castilla Fire Station, then upload the FSEC you receive here.'),
   doc('renovation-plan', 'Renovation/Alteration Plans (signed and sealed)', true),
   doc('prior-permit-proof', 'Copy of your existing/prior permit', false),
   doc('renovation-bom', 'Bill of Materials and Specifications', true),
@@ -67,6 +68,7 @@ const RENOVATION_ALTERATION_DOCS: RequirementDocument[] = [
 
 const ADDITION_EXTENSION_DOCS: RequirementDocument[] = [
   ...COMMON_DOCS,
+  doc('fsec', 'Fire Safety Evaluation Clearance (FSEC)', true, 'Issued by the Bureau of Fire Protection, not by the Municipality. Apply online at BFP-FSIS (fsis.e-bfp.com) or at the Castilla Fire Station, then upload the FSEC you receive here.'),
   doc('addition-plan', 'Addition / Extension Plans (signed and sealed)', true),
   doc('prior-permit-proof', 'Copy of your existing/prior permit', false),
   doc('addition-struct-plan', 'Structural Analysis for the added load (signed and sealed)', true),
@@ -103,7 +105,7 @@ export const REQUIREMENTS_CATALOG: Record<PermitType, ApplicationTypeRequirement
       doc('bpnc-professional-licenses', 'Valid Licenses (PRC) of all involved professionals', true),
       doc('bpnc-valid-id', 'Valid ID of Applicant and Owner of Lot', true),
       doc('bpnc-zoning-locational', 'Zoning / Locational Clearance', true, 'Issued by MPDC.'),
-      doc('bpnc-fire-safety-clearance', 'Fire Safety Evaluation Clearance', true, 'Issued by BFP.'),
+      doc('bpnc-fire-safety-clearance', 'Fire Safety Evaluation Clearance', true, 'Issued by the Bureau of Fire Protection, not by the Municipality. Apply online at BFP-FSIS (fsis.e-bfp.com) or at the Castilla Fire Station, then upload the FSEC you receive here.'),
       doc('bpnc-construction-safety-health', 'Approved Construction Safety and Health Program', true, 'Issued by DOLE.'),
       doc('bpnc-road-clearance', 'Road Clearance', true, 'Issued by DPWH/PEO.'),
     ],
@@ -337,7 +339,7 @@ export const REQUIREMENTS_CATALOG: Record<PermitType, ApplicationTypeRequirement
       ...COMMON_DOCS,
       doc('coo-asbuilt', 'As-Built Plans', true),
       doc('coo-completion', 'Certificate of Completion', true),
-      doc('coo-fsic', 'Fire Safety Inspection Certificate (final)', true),
+      doc('coo-fsic', 'Fire Safety Inspection Certificate (final)', true, 'Issued by the Bureau of Fire Protection after it inspects the finished building. Apply online at BFP-FSIS (fsis.e-bfp.com) or at the Castilla Fire Station, then upload the FSIC you receive here.'),
       doc('coo-electrical-final', 'Certificate of Final Electrical Inspection', true),
     ],
   },

@@ -2,7 +2,9 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { ALL_PERMIT_TYPES, ApplicationAction, PermitType, isValidPermitType } from '../../core/domain/permit.model';
+import {
+  ApplicationAction, FILEABLE_PERMIT_TYPES, PermitType, RETIRED_PERMIT_TYPES, isValidPermitType,
+} from '../../core/domain/permit.model';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import {
   actionNeedsExistingPermit,
@@ -645,7 +647,8 @@ export class ApplicationWizardPage {
     { permitNumber: string; permitType?: string; businessName?: string | null; issuedDate?: string } | null
   >(null);
   protected readonly checkingPermit = signal(false);
-  protected readonly allPermitTypes = ALL_PERMIT_TYPES;
+  // Not the FSEC / FSIC: the BFP issues those through BFP-FSIS (RETIRED_PERMIT_TYPES).
+  protected readonly allPermitTypes = FILEABLE_PERMIT_TYPES;
 
   protected readonly existingPermitPrompt = existingPermitPrompt;
   protected readonly actionReferenceIsComplete = actionReferenceIsComplete;
@@ -873,7 +876,7 @@ export class ApplicationWizardPage {
       this.isGeneric = true;
       this.documents = this.applicationStore.requiredDocumentsFor('generic', this.applicationAction);
       void this.resumeDraft(draftParam);
-    } else if (typeParam && typeParam !== 'generic' && isValidPermitType(typeParam)) {
+    } else if (typeParam && typeParam !== 'generic' && isValidPermitType(typeParam) && !RETIRED_PERMIT_TYPES.has(typeParam)) {
       this.isGeneric = false;
       this.permitType = typeParam;
       this.documents = this.applicationStore.requiredDocumentsFor(typeParam, this.applicationAction);

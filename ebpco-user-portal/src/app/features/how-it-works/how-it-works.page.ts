@@ -25,7 +25,7 @@ const STEPS: ProcessStep[] = [
   {
     label: 'Under Review',
     title: 'Document & technical evaluation',
-    description: 'Your documents are checked for completeness, then evaluated by the relevant office — Zoning, Fire Safety, and/or the Office of the Building Official, depending on your permit type.',
+    description: 'Your documents are checked for completeness, then evaluated by the offices your permit needs — Zoning, Fire Safety, and/or the Office of the Building Official. A stage with nothing on your checklist to check is skipped: a Fencing Permit, for example, does not wait on Fire Safety. The Fire Safety stage checks the FSEC or FSIC you got from the BFP (fsis.e-bfp.com); it does not issue one.',
   },
   {
     label: 'Payment Verification',
