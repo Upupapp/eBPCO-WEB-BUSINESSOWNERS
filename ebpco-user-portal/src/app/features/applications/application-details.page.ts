@@ -17,6 +17,7 @@ import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse, InstructionLetter, TimelineEntryResponse } from '../../core/api/citizen-api.models';
+import { duplicateOf } from '../../core/api/problem';
 
 /** Same extension-sniffing fallback as my-documents.page.ts / application-wizard.page.ts. */
 function fileTypeFromName(name: string): SavedDocumentFileType {
@@ -539,22 +540,33 @@ export class ApplicationDetailsPage {
         permitType && permitType !== 'Business Permit' && this.store.hasRealRequiredDocuments(permitType)
           ? req.id
           : null;
-      this.api.uploadDocument({
-        fileName: file.name, label: req.label, applicationId: this.id(), requirementCode, contentBase64,
-      }).subscribe({
-        next: () => {
-          this.toast.success(`"${req.label}" sent.`);
-          this.api.listDocuments(this.id()).subscribe({
-            next: (docs) => this.realDocuments.set(docs),
-            error: () => {},
-          });
-        },
-        error: (e) => {
-          this.toast.error(this.resubmission.explain(e));
-          this.uploadingMissingId.set(null);
-        },
-        complete: () => this.uploadingMissingId.set(null),
-      });
+      const send = (reuseOf: string | null): void => {
+        this.api.uploadDocument({
+          fileName: file.name, label: req.label, applicationId: this.id(), requirementCode, contentBase64, reuseOf,
+        }).subscribe({
+          next: () => {
+            this.toast.success(`"${req.label}" sent.`);
+            this.api.listDocuments(this.id()).subscribe({
+              next: (docs) => this.realDocuments.set(docs),
+              error: () => {},
+            });
+          },
+          error: (e) => {
+            // A file they already have in My Documents: send their copy
+            // instead of storing the same file a second time.
+            const existing = duplicateOf(e);
+            if (existing !== null && reuseOf === null) {
+              this.toast.show(`You already had "${existing.fileName}" in My Documents, so that copy was used.`);
+              send(existing.id);
+              return;
+            }
+            this.toast.error(this.resubmission.explain(e));
+            this.uploadingMissingId.set(null);
+          },
+          complete: () => this.uploadingMissingId.set(null),
+        });
+      };
+      send(null);
     } catch {
       this.toast.error(`Could not send "${req.label}". Try again.`);
       this.uploadingMissingId.set(null);

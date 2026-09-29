@@ -204,6 +204,12 @@ export interface UploadDocumentRequest {
   label: string;
   applicationId?: string | null;
   requirementCode?: string | null;
+  /**
+   * The citizen's own document this upload copies (reusing it on another
+   * application). Without it, a file they already have is refused 409 — see
+   * `duplicateOf`.
+   */
+  reuseOf?: string | null;
   contentBase64: string;
 }
 
@@ -460,6 +466,14 @@ export interface DocumentHistoryEntry {
   applicationReference: string | null;
   /** Null for an unattached document — nothing has reviewed it because there is no application to review it against. */
   reviewStatus: DocumentReviewStatus | null;
+  /**
+   * Every application a copy of this FILE is on. The list shows each file
+   * once, however many copies reuse made (ebpco-api 061). Absent from an
+   * older server.
+   */
+  applications?: { id: string; referenceNumber: string | null }[];
+  /** How many copies stand behind this entry. Absent from an older server. */
+  copies?: number;
 }
 
 /** `GET /applications/{id}/requirements` — the checklist snapshot taken at filing, not the live catalogue. */

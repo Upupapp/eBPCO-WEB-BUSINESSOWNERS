@@ -22,7 +22,7 @@ import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { DocumentHistoryEntry } from '../../core/api/citizen-api.models';
 import { UploadLimitsService } from '../../core/api/upload-limits.service';
 import { toBase64 } from '../../core/api/document-resubmission.service';
-import { ApiError } from '../../core/api/problem';
+import { ApiError, duplicateOf } from '../../core/api/problem';
 import { CapitalizeNameDirective } from '../../core/utils/capitalize-name.directive';
 import { LegalDocument, LegalModalComponent } from '../../shared/ui/legal-modal.component';
 import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
@@ -1021,7 +1021,7 @@ export class ApplicationWizardPage {
    * Checked against `UploadLimitsService`'s LIVE ceiling, not the wizard's
    * own guess — the same real number `DocumentResubmissionService` uses.
    */
-  private async uploadReal(d: RequirementDocument, file: File): Promise<void> {
+  private async uploadReal(d: RequirementDocument, file: File, reuseOf: string | null = null): Promise<void> {
     if (file.size > this.uploadLimits.maxFileBytes()) {
       this.error.set(
         `"${file.name}" is ${Math.round(file.size / 1000)} KB. The Municipality's system accepts up to about ` +
@@ -1042,10 +1042,24 @@ export class ApplicationWizardPage {
       // loaded yet, exactly as before this fetch existed.
       const requirementCode = this.usingRealRequirementCodes ? d.id : null;
       const result = await firstValueFrom(
-        this.api.uploadDocument({ fileName: file.name, label: d.label, requirementCode, contentBase64 }),
+        this.api.uploadDocument({ fileName: file.name, label: d.label, requirementCode, contentBase64, reuseOf }),
       );
       this.uploadedDocumentIds.update((map) => ({ ...map, [d.id]: result.documentId }));
     } catch (error) {
+      // The same file they already have in My Documents: the server refuses a
+      // second upload of it. Here the citizen's intent is plain (attach THIS
+      // file to THIS requirement), so use their copy and say so, rather than
+      // an error they would have to act on.
+      const existing = duplicateOf(error);
+      if (existing !== null && reuseOf === null) {
+        this.uploadingRequirementId.set(null);
+        await this.uploadReal(d, file, existing.id);
+        this.toast.show(
+          `You already had "${existing.fileName}" in My Documents, so that copy was used. `
+          + 'Next time, pick it from "Use a document I already uploaded".',
+        );
+        return;
+      }
       this.error.set(
         error instanceof ApiError
           ? error.citizenMessage
@@ -1117,7 +1131,7 @@ export class ApplicationWizardPage {
           [d.id]: { kind: 'upload', file, fileName: real.fileName, fileType: fileTypeFromName(real.fileName) },
         };
         this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
-        await this.uploadReal(d, file);
+        await this.uploadReal(d, file, real.id);
       } catch {
         this.error.set(`Could not reuse "${real.fileName}". Try again, or upload a new file.`);
       } finally {

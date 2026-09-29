@@ -8,6 +8,7 @@ import { formatDate } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { DocumentHistoryEntry } from '../../core/api/citizen-api.models';
+import { duplicateOf } from '../../core/api/problem';
 import { toBase64 } from '../../core/api/document-resubmission.service';
 
 function fileTypeFromName(name: string): SavedDocumentFileType {
@@ -98,6 +99,9 @@ interface RealPreview {
                 </div>
                 <div class="doc-name" [title]="d.fileName">{{ d.fileName }}</div>
                 <div class="doc-label">{{ d.label }}</div>
+                @if (usedOn(d); as refs) {
+                  <div class="doc-used-on">Used on {{ refs }}</div>
+                }
                 <div class="doc-meta">
                   {{ (Number(d.byteSize) / 1024).toFixed(0) }} KB &middot; {{ formatDate(d.uploadedAt) }}
                   @if (d.expiresOn) {
@@ -176,8 +180,8 @@ interface RealPreview {
       @if (confirmDeleteFor(); as d) {
         <app-confirm-modal
           title="Remove from My Documents"
-          [message]="d.applicationReference
-            ? 'Remove ' + d.fileName + ' from My Documents? It will stay exactly as filed on ' + d.applicationReference + ' — this only stops it being offered for reuse elsewhere.'
+          [message]="usedOn(d)
+            ? 'Remove ' + d.fileName + ' from My Documents? It will stay exactly as filed on ' + usedOn(d) + ' — this only stops it being offered for reuse elsewhere.'
             : 'Remove ' + d.fileName + ' from My Documents? This deletes it.'"
           confirmLabel="Remove"
           tone="danger"
@@ -188,6 +192,11 @@ interface RealPreview {
     </div>
   `,
   styles: [`
+    .doc-used-on {
+      font-size: 12px;
+      color: var(--gray-600);
+      margin-top: 4px;
+    }
     .doc-toolbar {
       display: flex;
       align-items: center;
@@ -373,6 +382,13 @@ export class MyDocumentsPage {
     });
   }
 
+  /** The applications a copy of this file is on, joined for one line; '' when none. */
+  protected usedOn(d: DocumentHistoryEntry): string {
+    const refs = (d.applications ?? []).map((a) => a.referenceNumber).filter((r): r is string => !!r);
+    if (refs.length === 0 && d.applicationReference) refs.push(d.applicationReference);
+    return refs.join(', ');
+  }
+
   filtered() {
     const f = this.filter();
     const all = this.store.myDocuments();
@@ -411,8 +427,16 @@ export class MyDocumentsPage {
             });
           })();
         });
-      } catch {
-        this.toast.error(`Could not upload ${file.name}. Try again.`);
+      } catch (error) {
+        // The same file, already here under another name: the server compares
+        // the contents, not the name, and refuses a second copy.
+        const existing = duplicateOf(error);
+        this.toast.error(
+          existing !== null
+            ? `You already have this file in My Documents as "${existing.fileName}". `
+              + 'Reuse that one — it can be attached to any application.'
+            : `Could not upload ${file.name}. Try again.`,
+        );
       } finally {
         this.uploading.set(false);
         input.value = '';

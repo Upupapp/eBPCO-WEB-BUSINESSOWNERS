@@ -65,6 +65,28 @@ export class ApiError extends Error {
   }
 }
 
+/** The copy of a file the citizen already has, named by a 409 `duplicate-document` refusal. */
+export interface ExistingDocument {
+  readonly id: string;
+  readonly fileName: string;
+  readonly label: string;
+  /** The application it is attached to, or null when it sits unattached in My Documents. */
+  readonly applicationReference: string | null;
+}
+
+/**
+ * The server refuses an upload of a file the citizen already has in My
+ * Documents (ebpco-api 061) and names the copy they have. Null for any other
+ * error. A client either tells them to reuse it (My Documents) or reuses it
+ * for them by sending the same bytes again with `reuseOf` (a wizard, where the
+ * citizen's intent, "attach this file here", is already clear).
+ */
+export function duplicateOf(error: unknown): ExistingDocument | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const problem = error.problem as (Problem & { reason?: string; existingDocument?: ExistingDocument }) | null;
+  return problem?.reason === 'duplicate-document' && problem.existingDocument ? problem.existingDocument : null;
+}
+
 export function problemFrom(body: unknown, status: number): ApiError {
   const looksLikeProblem =
     !!body && typeof body === 'object' && ('detail' in body || 'title' in body || 'type' in body);
