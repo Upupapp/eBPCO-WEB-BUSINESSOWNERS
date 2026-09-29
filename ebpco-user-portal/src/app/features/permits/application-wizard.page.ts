@@ -1056,7 +1056,7 @@ export class ApplicationWizardPage {
         await this.uploadReal(d, file, existing.id);
         this.toast.show(
           `You already had "${existing.fileName}" in My Documents, so that copy was used. `
-          + 'Next time, pick it from "Use a document I already uploaded".',
+          + 'Next time, choose it under "or reuse" instead of uploading it again.',
         );
         return;
       }
