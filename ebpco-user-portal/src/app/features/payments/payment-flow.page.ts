@@ -12,13 +12,15 @@ import { ApplicationSummary } from '../../core/api/citizen-api.models';
 import { UploadLimitsService } from '../../core/api/upload-limits.service';
 import { toBase64 } from '../../core/api/document-resubmission.service';
 import { ApiError, duplicateOf } from '../../core/api/problem';
+import { BackLinkComponent } from '../../shared/ui/back-link.component';
 
 @Component({
   selector: 'app-payment-flow',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, BackLinkComponent],
   template: `
     @if (app(); as a) {
       <div class="page" style="max-width:560px;">
+        <app-back-link fallback="/payments" fallbackLabel="Payments" />
         <div class="page-header">
           <div>
             <h1>Pay Assessment</h1>

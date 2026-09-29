@@ -1,13 +1,13 @@
 import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { BackLinkComponent } from '../../shared/ui/back-link.component';
 import { PRIVACY_POLICY_SECTIONS } from '../../core/domain/legal-copy';
 
 @Component({
   selector: 'app-privacy',
-  imports: [RouterLink],
+  imports: [BackLinkComponent],
   template: `
     <div class="page" style="max-width:680px;">
-      <a routerLink="/landing" class="small">&larr; Back</a>
+      <app-back-link fallback="/landing" fallbackLabel="Home" [publicPage]="true" />
       <div class="page-header" style="margin-top:12px;">
         <h1>Privacy Policy</h1>
       </div>

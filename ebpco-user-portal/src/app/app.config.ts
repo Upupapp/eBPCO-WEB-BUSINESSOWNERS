@@ -6,6 +6,7 @@ import { routes } from './app.routes';
 import { citizenAuthInterceptor } from './core/api/citizen-auth.interceptor';
 import { AuthService } from './core/session/auth.service';
 import { UploadLimitsService } from './core/api/upload-limits.service';
+import { NavigationHistory } from './core/utils/navigation-history';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -26,5 +27,9 @@ export const appConfig: ApplicationConfig = {
     // old 750,000-byte default costs nothing (the server's own 413 still
     // governs regardless) — see UploadLimitsService's doc comment.
     provideAppInitializer(() => void inject(UploadLimitsService).refresh()),
+    // From the first navigation on, so a Back link knows the screen before.
+    provideAppInitializer(() => {
+      inject(NavigationHistory);
+    }),
   ],
 };

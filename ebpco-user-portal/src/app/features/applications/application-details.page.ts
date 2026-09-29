@@ -18,6 +18,7 @@ import { RequirementDocument } from '../../core/domain/requirements-catalog';
 import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse, InstructionLetter, TimelineEntryResponse } from '../../core/api/citizen-api.models';
 import { duplicateOf } from '../../core/api/problem';
+import { BackLinkComponent } from '../../shared/ui/back-link.component';
 
 /** Same extension-sniffing fallback as my-documents.page.ts / application-wizard.page.ts. */
 function fileTypeFromName(name: string): SavedDocumentFileType {
@@ -36,10 +37,11 @@ interface PreviewableDocument {
 
 @Component({
   selector: 'app-application-details',
-  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent, PermitReleaseComponent, DocumentPreviewComponent],
+  imports: [RouterLink, StatusPillComponent, ApplicationDocumentsComponent, PermitReleaseComponent, DocumentPreviewComponent, BackLinkComponent],
   template: `
     @if (app(); as a) {
       <div class="page">
+        <app-back-link fallback="/applications" fallbackLabel="My Applications" />
         <div class="page-header">
           <div>
             <h1>{{ a.permitType }}</h1>

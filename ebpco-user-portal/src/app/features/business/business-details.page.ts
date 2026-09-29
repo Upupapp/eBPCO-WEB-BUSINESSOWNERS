@@ -6,13 +6,15 @@ import { StatusPillComponent } from '../../shared/ui/status-pill.component';
 import { applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
 import { formatDate } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
+import { BackLinkComponent } from '../../shared/ui/back-link.component';
 
 @Component({
   selector: 'app-business-details',
-  imports: [RouterLink, StatusPillComponent],
+  imports: [RouterLink, StatusPillComponent, BackLinkComponent],
   template: `
     @if (business(); as b) {
       <div class="page">
+        <app-back-link fallback="/businesses" fallbackLabel="My Businesses" />
         <div class="page-header">
           <div>
             <h1>{{ b.name }}</h1>

@@ -11,6 +11,7 @@ import { agencyHeaderFor } from '../../core/domain/generated-document.helpers';
 import { fullName } from '../../core/domain/user.model';
 import { pesos } from '../../core/domain/assessment.model';
 import { formatDate, formatDateTime } from '../../core/utils/ids';
+import { BackLinkComponent } from '../../shared/ui/back-link.component';
 
 type WatermarkText = 'ELECTRONIC COPY' | 'NOT YET VERIFIED';
 
@@ -61,12 +62,12 @@ const FEE_LINES: ReadonlyArray<{ code: keyof NonNullable<ApplicationSummary['pay
  */
 @Component({
   selector: 'app-payment-receipt',
-  imports: [RouterLink],
+  imports: [RouterLink, BackLinkComponent],
   template: `
     @if (app(); as a) {
       <div class="page" style="max-width:900px;">
         <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <a [routerLink]="['/payments']" class="small">&larr; Back to Payments</a>
+          <app-back-link fallback="/payments" fallbackLabel="Payments" />
           @if (payment()) {
             <button class="btn btn-primary btn-sm" (click)="print()">Print / Download</button>
           }

@@ -11,6 +11,7 @@ import { Assessment, pesos } from '../../core/domain/assessment.model';
 import { formatDate } from '../../core/utils/ids';
 import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { BackLinkComponent } from '../../shared/ui/back-link.component';
 
 type WatermarkText = 'SAMPLE — NOT AN OFFICIAL PERMIT';
 
@@ -33,12 +34,12 @@ interface QrCell {
  */
 @Component({
   selector: 'app-permit-document',
-  imports: [RouterLink],
+  imports: [RouterLink, BackLinkComponent],
   template: `
     @if (app(); as a) {
       <div class="page" style="max-width:900px;">
         <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <a [routerLink]="['/applications', a.id]" class="small">&larr; Back to Application</a>
+          <app-back-link [fallback]="'/applications/' + a.id" fallbackLabel="Application" />
           <button class="btn btn-primary btn-sm" (click)="print()">Print / Download</button>
         </div>
 
