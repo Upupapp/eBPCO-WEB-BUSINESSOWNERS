@@ -20,6 +20,16 @@ let seq = 0;
  */
 const MAX_VISIBLE = 4;
 
+/**
+ * How long a toast stays: long enough to read. One 3.5s for every message took
+ * a two-sentence one ("You already have this file… Reuse that one…") away
+ * before it was read. About a quarter of a second a word, 3.5s to 12s.
+ */
+export function toastDuration(message: string): number {
+  const words = message.trim().split(/\s+/).filter(Boolean).length;
+  return Math.min(12_000, Math.max(3_500, 1_500 + words * 280));
+}
+
 @Injectable({ providedIn: 'root' })
 export class ToastService {
   readonly toasts = signal<Toast[]>([]);
@@ -33,7 +43,7 @@ export class ToastService {
       // Oldest fall off the top; the newest is always the one the citizen sees.
       return [...withoutRepeat, { id, message, kind }].slice(-MAX_VISIBLE);
     });
-    setTimeout(() => this.dismiss(id), 3500);
+    setTimeout(() => this.dismiss(id), toastDuration(message));
   }
 
   success(message: string): void {

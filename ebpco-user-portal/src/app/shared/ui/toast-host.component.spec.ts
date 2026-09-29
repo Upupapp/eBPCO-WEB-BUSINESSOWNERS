@@ -37,4 +37,14 @@ describe('ToastHost (task 10: status messages are announced)', () => {
     expect(host.querySelector('[role="alert"]')?.textContent).toContain('We could not save that.');
     expect(host.querySelector('[role="status"]')?.textContent ?? '').not.toContain('We could not save that.');
   });
+
+  it('lets a message be dismissed before its time is up', () => {
+    const fixture = render();
+    TestBed.inject(ToastService).show('Draft saved.');
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    (host.querySelector('.toast-close') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(host.querySelector('.toast')).toBeNull();
+  });
 });

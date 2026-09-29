@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ToastService } from './toast.service';
+import { ToastService, toastDuration } from './toast.service';
 
 /**
  * Guards tasks 9 and 10. Toasts dismissed themselves after 3.5s but nothing
@@ -33,5 +33,21 @@ describe('ToastService (task 9: the stack is capped)', () => {
     toast.success('Payment recorded');
     toast.error('Payment recorded');
     expect(toast.toasts().length).toBe(2);
+  });
+});
+
+describe('toastDuration (a message stays long enough to read)', () => {
+  it('keeps a short confirmation for 3.5s', () => {
+    expect(toastDuration('Draft saved.')).toBe(3_500);
+  });
+
+  it('keeps a two-sentence guidance message for twice as long or more', () => {
+    const reuse = 'You already have this file in My Documents as "fsec.pdf". '
+      + 'Reuse that one — it can be attached to any application.';
+    expect(toastDuration(reuse)).toBeGreaterThanOrEqual(7_000);
+  });
+
+  it('never keeps one longer than 12s', () => {
+    expect(toastDuration('word '.repeat(200))).toBe(12_000);
   });
 });

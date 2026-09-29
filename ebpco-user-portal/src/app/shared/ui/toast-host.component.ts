@@ -7,7 +7,7 @@ import { ToastService } from './toast.service';
     <!--
       A live region. Without one, a screen-reader user is never told an action
       succeeded or failed — the toast appears, announces nothing, and vanishes
-      after 3.5s. WCAG 2.1 4.1.3 Status Messages (AA).
+      after a few seconds. WCAG 2.1 4.1.3 Status Messages (AA).
       axe does not flag this: the rule can only judge a live region that exists.
 
       role="status" (polite) for ordinary confirmations; errors get their own
@@ -17,12 +17,18 @@ import { ToastService } from './toast.service';
     <div class="toast-host">
       <div role="status" aria-live="polite" aria-atomic="false">
         @for (t of polite(); track t.id) {
-          <div class="toast" [class.success]="t.kind === 'success'">{{ t.message }}</div>
+          <div class="toast" [class.success]="t.kind === 'success'">
+            <span>{{ t.message }}</span>
+            <button type="button" class="toast-close" aria-label="Dismiss" (click)="toast.dismiss(t.id)">&times;</button>
+          </div>
         }
       </div>
       <div role="alert" aria-live="assertive" aria-atomic="false">
         @for (t of errors(); track t.id) {
-          <div class="toast error">{{ t.message }}</div>
+          <div class="toast error">
+            <span>{{ t.message }}</span>
+            <button type="button" class="toast-close" aria-label="Dismiss" (click)="toast.dismiss(t.id)">&times;</button>
+          </div>
         }
       </div>
     </div>
