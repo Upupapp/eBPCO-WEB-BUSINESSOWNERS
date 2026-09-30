@@ -10,12 +10,17 @@ import { DocumentStatus } from '../../core/domain/document.model';
  * falling through to the `?? 'badge-gray'` default below (which would have
  * been the right color by accident, not by a decision recorded anywhere).
  */
-const APPLICANT_STATUS_CLASS: Record<ApplicantStatus | 'Cancelled' | 'Released' | 'Completed' | 'Payment Verified', string> = {
+const APPLICANT_STATUS_CLASS: Record<
+  ApplicantStatus | 'Cancelled' | 'Released' | 'Completed' | 'Payment Verified' | 'Revision Required' | 'Awaiting Payment',
+  string
+> = {
   Draft: 'badge-gray',
   Submitted: 'badge-blue',
   'Under Review': 'badge-primary',
   'Payment Verification': 'badge-amber',
   'Payment Verified': 'badge-green',
+  'Revision Required': 'badge-amber',
+  'Awaiting Payment': 'badge-amber',
   Approved: 'badge-green',
   'Ready for Release': 'badge-green',
   Rejected: 'badge-red',

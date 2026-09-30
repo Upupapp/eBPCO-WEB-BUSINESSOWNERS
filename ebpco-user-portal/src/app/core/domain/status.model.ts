@@ -114,6 +114,12 @@ export function applicantStatusLabel(status: ApplicationLifecycleStatus): string
   // Admin Portal showed For Approval (found live 2026-09-28). The category
   // stays Payment Verification for the filter tab and counts.
   if (status === 'Payment Verified' || status === 'For Approval') return 'Payment Verified';
+  // The two statuses that wait on the CITIZEN say so: "Under Review" on a
+  // returned application, and "Payment Verification" on an unpaid Order, read
+  // as the office still working while it waited on them (found live
+  // 2026-09-30). Categories unchanged.
+  if (status === 'Revision Required') return 'Revision Required';
+  if (status === 'Assessed') return 'Awaiting Payment';
   return applicantStatusOf(status);
 }
 

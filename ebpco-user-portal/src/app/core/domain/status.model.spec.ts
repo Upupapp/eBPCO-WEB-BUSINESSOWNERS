@@ -9,10 +9,17 @@ describe('applicantStatusLabel', () => {
     expect(applicantStatusLabel('For Approval')).toBe('Payment Verified');
   });
 
-  it('keeps an unverified payment as Payment Verification', () => {
-    for (const s of ['Assessed', 'Payment Submitted', 'Payment Under Verification'] as const) {
+  it('keeps a submitted, unverified payment as Payment Verification', () => {
+    for (const s of ['Payment Submitted', 'Payment Under Verification'] as const) {
       expect(applicantStatusLabel(s)).toBe('Payment Verification');
     }
+  });
+
+  it('says when the application is waiting on the citizen', () => {
+    expect(applicantStatusLabel('Revision Required')).toBe('Revision Required');
+    expect(applicantStatusLabel('Assessed')).toBe('Awaiting Payment');
+    expect(applicantStatusOf('Revision Required')).toBe('Under Review');
+    expect(applicantStatusOf('Assessed')).toBe('Payment Verification');
   });
 
   it('leaves the filter category unchanged', () => {
