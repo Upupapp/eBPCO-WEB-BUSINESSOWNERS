@@ -1,6 +1,6 @@
 import { ApplicationConfig, inject, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { provideRouter, withInMemoryScrolling } from '@angular/router';
 
 import { routes } from './app.routes';
 import { citizenAuthInterceptor } from './core/api/citizen-auth.interceptor';
@@ -11,7 +11,9 @@ import { NavigationHistory } from './core/utils/navigation-history';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideRouter(routes),
+    // A new screen opens at its top, not at however far down the last one was
+    // scrolled; Back returns to where the citizen was.
+    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
     // API_BASE_URL is read at runtime from public/config.js (see
     // api-config.ts) — '' in local dev and production alike, meaning
     // same-origin, forwarded by proxy.conf.json in dev and by the host
