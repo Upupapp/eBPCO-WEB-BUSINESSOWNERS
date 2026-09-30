@@ -15,7 +15,7 @@ const doc = (over: Partial<ApplicationDocumentResponse>): ApplicationDocumentRes
   ...over,
 });
 
-function render(documents: ApplicationDocumentResponse[]) {
+function render(documents: ApplicationDocumentResponse[], returned = false) {
   // Reset first: a second configureTestingModule on an instantiated module
   // throws, and the throw surfaces as the assertion "failing" for the wrong
   // reason entirely.
@@ -23,6 +23,7 @@ function render(documents: ApplicationDocumentResponse[]) {
   TestBed.configureTestingModule({ imports: [ApplicationDocumentsComponent] });
   const fixture = TestBed.createComponent(ApplicationDocumentsComponent);
   fixture.componentRef.setInput('documents', documents);
+  fixture.componentRef.setInput('returned', returned);
   fixture.detectChanges();
   return fixture;
 }
@@ -109,6 +110,20 @@ describe('ApplicationDocuments — the office speaking to the citizen', () => {
                      doc({ reviewStatus: null }),
                      doc({ reviewStatus: 'Rejected', supersededByDocumentId: 'newer' })]) {
       expect((render([d]).nativeElement as HTMLElement).querySelector('[data-action="replace"]')).toBeNull();
+    }
+  });
+
+  it('while the application is returned, any document not yet accepted can be replaced', () => {
+    // The office's remark can name a document it never flagged ("the Valid ID
+    // is expired"); the server accepts a replacement for it, so the citizen
+    // must be offered one.
+    const unreviewed = (render([doc({ reviewStatus: null })], true).nativeElement as HTMLElement);
+    expect(unreviewed.querySelector('[data-action="replace"]')).toBeTruthy();
+
+    // Still never where the server would 409.
+    for (const d of [doc({ reviewStatus: 'Accepted' }),
+                     doc({ reviewStatus: null, supersededByDocumentId: 'newer' })]) {
+      expect((render([d], true).nativeElement as HTMLElement).querySelector('[data-action="replace"]')).toBeNull();
     }
   });
 });

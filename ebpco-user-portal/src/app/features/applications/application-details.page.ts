@@ -212,6 +212,7 @@ interface PreviewableDocument {
           <div class="card-title">Documents</div>
           <app-application-documents
             [documents]="contractDocs()"
+            [returned]="a.lifecycleStatus === 'Revision Required'"
             (replace)="onReplace($event)"
             (preview)="onPreview($event)"
           />

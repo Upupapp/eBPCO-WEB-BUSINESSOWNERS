@@ -114,6 +114,13 @@ import { formatDate } from '../../core/utils/ids';
 })
 export class ApplicationDocumentsComponent {
   readonly documents = input.required<readonly ApplicationDocumentResponse[]>();
+  /**
+   * The office returned the application for revision. Its remarks may name a
+   * document it did not flag ("the Valid ID is expired"), so while it is
+   * returned any document not yet accepted can be replaced, as the server
+   * allows; otherwise only the ones the office asked for.
+   */
+  readonly returned = input(false);
   /** The document the citizen wants to replace. */
   readonly replace = output<ApplicationDocumentResponse>();
 
@@ -130,7 +137,9 @@ export class ApplicationDocumentsComponent {
   protected readonly label = reviewLabel;
   protected readonly explain = rejectionExplanation;
   protected readonly security = securityState;
-  protected readonly canReplace = (c: DocumentChain) => canResubmit(c);
+  protected readonly canReplace = (c: DocumentChain) =>
+    canResubmit(c)
+    || (this.returned() && c.current.supersededByDocumentId === null && c.current.reviewStatus !== 'Accepted');
 
   /**
    * What the document's own expiry date says today.
