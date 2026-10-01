@@ -22,6 +22,7 @@ interface Testable {
   understandRequirements: boolean;
   agreeTerms: boolean;
   draftId(): string | null;
+  step(): number;
   uploadedDocumentIds(): Record<string, string>;
   toStep(next: 1 | 2 | 3 | 4): void;
   submit(): Promise<void>;
@@ -218,6 +219,42 @@ describe('ApplicationWizardPage — save as draft', () => {
     const slot = page.attached['lot-plan'];
     expect(slot?.kind).toBe('attached');
     expect(page.uploadedDocumentIds()['lot-plan']).toBe('doc-1');
+
+    // Every step was already done, so Continue reopens it at Review & Submit.
+    await waitUntil(() => page.step() === 4);
+  });
+
+  it('resuming opens on the first step not yet finished, not on step 1', async () => {
+    TestBed.configureTestingModule({
+      imports: [ApplicationWizardPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: API_BASE_URL, useValue: BASE },
+        { provide: ActivatedRoute, useValue: {
+            snapshot: { queryParamMap: convertToParamMap({ draft: 'draft-1' }) } } },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    const appReq = http.expectOne(`${BASE}/applications/draft-1`);
+    const docsReq = http.expectOne(`${BASE}/applications/draft-1/documents`);
+    http.expectOne(`${BASE}/documents/me`).flush([]);
+
+    // The business and details are saved; no document is attached yet.
+    appReq.flush(summaryFor({
+      permitType: 'Fencing Permit', location: '45 Bonifacio Ave', form: { scopeOfWork: 'Replace boundary fence' },
+    }));
+    docsReq.flush([]);
+    const requirementsReq = await waitForRequest(http);
+    requirementsReq.flush({
+      documents: [{ code: 'lot-plan', label: 'Lot Plan', description: '', required: true }],
+    });
+    fixture.detectChanges();
+    const page = testable(fixture.componentInstance);
+
+    await waitUntil(() => page.step() === 3);
   });
 
   it('finalizing an already-autosaved draft PATCHes then POSTs .../submit — never a second POST /applications', async () => {

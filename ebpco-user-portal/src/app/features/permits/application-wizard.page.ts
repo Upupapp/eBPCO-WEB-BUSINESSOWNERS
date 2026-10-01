@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { blankFormFor } from '../../core/domain/permit-form-assets';
+import { DraftProgress, resumeStep } from '../../core/domain/draft-resume';
 import {
   ApplicationAction, FILEABLE_PERMIT_TYPES, PermitType, RETIRED_PERMIT_TYPES, isValidPermitType,
 } from '../../core/domain/permit.model';
@@ -127,6 +128,84 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
     }
     .blank-form-link strong { color: var(--primary-600, #a5182a); }
     .blank-form-link a { font-weight: 600; }
+
+    /* Documents step: one card per document (see the template's own comment). */
+    .docs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .docs-head p { margin: 4px 0 0; }
+    .docs-progress { min-width: 190px; font-size: 13px; color: var(--gray-600); text-align: right; }
+    .docs-progress strong { color: var(--gray-900); }
+    .docs-progress-bar { height: 6px; margin-top: 6px; border-radius: 99px; background: var(--gray-100); overflow: hidden; }
+    .docs-progress-bar span { display: block; height: 100%; border-radius: 99px; background: var(--success-500); transition: width .25s ease; }
+    .req-group { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 22px 0 0; }
+    .req-group-title { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--gray-700); }
+    .req-group-hint { font-size: 13px; color: var(--gray-500); }
+    .req-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .req {
+      display: flex; gap: 14px; padding: 16px;
+      border: 1px solid var(--border-light); border-radius: var(--radius-lg); background: var(--surface);
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .req--done { border-color: #cfeedd; background: #fbfefc; }
+    .req-status {
+      flex: none; width: 28px; height: 28px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 13px; font-weight: 700; color: var(--gray-500);
+      border: 2px solid var(--gray-200); background: var(--surface);
+    }
+    .req--done .req-status { color: #fff; background: var(--success-500); border-color: var(--success-500); }
+    .req-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .req-title strong { font-size: 15px; line-height: 1.35; color: var(--gray-900); }
+    .req-desc { font-size: 13px; line-height: 1.45; color: var(--gray-500); }
+    .req-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+    .req-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .req-action { display: inline-flex; align-items: center; gap: 7px; }
+    /* Tinted rather than solid: a Building Permit lists twenty-two of these. */
+    .req-upload { background: var(--primary-50); color: var(--primary-600); border-color: var(--primary-100); }
+    .req-upload:hover:not(:disabled) { background: var(--primary-100); border-color: var(--primary-500); }
+    .req-busy { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; color: var(--gray-600); }
+    .req-spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--gray-200); border-top-color: var(--primary-500);
+      animation: req-spin .8s linear infinite;
+    }
+    @keyframes req-spin { to { transform: rotate(360deg); } }
+    .req-file {
+      display: flex; align-items: center; gap: 12px; margin-top: 4px; padding: 10px 12px;
+      border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--surface);
+    }
+    .req-file-icon { flex: none; color: var(--primary-500); }
+    .req-file-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .req-file-name {
+      all: unset; cursor: pointer; max-width: 100%;
+      font-size: 14px; font-weight: 600; color: var(--gray-900);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .req-file-name:hover:not(:disabled) { color: var(--primary-600); text-decoration: underline; }
+    .req-file-name:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 2px; border-radius: 4px; }
+    .req-file-note { font-size: 12px; color: var(--gray-500); }
+    .req-file-actions { flex: none; display: flex; gap: 4px; }
+    .reuse-panel {
+      margin-top: 2px; max-height: 264px; overflow: auto;
+      border: 1px solid var(--border-medium); border-radius: var(--radius-md);
+      background: var(--surface); box-shadow: var(--shadow-md);
+    }
+    .reuse-panel-head { padding: 9px 12px; font-size: 12px; color: var(--gray-500); border-bottom: 1px solid var(--border-light); }
+    .reuse-option {
+      all: unset; box-sizing: border-box; width: 100%; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 12px;
+    }
+    .reuse-option + .reuse-option { border-top: 1px solid var(--border-light); }
+    .reuse-option:hover, .reuse-option:focus-visible { background: var(--primary-50); }
+    .reuse-option-name { min-width: 0; font-size: 14px; font-weight: 600; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reuse-option-meta { flex: none; font-size: 12px; color: var(--gray-500); }
+    @media (max-width: 560px) {
+      .req { gap: 10px; padding: 14px; }
+      .docs-progress { text-align: left; width: 100%; }
+      .req-file { flex-wrap: wrap; }
+      .req-file-actions { width: 100%; justify-content: flex-end; }
+      .reuse-option { flex-direction: column; align-items: flex-start; gap: 2px; }
+      .reuse-option-name { white-space: normal; overflow-wrap: anywhere; }
+    }
   `],
   template: `
     <div class="page" style="max-width:760px;">
@@ -331,8 +410,29 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
 
       @if (step() === 3) {
         <div class="card">
-          <div class="card-title">Required Documents</div>
-          <p class="small muted">Accepted formats: PDF, JPG, JPEG, PNG.</p>
+          <!--
+            One card per document, each in one of three plain states: nothing
+            yet (Upload file, or Choose from My Documents), sending, or a file
+            attached (its name opens it; Replace and Remove beside it). Replaces
+            the browser's own "Choose File / No file chosen" control and an
+            "or reuse" dropdown whose placeholder was cut off mid-word, which
+            together read as two competing ways to do one thing (2026-10-01).
+          -->
+          <div class="docs-head">
+            <div>
+              <div class="card-title">Required Documents</div>
+              <p class="small muted">Upload a PDF, JPG or PNG for each one, or use a file already in My Documents.</p>
+            </div>
+            @if (requiredCount() > 0) {
+              <div class="docs-progress">
+                <span><strong>{{ requiredAttachedCount() }} of {{ requiredCount() }}</strong> required attached</span>
+                <div class="docs-progress-bar" role="progressbar" aria-label="Required documents attached"
+                     [attr.aria-valuenow]="requiredAttachedCount()" aria-valuemin="0" [attr.aria-valuemax]="requiredCount()">
+                  <span [style.width.%]="(requiredAttachedCount() / requiredCount()) * 100"></span>
+                </div>
+              </div>
+            }
+          </div>
           @if (needsExistingPermit()) {
             <!--
               Municipal ruling, 3 Sep 2026 (docs/RULING-2026-09-03-renewal-reuse.md).
@@ -343,7 +443,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               file are carried over. Neutral styling, not a warning: being asked
               for the full list is the normal case, not a problem.
             -->
-            <div class="card" style="background:var(--secondary-50); margin-bottom:12px;">
+            <div class="card" style="background:var(--secondary-50); margin:12px 0 0;">
               <strong>Your documents are already attached.</strong>
               {{ reusedCount() }} of your
               {{ applicationAction === 'Renewal' ? 'existing permit' : 'permit' }}'s documents have
@@ -351,13 +451,26 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               them with a newer copy if something has changed.
             </div>
           }
-          @for (d of documents; track d.id) {
-            <div style="padding:12px 0; border-bottom:1px solid var(--border-light);">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                <div>
-                  <span class="badge" [class]="isRequired(d) ? 'badge-req' : 'badge-opt'" style="margin-right:6px;">{{ isRequired(d) ? 'Required' : 'Optional' }}</span>
-                  <strong>{{ d.label }}</strong>
-                  @if (d.description) { <div class="small muted">{{ d.description }}</div> }
+          @for (group of documentGroups(); track group.required) {
+          <div class="req-group">
+            <span class="req-group-title">{{ group.required ? 'Required' : 'Optional' }}</span>
+            <span class="req-group-hint">
+              {{ group.required ? 'Needed before you can submit.' : 'Attach only if your project includes this work.' }}
+            </span>
+          </div>
+          <ol class="req-list">
+            @for (d of group.documents; track d.id; let i = $index) {
+              <li class="req" [class.req--done]="!!attached[d.id]">
+                <div class="req-status" aria-hidden="true">
+                  @if (attached[d.id]) {
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                  } @else {
+                    {{ i + 1 }}
+                  }
+                </div>
+                <div class="req-body">
+                  <div class="req-title"><strong>{{ d.label }}</strong></div>
+                  @if (d.description) { <div class="req-desc">{{ d.description }}</div> }
                   <!-- A document that IS a form to sign on paper: the blank one, to print, sign and upload here. -->
                   @if (blankFormFor(d.id, d.label); as form) {
                     <div class="blank-form-link">
@@ -371,101 +484,112 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                       </span>
                     </div>
                   }
-                </div>
-                @if (uploadingRequirementId() === d.id) {
-                  <span class="badge">Sending…</span>
-                } @else if (attached[d.id]; as slot) {
-                  <button
-                    type="button" class="badge badge-green"
-                    style="border:none; cursor:pointer; font:inherit;"
-                    [disabled]="previewingId() === d.id"
-                    [attr.aria-label]="'View ' + slot.fileName"
-                    (click)="previewAttached(d)"
-                  >
-                    {{ previewingId() === d.id ? 'Opening…' : slot.fileName }}
-                  </button>
-                  @if (slot.kind === 'upload' && api.configured && !uploadedDocumentIds()[d.id]) {
-                    <span class="small muted">Not sent yet</span>
-                  }
-                }
-              </div>
-              <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <!--
-                  The requirement's name lives in a <strong> above, not a
-                  <label>, so this control had no accessible name at all. It
-                  renders once per requirement — twenty-two times on a Zoning
-                  application — so a screen reader user met twenty-two identical
-                  unnamed file pickers with no way to tell which document each
-                  one was for. Named from the requirement itself so the two can
-                  never drift apart.
-                -->
-                <!--
-                  A reused document says so, and says WHEN IT WAS CERTIFIED,
-                  because that is the fact the officer needs to make the
-                  judgement the Municipal ruling leaves to them.
 
-                  Deliberately NEUTRAL: no amber, no warning icon, and nothing
-                  about age even when the document is long past its validity.
-                  The ruling is explicit that an expired reused document is
-                  accepted and that the officer decides — and a warning we add
-                  for kindness becomes a refusal the citizen believes. See
-                  docs/RULING-2026-09-03-renewal-reuse.md.
-                -->
-                @if (attached[d.id]; as slot) {
-                  @if (slot.kind === 'reused') {
-                    <div class="small muted" style="flex-basis:100%;">
-                      Reused from your previous permit@if (slot.certifiedOn) {, certified {{ formatDate(slot.certifiedOn) }}}.
+                  <!--
+                    The one file control for this document, opened by Upload
+                    file or Replace below. #fileInput is handed to Remove and
+                    to reuse so they can clear it: a file input keeps the last
+                    pick on its own, and would otherwise still hold a file
+                    that is no longer attached. Named from the requirement, so
+                    each of the (up to twenty-two) pickers says which one it is.
+                  -->
+                  <input
+                    #fileInput
+                    type="file"
+                    class="req-file-input"
+                    tabindex="-1"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    [attr.aria-label]="(attached[d.id]?.kind === 'reused' ? 'Replace ' : 'Attach ') + d.label"
+                    (change)="onFileSelected($event, d)"
+                  />
+
+                  @if (uploadingRequirementId() === d.id) {
+                    <div class="req-busy" role="status"><span class="req-spinner" aria-hidden="true"></span> Sending to the Municipality…</div>
+                  } @else if (attached[d.id]; as slot) {
+                    <div class="req-file">
+                      <svg class="req-file-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>
+                      <div class="req-file-text">
+                        <button
+                          type="button" class="req-file-name"
+                          [disabled]="previewingId() === d.id"
+                          [attr.aria-label]="'View ' + slot.fileName"
+                          [title]="slot.fileName"
+                          (click)="previewAttached(d)"
+                        >{{ previewingId() === d.id ? 'Opening…' : slot.fileName }}</button>
+                        <!--
+                          A reused document says so, and says WHEN IT WAS CERTIFIED,
+                          because that is the fact the officer needs to make the
+                          judgement the Municipal ruling leaves to them.
+
+                          Deliberately NEUTRAL: no amber, no warning icon, and nothing
+                          about age even when the document is long past its validity.
+                          The ruling is explicit that an expired reused document is
+                          accepted and that the officer decides — and a warning we add
+                          for kindness becomes a refusal the citizen believes. See
+                          docs/RULING-2026-09-03-renewal-reuse.md.
+                        -->
+                        <span class="req-file-note">
+                          @if (slot.kind === 'reused') {
+                            Reused from your previous permit@if (slot.certifiedOn) {, certified {{ formatDate(slot.certifiedOn) }}}.
+                          } @else if (slot.kind === 'attached') {
+                            Saved from where you left off.
+                          } @else if (api.configured && !uploadedDocumentIds()[d.id]) {
+                            Not sent yet
+                          } @else {
+                            Attached. Click the name to view it.
+                          }
+                        </span>
+                      </div>
+                      <div class="req-file-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" (click)="fileInput.click()">Replace</button>
+                        <button type="button" class="btn btn-ghost btn-sm" (click)="removeAttachment(d, fileInput)">Remove</button>
+                      </div>
                     </div>
-                  } @else if (slot.kind === 'attached') {
-                    <div class="small muted" style="flex-basis:100%;">Saved from where you left off.</div>
-                  }
-                }
-                <!--
-                  #fileInput is handed to Remove and to the reuse picker so
-                  they can clear it. A native file input keeps showing the
-                  last chosen filename on its own, so after "Remove" the row
-                  read "Choose File  sample.pdf" while nothing was attached —
-                  the citizen could not tell whether the removal had happened.
-                -->
-                <input
-                  #fileInput
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  [attr.aria-label]="(attached[d.id]?.kind === 'reused' ? 'Replace ' : 'Attach ') + d.label"
-                  (change)="onFileSelected($event, d)"
-                />
-                @if (reusable().length > 0) {
-                  <label [for]="'reuse-' + d.id" class="small muted">or reuse</label>
-                  <select
-                    [id]="'reuse-' + d.id"
-                    class="input"
-                    style="max-width:260px;"
-                    [ngModel]="null"
-                    [ngModelOptions]="{ standalone: true }"
-                    (ngModelChange)="reuseExisting(d, $event, fileInput)"
-                  >
-                    <option [ngValue]="null">A document you've already uploaded…</option>
-                    @for (saved of reusable(); track saved.id) {
-                      <!--
-                        The upload date is shown because it is the only thing
-                        this portal knows about a saved document's age. The
-                        library carries no expiry date, so the portal cannot say
-                        whether a document is still valid — but it can stop a
-                        citizen reusing a two-year-old clearance without ever
-                        seeing how old it was.
-                      -->
-                      <option [ngValue]="saved">{{ saved.fileName }} · uploaded {{ formatDate(saved.uploadedAt) }}</option>
+                  } @else {
+                    <div class="req-actions">
+                      <button type="button" class="btn btn-sm req-action req-upload" (click)="fileInput.click()">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></svg>
+                        Upload file
+                      </button>
+                      @if (reusable().length > 0) {
+                        <button
+                          type="button" class="btn btn-secondary btn-sm req-action"
+                          [attr.aria-expanded]="reuseOpenFor() === d.id"
+                          [attr.aria-controls]="'reuse-' + d.id"
+                          (click)="toggleReuse(d.id)"
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
+                          Choose from My Documents
+                        </button>
+                      }
+                    </div>
+                    @if (reuseOpenFor() === d.id) {
+                      <div class="reuse-panel" [id]="'reuse-' + d.id" role="group" [attr.aria-label]="'Your documents, for ' + d.label">
+                        <div class="reuse-panel-head">Pick the file to attach as “{{ d.label }}”</div>
+                        @for (saved of reusable(); track saved.id) {
+                          <!--
+                            The upload date is shown because it is the only thing
+                            this portal knows about a saved document's age. The
+                            library carries no expiry date, so the portal cannot say
+                            whether a document is still valid — but it can stop a
+                            citizen reusing a two-year-old clearance without ever
+                            seeing how old it was.
+                          -->
+                          <button type="button" class="reuse-option" (click)="pickReuse(d, saved, fileInput)">
+                            <span class="reuse-option-name">{{ saved.fileName }}</span>
+                            <span class="reuse-option-meta">Uploaded {{ formatDate(saved.uploadedAt) }}</span>
+                          </button>
+                        }
+                      </div>
                     }
-                  </select>
-                }
-                @if (attached[d.id]) {
-                  <button class="btn btn-ghost btn-sm" (click)="removeAttachment(d, fileInput)">Remove</button>
-                }
-              </div>
-            </div>
+                  }
+                </div>
+              </li>
+            }
+          </ol>
           }
           @if (error()) { <div class="field error" style="margin-top:10px;">{{ error() }}</div> }
-          <div style="display:flex; gap:10px; margin-top:14px;">
+          <div style="display:flex; gap:10px; margin-top:16px;">
             <button class="btn btn-secondary" (click)="step.set(2)">Back</button>
             <button class="btn btn-primary" (click)="toStep(4)">Continue</button>
           </div>
@@ -616,8 +740,12 @@ export class ApplicationWizardPage {
    * call fails: the static catalog is a genuine, disclosed fallback, not
    * an error state.
    */
-  private loadRealDocuments(permitType: PermitType | 'generic', applicationAction: ApplicationAction): void {
+  private loadRealDocuments(permitType: PermitType | 'generic', applicationAction: ApplicationAction): Promise<void> {
     const key = permitType === 'generic' ? 'Business Permit' : permitType;
+    // Settles once the checklist has answered (or failed), for the one
+    // caller that has to wait for it: resumeDraft(), deciding which step to open on.
+    let settle!: () => void;
+    const settled = new Promise<void>((resolve) => { settle = resolve; });
     this.api.getRequirementsForPermitType(key, applicationAction).subscribe({
       next: (result) => {
         if (result.documents.length === 0) return;
@@ -643,8 +771,10 @@ export class ApplicationWizardPage {
         this.documents = nextDocs;
         this.usingRealRequirementCodes = true;
       },
-      error: () => {},
+      error: () => settle(),
+      complete: () => settle(),
     });
+    return settled;
   }
 
   businessId: string | null = null;
@@ -931,9 +1061,10 @@ export class ApplicationWizardPage {
    * GET always would be — nothing here is reconstructed from local state,
    * because there is none: a reload is exactly the case this exists for.
    *
-   * Lands on step 1 rather than guessing which step the citizen was on —
-   * every field is pre-filled and still editable from there regardless, and
-   * guessing wrong would hide a field that needs a second look.
+   * Opens where the citizen stopped: the first step not yet finished, or
+   * Review & Submit once everything is (`resumeStep`). Decided only after the
+   * live checklist has answered, since that is what says which documents are
+   * still missing. Every field stays pre-filled and editable through Back.
    */
   private async resumeDraft(id: string): Promise<void> {
     const result = await this.applicationStore.fetchForResume(id);
@@ -972,7 +1103,7 @@ export class ApplicationWizardPage {
       this.isGeneric ? 'generic' : this.permitType!, this.applicationAction,
     );
     this.usingRealRequirementCodes = false;
-    this.loadRealDocuments(this.isGeneric ? 'generic' : this.permitType!, this.applicationAction);
+    const checklist = this.loadRealDocuments(this.isGeneric ? 'generic' : this.permitType!, this.applicationAction);
 
     // Every already-attached document came back with the requirement code
     // it answers (C-6) — re-hydrated as 'attached' rather than 'upload':
@@ -994,6 +1125,33 @@ export class ApplicationWizardPage {
     this.attached = attached;
     this.uploadedDocumentIds.set(ids);
     this.saveStatus.set('saved');
+
+    await checklist;
+    let step = resumeStep(this.draftProgress());
+    if (step >= 3) {
+      // What toStep(3) would have done on the way: a renewal's documents
+      // carried over from the permit it renews. Then asked again, since that
+      // can be what completes the list.
+      this.carryOverDocuments();
+      step = resumeStep(this.draftProgress());
+    }
+    this.step.set(step);
+  }
+
+  /** What is already done, by the same tests toStep() applies on the way forward. */
+  private draftProgress(): DraftProgress {
+    const business = this.businessId ? this.businesses.businessById(this.businessId) : undefined;
+    const proof = this.priorPermitClaim ? this.priorPermitProofRequirement() : undefined;
+    return {
+      // An unknown business (the list not loaded yet) does not hold the
+      // citizen back; one known to be inactive does, as toStep(2) would.
+      applicantDone: this.businessId !== null
+        && (business === undefined || business.status === 'Active')
+        && actionReferenceIsComplete(this.applicationAction, this.relatedPermitNumber, this.priorPermitClaim)
+        && (!proof || !!this.attached[proof.id]),
+      detailsDone: !!this.projectAddress.trim() && !!this.scopeOfWork.trim(),
+      documentsDone: this.documents.every((d) => !this.isRequired(d) || !!this.attached[d.id]),
+    };
   }
 
   reviewingOffice(): string {
@@ -1007,6 +1165,36 @@ export class ApplicationWizardPage {
 
   attachedCount(): number {
     return Object.keys(this.attached).length;
+  }
+
+  /** Required documents first, then optional ones, each under its own heading; an empty group is left out. */
+  protected documentGroups(): { required: boolean; documents: RequirementDocument[] }[] {
+    return [true, false]
+      .map((required) => ({ required, documents: this.documents.filter((d) => this.isRequired(d) === required) }))
+      .filter((group) => group.documents.length > 0);
+  }
+
+  /** The progress line over the documents: required ones only, since optional ones never hold an application back. */
+  protected requiredCount(): number {
+    return this.documents.filter((d) => this.isRequired(d)).length;
+  }
+
+  protected requiredAttachedCount(): number {
+    return this.documents.filter((d) => this.isRequired(d) && !!this.attached[d.id]).length;
+  }
+
+  /** Which document's "Choose from My Documents" list is open, if any — one at a time. */
+  protected readonly reuseOpenFor = signal<string | null>(null);
+
+  protected toggleReuse(requirementId: string): void {
+    this.reuseOpenFor.update((open) => (open === requirementId ? null : requirementId));
+  }
+
+  protected async pickReuse(
+    d: RequirementDocument, item: DocumentHistoryEntry | SavedDocument, fileInput?: HTMLInputElement,
+  ): Promise<void> {
+    this.reuseOpenFor.set(null);
+    await this.reuseExisting(d, item, fileInput);
   }
 
   async onFileSelected(event: Event, d: RequirementDocument): Promise<void> {
