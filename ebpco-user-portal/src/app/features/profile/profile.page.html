@@ -45,12 +45,39 @@
         </div>
         <p class="small muted profile-side-note">
           @if (u.emailVerification.status === 'Verified') {
-            Your email address was confirmed when you signed up.
+            Your email address is confirmed.
           } @else {
-            Your email address was not confirmed when this account was created. This does not block
-            anything here; the Municipality may confirm it with you directly.
+            Your email address has not been confirmed yet. This does not block anything here, but
+            confirming it makes sure the Municipality’s notices reach you.
           }
         </p>
+        @if (u.emailVerification.status !== 'Verified') {
+          @if (!verifyOpen()) {
+            <button type="button" class="btn btn-secondary btn-sm btn-block profile-verify-open" (click)="verifyOpen.set(true)">
+              Verify my email
+            </button>
+          } @else {
+            <div class="profile-verify" role="region" aria-label="Verify my email">
+              <p class="small">We will send a 6-digit code to <strong>{{ u.email }}</strong>. Enter it here to confirm the address is yours.</p>
+              <button type="button" class="btn btn-sm btn-block" [class.btn-primary]="!verifyCodeSent()" [class.btn-secondary]="verifyCodeSent()"
+                      [disabled]="verifySending()" (click)="sendEmailCode()">
+                {{ verifySending() ? 'Sending…' : (verifyCodeSent() ? 'Send a new code' : 'Send code') }}
+              </button>
+              @if (verifyCodeSent()) {
+                <div class="profile-verify-row">
+                  <input class="input" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code"
+                         aria-label="6-digit code" [(ngModel)]="verifyCode" (keyup.enter)="confirmEmailCode()" />
+                  <button type="button" class="btn btn-primary btn-sm" [disabled]="verifyConfirming()" (click)="confirmEmailCode()">
+                    {{ verifyConfirming() ? 'Checking…' : 'Confirm' }}
+                  </button>
+                </div>
+              }
+              @if (verifyNotice()) { <p class="small muted" style="margin:6px 0 0;">{{ verifyNotice() }}</p> }
+              @if (verifyError()) { <div class="field error" style="margin-top:6px;">{{ verifyError() }}</div> }
+              <p class="small muted" style="margin:8px 0 0;">If the code does not arrive, check your spam folder, or ask the office to confirm your email for you.</p>
+            </div>
+          }
+        }
       </div>
 
       <div class="profile-main">

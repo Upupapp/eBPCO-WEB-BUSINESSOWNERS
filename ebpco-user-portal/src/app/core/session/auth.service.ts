@@ -271,6 +271,15 @@ export class AuthService {
   }
 
   /**
+   * Re-reads `GET /me` into the session, so a change the server made shows at
+   * once: the Profile calls it after the citizen confirms their email.
+   */
+  async reloadProfile(): Promise<void> {
+    const me = await this.identity.me();
+    if (me.kind === 'applicant') this._profile.set(meResponseToAccount(me));
+  }
+
+  /**
    * Arms the background refresh for whatever time is actually left on the
    * access token, per `CitizenTokenStore.expiresInSeconds()`. Fires at 80%
    * of the remaining life (capped to a 90-second-before-expiry floor) so it

@@ -103,6 +103,26 @@
   margin: 10px 0 0;
 }
 
+.profile-verify-open { margin-top: 12px; }
+
+// Verify my email, under the email badge: send a code, then the six digits.
+.profile-verify {
+  text-align: left;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  p { margin: 0; }
+}
+
+.profile-verify-row {
+  display: flex;
+  gap: 8px;
+
+  .input { flex: 1; min-width: 0; letter-spacing: 0.12em; }
+}
+
 .profile-main {
   min-width: 0;
 }

@@ -6,6 +6,7 @@ import { TERMS_CONDITIONS_TEXT, PRIVACY_POLICY_TEXT } from '../../core/domain/le
 import { ToastService } from '../../shared/ui/toast.service';
 import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { CitizenIdentityApi } from '../../core/api/citizen-identity.api';
 import { CitizenProfile, buildRectification, heldValue, rectificationProblem } from '../../core/api/citizen-profile';
 import { ApiError } from '../../core/api/problem';
 import {
@@ -107,6 +108,67 @@ export class ProfilePage {
    * flag for its own upload/remove buttons.
    */
   protected readonly photoBusy = signal(false);
+
+  // ── Verify my email — POST /me/contacts/email/request and /confirm ────
+  //
+  // Sign-up tells a citizen who skips its code that they can verify "later
+  // from your Profile", and until now nothing here could. Same steps as
+  // sign-up's: a code to the account's own address, then the six digits.
+  // The mobile app has the same, under Profile (2026-10-01).
+  private readonly identity = inject(CitizenIdentityApi);
+  readonly verifyOpen = signal(false);
+  readonly verifySending = signal(false);
+  readonly verifyConfirming = signal(false);
+  readonly verifyCodeSent = signal(false);
+  readonly verifyNotice = signal<string | null>(null);
+  readonly verifyError = signal<string | null>(null);
+  verifyCode = '';
+
+  protected async sendEmailCode(): Promise<void> {
+    this.verifySending.set(true);
+    this.verifyNotice.set(null);
+    this.verifyError.set(null);
+    try {
+      const result = await this.identity.requestMyEmailCode();
+      if (result.kind === 'already-verified') {
+        await this.emailVerified();
+        return;
+      }
+      this.verifyCodeSent.set(result.kind === 'sent' || result.kind === 'too-soon');
+      this.verifyNotice.set(result.kind === 'sent' ? 'A 6-digit code was sent. It expires in a few minutes.' : result.detail);
+    } catch (error) {
+      this.verifyError.set(error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Check your connection and try again.');
+    } finally {
+      this.verifySending.set(false);
+    }
+  }
+
+  protected async confirmEmailCode(): Promise<void> {
+    const code = this.verifyCode.trim();
+    if (!/^\d{6}$/.test(code)) {
+      this.verifyError.set('Enter the 6-digit code exactly as sent.');
+      return;
+    }
+    this.verifyConfirming.set(true);
+    this.verifyError.set(null);
+    try {
+      const result = await this.identity.confirmMyEmailCode(code);
+      if (result.kind === 'confirmed') await this.emailVerified();
+      else this.verifyError.set(result.detail);
+    } catch (error) {
+      this.verifyError.set(error instanceof ApiError ? error.citizenMessage : 'We could not reach the Municipality’s system. Check your connection and try again.');
+    } finally {
+      this.verifyConfirming.set(false);
+    }
+  }
+
+  private async emailVerified(): Promise<void> {
+    await this.auth.reloadProfile();
+    this.verifyOpen.set(false);
+    this.verifyCodeSent.set(false);
+    this.verifyCode = '';
+    this.toast.success('Your email address is verified.');
+  }
 
   currentPassword = '';
   newPassword = '';

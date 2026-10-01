@@ -58,6 +58,19 @@ export class FakeCitizenIdentityApi {
   async confirmRegistrationEmailCode(): Promise<{ kind: 'confirmed' }> {
     return { kind: 'confirmed' };
   }
+  /** Tests: an account whose email was never confirmed. */
+  unverifyEmail(): void {
+    this.account.emailVerifiedAt = null;
+  }
+  async requestMyEmailCode(): Promise<{ kind: 'sent'; detail: string }> {
+    return { kind: 'sent', detail: 'A 6-digit code was sent.' };
+  }
+  /** `123456` is the right code; anything else is refused, as the server words it. */
+  async confirmMyEmailCode(code: string): Promise<{ kind: 'confirmed' } | { kind: 'refused'; detail: string }> {
+    if (code !== '123456') return { kind: 'refused', detail: 'That code is not right.' };
+    this.account.emailVerifiedAt = '2026-10-01T00:00:00.000Z';
+    return { kind: 'confirmed' };
+  }
   async changePassword(): Promise<{ kind: 'done' }> {
     return { kind: 'done' };
   }

@@ -278,3 +278,54 @@ describe('ProfilePage (F-25: a profile change reaches no office)', () => {
     expect(TestBed.inject(AuthService).currentUser()?.street).toBe('77 New Street, Barangay Bagumbayan');
   });
 });
+
+/**
+ * Verify my email (2026-10-01): sign-up tells a citizen who skips its code that
+ * they can verify "later from your Profile". The Profile now can, the same way
+ * the mobile app does: a code to the account's own address, then the six digits.
+ */
+describe('ProfilePage (verify my email)', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  async function setup(verified: boolean) {
+    configure();
+    const fake = TestBed.inject(CitizenIdentityApi) as unknown as FakeCitizenIdentityApi;
+    if (!verified) fake.unverifyEmail();
+    const { fixture } = await signInAndCreate();
+    return { fixture, el: fixture.nativeElement as HTMLElement };
+  }
+  const button = (el: HTMLElement, text: string) =>
+    Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes(text)) as HTMLButtonElement | undefined;
+
+  it('offers it only while the email is unconfirmed', async () => {
+    expect(button((await setup(true)).el, 'Verify my email')).toBeUndefined();
+    TestBed.resetTestingModule();
+    expect(button((await setup(false)).el, 'Verify my email')).toBeTruthy();
+  });
+
+  it('sends a code, refuses a wrong one in the words the server uses, and confirms the right one', async () => {
+    const { fixture, el } = await setup(false);
+    const stable = async () => { await fixture.whenStable(); fixture.detectChanges(); };
+
+    button(el, 'Verify my email')!.click();
+    fixture.detectChanges();
+    button(el, 'Send code')!.click();
+    await stable();
+    expect(el.textContent).toContain('A 6-digit code was sent');
+
+    const input = el.querySelector('input[aria-label="6-digit code"]') as HTMLInputElement;
+    input.value = '000000';
+    input.dispatchEvent(new Event('input'));
+    button(el, 'Confirm')!.click();
+    await stable();
+    expect(el.textContent).toContain('That code is not right.');
+
+    input.value = '123456';
+    input.dispatchEvent(new Event('input'));
+    button(el, 'Confirm')!.click();
+    await stable();
+    await stable();
+    expect(el.textContent).toContain('Email: Verified');
+    expect(button(el, 'Verify my email')).toBeUndefined();
+  });
+});

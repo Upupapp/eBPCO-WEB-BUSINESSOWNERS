@@ -143,6 +143,46 @@ export class CitizenIdentityApi {
   }
 
   /**
+   * `POST /me/contacts/email/request` — a code to the signed-in citizen's own
+   * email, for an account whose email was never confirmed. Sign-up tells a
+   * citizen who skips its code they can verify "later from your Profile"; this
+   * is that. Same `delivery` split as the registration request above; the
+   * server's 409s are a code asked for too soon, or an email already verified.
+   */
+  async requestMyEmailCode(): Promise<
+    { kind: 'sent' | 'not-sent' | 'failed'; detail: string } | { kind: 'too-soon' | 'already-verified'; detail: string }
+  > {
+    try {
+      const result = await this.post<{ delivery: 'sent' | 'not-sent' | 'failed'; detail: string }>(
+        '/me/contacts/email/request', {},
+      );
+      return { kind: result.delivery, detail: result.detail };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        const already = error.citizenMessage.toLowerCase().includes('already verified');
+        return { kind: already ? 'already-verified' : 'too-soon', detail: error.citizenMessage };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * `POST /me/contacts/email/confirm` — the six digits. On success the email is
+   * verified everywhere: `GET /me`'s `emailVerifiedAt`, and the office's record.
+   */
+  async confirmMyEmailCode(code: string): Promise<{ kind: 'confirmed' } | { kind: 'refused'; detail: string }> {
+    try {
+      await this.post('/me/contacts/email/confirm', { code });
+      return { kind: 'confirmed' };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        return { kind: 'refused', detail: error.citizenMessage };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * `POST /auth/token/refresh` — trades the stored refresh token for a new
    * access/refresh pair.
    *
