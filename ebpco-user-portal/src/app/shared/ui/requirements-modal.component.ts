@@ -2,7 +2,6 @@ import { DOCUMENT } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { ApplicationAction, PermitType } from '../../core/domain/permit.model';
 import { RequirementDocument, documentsFor, requirementsFor } from '../../core/domain/requirements-catalog';
-import { permitFormAssetFor } from '../../core/domain/permit-form-assets';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 
 const ACTIONS: readonly ApplicationAction[] = ['New', 'Renewal', 'Amendment'];
@@ -88,19 +87,6 @@ const ACTION_LABEL: Record<ApplicationAction, string> = {
             }
           </ul>
 
-          <a
-            class="small req-modal-form-link"
-            [href]="formAsset().fileName"
-            target="_blank"
-            rel="noopener"
-          >
-            Download the official blank form — {{ formAsset().label }}
-          </a>
-          @if (formAsset().isFallback) {
-            <p class="small muted" style="margin:-6px 0 0;">
-              Castilla has no dedicated form for this permit; the generic Unified Application Form is used.
-            </p>
-          }
         </div>
       </div>
     </div>
@@ -178,7 +164,6 @@ export class RequirementsModalComponent implements OnInit, AfterViewInit, OnDest
    * bound it — reading it eagerly here is what NG8118 refuses to compile.
    */
   protected readonly entry = computed(() => requirementsFor(this.permitType()));
-  protected readonly formAsset = computed(() => permitFormAssetFor(this.permitType()));
 
   /** Real checklist per action, once loaded; absent means "not asked yet or the LGU hasn't published one" — falls back to the static catalog either way. */
   private readonly real = signal<Partial<Record<ApplicationAction, RequirementDocument[]>>>({});

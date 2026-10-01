@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { blankFormFor } from '../../core/domain/permit-form-assets';
 import {
   ApplicationAction, FILEABLE_PERMIT_TYPES, PermitType, RETIRED_PERMIT_TYPES, isValidPermitType,
 } from '../../core/domain/permit.model';
@@ -345,6 +346,13 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   <span class="badge" [class]="isRequired(d) ? 'badge-req' : 'badge-opt'" style="margin-right:6px;">{{ isRequired(d) ? 'Required' : 'Optional' }}</span>
                   <strong>{{ d.label }}</strong>
                   @if (d.description) { <div class="small muted">{{ d.description }}</div> }
+                  <!-- A document that IS a form to sign on paper: the blank one, to print, sign and upload here. -->
+                  @if (blankFormFor(d.id, d.label); as form) {
+                    <div class="small" style="margin-top:4px;">
+                      <a [href]="form.fileName" target="_blank" rel="noopener">Get the blank form</a>
+                      <span class="muted"> — {{ form.label }}@if (form.isReferenceTemplate) {, a reference template (Castilla has not published its own)}</span>
+                    </div>
+                  }
                 </div>
                 @if (uploadingRequirementId() === d.id) {
                   <span class="badge">Sending…</span>
@@ -505,6 +513,8 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
   `,
 })
 export class ApplicationWizardPage {
+  /** The blank form a document row asks the citizen to sign and upload, if it is one. */
+  protected readonly blankFormFor = blankFormFor;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   protected readonly businesses = inject(BusinessStore);

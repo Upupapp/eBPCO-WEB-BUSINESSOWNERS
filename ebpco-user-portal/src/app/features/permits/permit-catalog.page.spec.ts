@@ -4,68 +4,54 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { PermitCatalogPage } from './permit-catalog.page';
 import { PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
-import { permitFormAssetFor } from '../../core/domain/permit-form-assets';
+import { ALL_BLANK_FORMS, blankFormFor } from '../../core/domain/permit-form-assets';
 
 /**
- * Guards F-13: `permit-form-assets.ts` mapped every permit type to the
- * Municipality's own blank form, and NOTHING imported it. 13 of the 14 bundled
- * PDFs were unreachable from any screen — only the Unified Application Form
- * was, via a hard-coded href on the permit document page.
- *
- * The files existed and every path resolved, which is exactly why a
- * file-existence check missed it: a file existing is not the feature working.
- * These assertions are about REACHABILITY.
+ * Blank forms (2026-10-01): offered only where a requirement asks the citizen
+ * to fill one in and upload it, the Building Permit's Unified Building Permit
+ * Form and its ancillary forms. Every other permit is filed online, so Permit
+ * Services offers no form download; the link sits on the document row. The
+ * mobile app does the same.
  */
 const ALL_TYPES = PERMIT_TYPE_GROUPS.flatMap((g) => g.types) as PermitType[];
 
-describe('Permit form assets (F-13: bundled forms must be reachable)', () => {
-  it('covers every permit type the catalogue offers', () => {
-    expect(ALL_TYPES.length).toBeGreaterThan(0);
-    for (const type of ALL_TYPES) {
-      const asset = permitFormAssetFor(type);
-      expect(asset).toBeTruthy();
-      expect(asset.fileName).toContain('assets/permit-forms/');
-      expect(asset.label.length).toBeGreaterThan(0);
-    }
+describe('Blank forms: only where a document asks for one', () => {
+  const FORM_CODES = [
+    'bpnc-unified-form', 'bpnc-ancillary-electrical', 'bpnc-ancillary-fencing', 'bpnc-ancillary-architectural',
+    'bpnc-ancillary-sanitary-plumbing', 'bpnc-ancillary-mechanical', 'bpnc-ancillary-civil-structural',
+    'bpnc-ancillary-excavation', 'bpnc-ancillary-electronics',
+  ];
+
+  it('the Unified Building Permit Form and each ancillary form have their blank form, by code', () => {
+    for (const code of FORM_CODES) expect(blankFormFor(code), code).not.toBeNull();
   });
 
-  it('reaches more than just the Unified Application Form', () => {
-    // The regression this guards: everything collapsing back to one hard-coded
-    // href, leaving the other bundled forms stranded.
-    const distinct = new Set(ALL_TYPES.map((t) => permitFormAssetFor(t).fileName));
-    expect(distinct.size).toBeGreaterThan(1);
+  it('finds it by label for the built-in catalog, and nothing for a document that is not a form', () => {
+    expect(blankFormFor('some-other-id', 'Unified Building Permit Form')).not.toBeNull();
+    expect(blankFormFor('bpnc-valid-id', 'Valid ID')).toBeNull();
+    expect(blankFormFor(null, null)).toBeNull();
   });
 
-  it('renders a working download link once a permit\'s requirements popup is open', () => {
-    // The defect was a module nobody imported, so assert the RENDER, not the
-    // presence of the mapping. Reading the compiled template as a string does
-    // not work — Angular compiles it to a function.
+  it('links every form under the served folder, once each, and labels the Architectural one a reference template', () => {
+    for (const form of ALL_BLANK_FORMS) expect(form.fileName.startsWith('assets/permit-forms/'), form.fileName).toBe(true);
+    expect(new Set(ALL_BLANK_FORMS.map((f) => f.fileName)).size).toBe(ALL_BLANK_FORMS.length);
+    expect(blankFormFor('bpnc-ancillary-architectural')!.isReferenceTemplate).toBe(true);
+    expect(blankFormFor('bpnc-unified-form')!.isReferenceTemplate).toBe(false);
+  });
+
+  it('the requirements popup of a permit offers no form download', () => {
     TestBed.configureTestingModule({
       imports: [PermitCatalogPage],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     const fixture = TestBed.createComponent(PermitCatalogPage);
     fixture.detectChanges();
-
-    // Deliberately NOT ALL_TYPES[0]: the first type is a Building Permit whose
-    // form IS the Unified Application Form, so a regression that collapses every
-    // link back to that one hard-coded href would still pass. Pick a type whose
-    // form is distinct, or this test cannot fail.
-    const type = ALL_TYPES.find(
-      (t) => !permitFormAssetFor(t).fileName.includes('unified-application-form'),
-    )!;
-    expect(type).toBeTruthy();
-    (fixture.componentInstance as unknown as { openRequirements(t: PermitType): void }).openRequirements(type);
+    (fixture.componentInstance as unknown as { openRequirements(t: PermitType): void }).openRequirements(ALL_TYPES[0]);
     fixture.detectChanges();
-
-    // RequirementsModalComponent re-parents itself onto <body> (same reason
-    // LegalModalComponent does — see its own doc comment), so the popup's
-    // content lives outside this fixture's own element.
     const links = [...document.body.querySelectorAll('a[href]')]
       .map((a) => a.getAttribute('href') ?? '')
       .filter((href) => href.includes('assets/permit-forms/'));
-
-    expect(links).toContain(permitFormAssetFor(type).fileName);
+    expect(links).toEqual([]);
     TestBed.resetTestingModule();
   });
 });

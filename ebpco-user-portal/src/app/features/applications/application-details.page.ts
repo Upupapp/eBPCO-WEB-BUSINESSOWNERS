@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { blankFormFor } from '../../core/domain/permit-form-assets';
 import { firstValueFrom } from 'rxjs';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
@@ -184,7 +185,12 @@ interface PreviewableDocument {
             <ul style="list-style:none; padding:0; margin:0;">
               @for (req of missingRequired(); track req.id) {
                 <li style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border-light);">
-                  <span>{{ req.label }}@if (!req.required) { <span class="small muted"> (optional)</span> }</span>
+                  <span>
+                    {{ req.label }}@if (!req.required) { <span class="small muted"> (optional)</span> }
+                    @if (blankFormFor(req.id, req.label); as form) {
+                      <span class="small" style="display:block;"><a [href]="form.fileName" target="_blank" rel="noopener">Get the blank form</a></span>
+                    }
+                  </span>
                   <span>
                     <input
                       type="file"
@@ -255,6 +261,8 @@ interface PreviewableDocument {
   `,
 })
 export class ApplicationDetailsPage {
+  /** The blank form a missing document asks the citizen to sign and upload, if it is one. */
+  protected readonly blankFormFor = blankFormFor;
   private readonly route = inject(ActivatedRoute);
   protected readonly store = inject(ApplicationStore);
   private readonly toast = inject(ToastService);

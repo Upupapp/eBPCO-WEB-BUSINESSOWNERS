@@ -279,11 +279,6 @@ interface QrCell {
           </article>
         }
 
-        <div class="no-print" style="text-align:center; margin-top:16px;">
-          <a [href]="'assets/permit-forms/unified-application-form.pdf'" target="_blank" rel="noopener" class="small">
-            View the blank reference application form (not your personalized permit)
-          </a>
-        </div>
       </div>
     } @else {
       <div class="page">

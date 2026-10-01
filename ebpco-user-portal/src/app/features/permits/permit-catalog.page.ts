@@ -3,7 +3,6 @@ import { Router, RouterLink } from '@angular/router';
 import { BFP_FSIS_URL, PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
 import { REQUIREMENTS_CATALOG } from '../../core/domain/requirements-catalog';
 import { BusinessStore } from '../../core/stores/business.store';
-import { permitFormAssetFor } from '../../core/domain/permit-form-assets';
 import { permitVisual } from '../../core/domain/permit-visual';
 import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.component';
 
@@ -179,7 +178,6 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
   ],
 })
 export class PermitCatalogPage {
-  protected readonly formAsset = permitFormAssetFor;
   protected readonly permitVisual = permitVisual;
   protected readonly businesses = inject(BusinessStore);
   private readonly router = inject(Router);
