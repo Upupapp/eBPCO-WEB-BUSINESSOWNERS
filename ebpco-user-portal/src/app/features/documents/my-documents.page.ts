@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DocumentLibraryStore } from '../../core/stores/document-library.store';
 import { SAVED_DOCUMENT_CATEGORY_LABELS, SavedDocument, SavedDocumentCategory, SavedDocumentFileType } from '../../core/domain/document.model';
 import { DocumentPreviewComponent } from '../../shared/ui/document-preview.component';
+import { DocumentThumbnailComponent } from '../../shared/ui/document-thumbnail.component';
 import { ConfirmModalComponent } from '../../shared/ui/confirm-modal.component';
 import { formatDate } from '../../core/utils/ids';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -40,7 +41,7 @@ interface RealPreview {
  */
 @Component({
   selector: 'app-my-documents',
-  imports: [FormsModule, DocumentPreviewComponent, ConfirmModalComponent],
+  imports: [FormsModule, DocumentPreviewComponent, DocumentThumbnailComponent, ConfirmModalComponent],
   template: `
     <div class="page">
       <div class="page-header">
@@ -87,6 +88,8 @@ interface RealPreview {
           <div class="doc-grid">
             @for (d of visibleRealDocuments(); track d.id) {
               <div class="doc-card">
+                <app-document-thumbnail class="doc-thumb" [documentId]="d.id" [fileName]="d.fileName"
+                  [kind]="fileTypeOf(d) === 'pdf' ? 'pdf' : 'img'" (open)="viewReal(d)" />
                 <div class="doc-card-top">
                   <span class="doc-type-chip" [class.doc-type-chip--image]="fileTypeOf(d) !== 'pdf'">
                     {{ fileTypeOf(d) === 'pdf' ? 'PDF' : 'IMG' }}
@@ -264,6 +267,12 @@ interface RealPreview {
       border-radius: var(--radius-lg, 12px);
       padding: 16px;
       transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+    }
+    /* The preview fills the top of the card, edge to edge. */
+    .doc-thumb {
+      margin: -16px -16px 8px;
+      border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+      overflow: hidden;
     }
     .doc-card:hover {
       border-color: var(--border-medium, #e6e6ec);

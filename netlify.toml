@@ -114,3 +114,11 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     # No camera/mic/geolocation/USB anywhere in this app.
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), usb=()"
+
+# pdf.js's worker (My Documents previews) is an ES module, `.mjs`. A browser
+# starts a module worker only from a JavaScript content type, so it is stated
+# here rather than left to the host's guess for the extension.
+[[headers]]
+  for = "/pdfjs/*"
+  [headers.values]
+    Content-Type = "text/javascript; charset=utf-8"
