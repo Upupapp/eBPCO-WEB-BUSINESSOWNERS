@@ -12,15 +12,18 @@
  * mobile app does the same (its `permit_forms.dart`).
  *
  * The files under `public/assets/permit-forms/` are byte for byte the admin
- * portal's `public/assets/permits/`. The Architectural form is a generic
- * reference template, as on the admin portal and the app: Castilla has not
- * published its own, and the link says so.
+ * portal's `public/assets/permits/`. The Architectural form is another
+ * city's (Puerto Princesa's), a reference template as on the admin portal and
+ * the app: Castilla has not published its own, and the link says so. Every
+ * other form's printed heading names the Municipality of Castilla.
  */
 export interface BlankForm {
   /** Relative to the site root. */
   fileName: string;
-  /** The document's own title. */
+  /** The form's own heading and NBC form number, as printed on it (read off each PDF's first page, 2026-10-01). */
   label: string;
+  /** The name it downloads under: the form's, the same as the mobile app's. */
+  downloadName: string;
   /** A generic reference template standing in for a form Castilla has not published. */
   isReferenceTemplate: boolean;
 }
@@ -30,23 +33,23 @@ const dir = 'assets/permit-forms';
 /** Requirement code (the server's) and label (shared with the static catalog), and the form each asks for. */
 const BLANK_FORMS: ReadonlyArray<{ code: string; requirementLabel: string; form: BlankForm }> = [
   { code: 'bpnc-unified-form', requirementLabel: 'Unified Building Permit Form',
-    form: { fileName: `${dir}/unified-application-form.pdf`, label: 'Unified Application Form for Building Permit', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/unified-application-form.pdf`, label: 'Unified Application Form for Building Permit', downloadName: 'Unified Application Form for Building Permit.pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-electrical', requirementLabel: 'Electrical Permit (ancillary application form)',
-    form: { fileName: `${dir}/electrical-form.pdf`, label: 'Electrical Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/electrical-form.pdf`, label: 'Electrical Permit Form (NBC Form No. A-03)', downloadName: 'Electrical Permit Form (NBC A-03).pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-fencing', requirementLabel: 'Fencing Permit (ancillary application form)',
-    form: { fileName: `${dir}/fencing-permit-form.pdf`, label: 'Fencing Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/fencing-permit-form.pdf`, label: 'Fencing Permit Form (NBC Form No. B-03)', downloadName: 'Fencing Permit Form (NBC B-03).pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-architectural', requirementLabel: 'Architectural Permit (ancillary application form)',
-    form: { fileName: `${dir}/architectural-form.pdf`, label: 'Architectural Permit Form', isReferenceTemplate: true } },
+    form: { fileName: `${dir}/architectural-form.pdf`, label: 'Architectural Permit Form (reference template)', downloadName: 'Architectural Permit Form (reference template).pdf', isReferenceTemplate: true } },
   { code: 'bpnc-ancillary-sanitary-plumbing', requirementLabel: 'Sanitary/Plumbing Permit (ancillary application form)',
-    form: { fileName: `${dir}/sanitary-form.pdf`, label: 'Sanitary Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/sanitary-form.pdf`, label: 'Sanitary Permit Form (NBC Form No. A-05)', downloadName: 'Sanitary Permit Form (NBC A-05).pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-mechanical', requirementLabel: 'Mechanical Permit (ancillary application form)',
-    form: { fileName: `${dir}/mechanical-form.pdf`, label: 'Mechanical Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/mechanical-form.pdf`, label: 'Mechanical Permit Form (NBC Form No. A-04)', downloadName: 'Mechanical Permit Form (NBC A-04).pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-civil-structural', requirementLabel: 'Civil/Structural Permit (ancillary application form)',
-    form: { fileName: `${dir}/structural-form.pdf`, label: 'Structural Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/structural-form.pdf`, label: 'Civil/Structural Permit Form (NBC Form No. A-02)', downloadName: 'Civil-Structural Permit Form (NBC A-02).pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-excavation', requirementLabel: 'Excavation Permit (ancillary application form)',
-    form: { fileName: `${dir}/excavation-form.pdf`, label: 'Excavation Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/excavation-form.pdf`, label: 'Excavation and Ground Preparation Permit Form (NBC Form No. B-02)', downloadName: 'Excavation and Ground Preparation Permit Form (NBC B-02).pdf', isReferenceTemplate: false } },
   { code: 'bpnc-ancillary-electronics', requirementLabel: 'Electronics Permit (ancillary application form)',
-    form: { fileName: `${dir}/electronics-form.pdf`, label: 'Electronics Permit Form', isReferenceTemplate: false } },
+    form: { fileName: `${dir}/electronics-form.pdf`, label: 'Electronics Permit Form (NBC Form No. A-07)', downloadName: 'Electronics Permit Form (NBC A-07).pdf', isReferenceTemplate: false } },
 ];
 
 /** Every form the portal serves. */

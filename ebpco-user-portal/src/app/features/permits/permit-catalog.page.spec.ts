@@ -39,6 +39,14 @@ describe('Blank forms: only where a document asks for one', () => {
     expect(blankFormFor('bpnc-unified-form')!.isReferenceTemplate).toBe(false);
   });
 
+  it('downloads each form under its own name, the same as the mobile app', () => {
+    for (const form of ALL_BLANK_FORMS) {
+      expect(form.downloadName.endsWith('.pdf'), form.label).toBe(true);
+      expect(form.downloadName.includes('/'), form.label).toBe(false);
+    }
+    expect(blankFormFor('bpnc-unified-form')!.downloadName).toBe('Unified Application Form for Building Permit.pdf');
+  });
+
   it('the requirements popup of a permit offers no form download', () => {
     TestBed.configureTestingModule({
       imports: [PermitCatalogPage],

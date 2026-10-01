@@ -188,7 +188,11 @@ interface PreviewableDocument {
                   <span>
                     {{ req.label }}@if (!req.required) { <span class="small muted"> (optional)</span> }
                     @if (blankFormFor(req.id, req.label); as form) {
-                      <span class="small" style="display:block;"><a [href]="form.fileName" target="_blank" rel="noopener">Get the blank form</a></span>
+                      <span class="small" style="display:block; margin-top:2px;">
+                        Blank form: {{ form.label }} &middot;
+                        <a [href]="form.fileName" target="_blank" rel="noopener">View</a> &middot;
+                        <a [href]="form.fileName" [attr.download]="form.downloadName">Download</a>
+                      </span>
                     }
                   </span>
                   <span>

@@ -116,6 +116,18 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
 @Component({
   selector: 'app-application-wizard',
   imports: [FormsModule, RouterLink, CapitalizeNameDirective, LegalModalComponent, DocumentPreviewComponent],
+  // The blank form on a document row that is a form, set apart like the
+  // mobile app's: a tinted box with room around it, the form's own name, and
+  // View and Download.
+  styles: [`
+    .blank-form-link {
+      display: flex; flex-direction: column; gap: 2px;
+      margin: 10px 0 2px; padding: 10px 12px;
+      background: var(--primary-50); border: 1px solid var(--primary-100); border-radius: var(--radius-md);
+    }
+    .blank-form-link strong { color: var(--primary-600, #a5182a); }
+    .blank-form-link a { font-weight: 600; }
+  `],
   template: `
     <div class="page" style="max-width:760px;">
       <div class="page-header">
@@ -348,9 +360,15 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
                   @if (d.description) { <div class="small muted">{{ d.description }}</div> }
                   <!-- A document that IS a form to sign on paper: the blank one, to print, sign and upload here. -->
                   @if (blankFormFor(d.id, d.label); as form) {
-                    <div class="small" style="margin-top:4px;">
-                      <a [href]="form.fileName" target="_blank" rel="noopener">Get the blank form</a>
-                      <span class="muted"> — {{ form.label }}@if (form.isReferenceTemplate) {, a reference template (Castilla has not published its own)}</span>
+                    <div class="blank-form-link">
+                      <span class="small muted">Blank form to print and sign</span>
+                      <strong class="small">{{ form.label }}</strong>
+                      @if (form.isReferenceTemplate) { <span class="small muted">Castilla has not published its own; this one shows what will be asked.</span> }
+                      <span class="small">
+                        <a [href]="form.fileName" target="_blank" rel="noopener">View</a>
+                        &middot;
+                        <a [href]="form.fileName" [attr.download]="form.downloadName">Download</a>
+                      </span>
                     </div>
                   }
                 </div>
