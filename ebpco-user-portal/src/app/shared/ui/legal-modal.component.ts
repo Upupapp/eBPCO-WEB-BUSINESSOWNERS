@@ -1,6 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { AfterViewInit, Component, ElementRef, OnDestroy, computed, inject, input, output } from '@angular/core';
-import { PRIVACY_POLICY_SECTIONS, TERMS_CONDITIONS_TEXT } from '../../core/domain/legal-copy';
+import { PRIVACY_POLICY_SECTIONS, TERMS_SECTIONS } from '../../core/domain/legal-copy';
 
 export type LegalDocument = 'terms' | 'privacy';
 
@@ -40,17 +40,13 @@ export type LegalDocument = 'terms' | 'privacy';
           </button>
         </div>
         <div class="legal-modal-body">
-          @if (document() === 'terms') {
-            <p>{{ terms }}</p>
-          } @else {
-            @for (section of sections; track section.heading) {
-              <div style="margin-bottom:14px;">
-                <div class="card-title">{{ section.heading }}</div>
-                @for (paragraph of section.paragraphs; track paragraph) {
-                  <p class="small" style="margin:0 0 8px;">{{ paragraph }}</p>
-                }
-              </div>
-            }
+          @for (section of (document() === 'terms' ? termsSections : sections); track section.heading) {
+            <div style="margin-bottom:14px;">
+              <div class="card-title">{{ section.heading }}</div>
+              @for (paragraph of section.paragraphs; track paragraph) {
+                <p class="small" style="margin:0 0 8px;">{{ paragraph }}</p>
+              }
+            </div>
           }
         </div>
       </div>
@@ -91,9 +87,9 @@ export class LegalModalComponent implements AfterViewInit, OnDestroy {
   readonly document = input.required<LegalDocument>();
   readonly close = output<void>();
 
-  readonly title = computed(() => (this.document() === 'terms' ? 'Terms & Conditions' : 'Privacy Policy'));
+  readonly title = computed(() => (this.document() === 'terms' ? 'Terms & Conditions' : 'Privacy Notice'));
 
-  readonly terms = TERMS_CONDITIONS_TEXT;
+  readonly termsSections = TERMS_SECTIONS;
   readonly sections = PRIVACY_POLICY_SECTIONS;
 
   private readonly elementRef = inject(ElementRef<HTMLElement>);

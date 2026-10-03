@@ -146,7 +146,7 @@ describe('Renewal and amendment reuse (Municipal ruling)', () => {
     expect(page.error()).toBeNull();
   });
 
-  it('REPLACING a reused document does not inherit its certification date', () => {
+  it('REPLACING a reused document does not inherit its certification date', async () => {
     // Named by citizen-mobile in #0387, and it was missing from my
     // implementation though not from my proposal. The natural implementation
     // copies the record and swaps the file, and the admin note would then read
@@ -160,7 +160,7 @@ describe('Renewal and amendment reuse (Municipal ruling)', () => {
 
     const requirement = page.documents.find((d) => d.id === reqId)!;
     const fresh = new File([new Uint8Array([1, 2, 3])], 'new-scan.pdf', { type: 'application/pdf' });
-    page.onFileSelected({ target: { files: [fresh] } } as unknown as Event, requirement);
+    await page.onFileSelected({ target: { files: [fresh] } } as unknown as Event, requirement);
 
     const after = page.attached[reqId];
     expect(after.kind).toBe('upload');
@@ -171,14 +171,14 @@ describe('Renewal and amendment reuse (Municipal ruling)', () => {
     expect(after.supersedesDocumentId).toBe(before.documentId);
   });
 
-  it('the replacement reaches the store with NO certification date', () => {
+  it('the replacement reaches the store with NO certification date', async () => {
     startRenewal();
     const entry = Object.entries(page.attached).find(([, a]) => a.kind === 'reused')!;
     const [reqId, before] = entry;
     if (before.kind !== 'reused') throw new Error('expected a reused slot');
     const requirement = page.documents.find((d) => d.id === reqId)!;
     const fresh = new File([new Uint8Array([4, 5, 6])], 'new-scan.pdf', { type: 'application/pdf' });
-    page.onFileSelected({ target: { files: [fresh] } } as unknown as Event, requirement);
+    await page.onFileSelected({ target: { files: [fresh] } } as unknown as Event, requirement);
 
     const record = store.createDraft({
       businessId: 'biz-1', businessName: 'Test', permitType: 'Zoning / Locational Clearance',

@@ -20,6 +20,7 @@ import { toContractShape } from './demo-document.adapter';
 import { ApplicationDocumentResponse, InstructionLetter, TimelineEntryResponse } from '../../core/api/citizen-api.models';
 import { duplicateOf } from '../../core/api/problem';
 import { BackLinkComponent } from '../../shared/ui/back-link.component';
+import { ApplicationRecord } from '../../core/domain/application.model';
 
 /** Same extension-sniffing fallback as my-documents.page.ts / application-wizard.page.ts. */
 function fileTypeFromName(name: string): SavedDocumentFileType {
@@ -58,14 +59,27 @@ interface PreviewableDocument {
         </div>
 
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <strong>Progress</strong>
-            <span class="small muted">{{ progressPct(a.lifecycleStatus) }}%</span>
-          </div>
-          <div style="height:8px; background:var(--gray-100); border-radius:99px; overflow:hidden; margin-bottom:12px;">
-            <div style="height:100%; background:var(--primary-500);" [style.width.%]="progressPct(a.lifecycleStatus)"></div>
-          </div>
-          <p class="small" style="color:var(--gray-700);">{{ store.nextStepText(a.lifecycleStatus) }}</p>
+          <!--
+            A withdrawn, rejected or expired application has no progress to
+            show: it read "Cancelled · 100%" under a full bar (QA TC-34,
+            2026-10-03). It says how it ended, and when, instead.
+          -->
+          @if (closedAs(a.lifecycleStatus); as closed) {
+            <strong>{{ closed.title }}</strong>
+            <p class="small" style="color:var(--gray-700); margin:6px 0 0;">
+              @if (closedOn(a.lifecycleStatus); as on) { {{ closed.verb }} on {{ formatDate(on) }}. }
+              {{ closed.detail }}
+            </p>
+          } @else {
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <strong>Progress</strong>
+              <span class="small muted">{{ progressPct(a.lifecycleStatus) }}%</span>
+            </div>
+            <div style="height:8px; background:var(--gray-100); border-radius:99px; overflow:hidden; margin-bottom:12px;">
+              <div style="height:100%; background:var(--primary-500);" [style.width.%]="progressPct(a.lifecycleStatus)"></div>
+            </div>
+            <p class="small" style="color:var(--gray-700);">{{ store.nextStepText(a.lifecycleStatus) }}</p>
+          }
 
           @if (!isTerminal(a.lifecycleStatus) && !store.isReal(a.id)) {
             <button class="btn btn-secondary btn-sm" (click)="advance(a.id)">Demo: Simulate Office Update</button>
@@ -129,6 +143,20 @@ interface PreviewableDocument {
           }
         </div>
 
+        <!-- What the citizen entered in the Details step (QA TC-23): staff saw it, the citizen never did. -->
+        @if (projectDetails(a); as details) {
+          <div class="card">
+            <div class="card-title">Project Details</div>
+            <table class="table">
+              <tbody>
+                @for (row of details; track row.label) {
+                  <tr><td class="muted" style="width:40%;">{{ row.label }}</td><td style="white-space:pre-line;">{{ row.value }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
         @if (permit(); as p) {
           <div class="card" style="background:var(--success-100); border:none;">
             <strong style="color:var(--success-text)">Your permit has been issued</strong>
@@ -149,6 +177,9 @@ interface PreviewableDocument {
         @if (fees(); as asmt) {
           <div class="card">
             <div class="card-title">Assessment (Order of Payment){{ asmt.opsNumber ? ' · ' + asmt.opsNumber : '' }}</div>
+            @if (asmt.dueDate) {
+              <p class="small muted" style="margin:-4px 0 8px;">Pay on or before <strong>{{ formatDate(asmt.dueDate) }}</strong>.</p>
+            }
             <table class="table">
               <thead><tr><th>Fee</th><th>Amount</th></tr></thead>
               <tbody>
@@ -159,20 +190,31 @@ interface PreviewableDocument {
             </table>
             <hr class="divider" />
             <div style="display:flex; justify-content:space-between;"><strong>Total</strong><strong>{{ pesos(asmt.totalCentavos) }}</strong></div>
-            <div style="display:flex; justify-content:space-between;" class="small muted"><span>Balance</span><span>{{ pesos(asmt.balanceCentavos) }}</span></div>
-            @if (asmt.canPay) {
-              <a class="btn btn-primary btn-sm" style="margin-top:10px;" [routerLink]="['/payments', a.id]">Pay Now</a>
-            } @else if (asmt.pendingVerification) {
+            <div style="display:flex; justify-content:space-between;" class="small muted">
+              <span>Balance</span>
+              <span>{{ pesos(asmt.balanceCentavos) }}@if (asmt.pendingVerification) { — pending verification }</span>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+              @if (asmt.canPay) {
+                <a class="btn btn-primary btn-sm" [routerLink]="['/payments', a.id]">Pay Now</a>
+              }
+              @if (asmt.opsNumber) {
+                <a class="btn btn-secondary btn-sm" [routerLink]="['/payments', a.id, 'order']">Print Order of Payment</a>
+              }
+            </div>
+            @if (asmt.pendingVerification) {
               <p class="small muted" style="margin-top:10px;">Your payment is waiting for the Cashier to verify it.</p>
             }
           </div>
         }
 
-        <app-permit-release
-          [permitNumber]="permit()?.permitNumber ?? null"
-          [issuedDate]="permit() ? formatDate(permit()!.issuedDate) : null"
-          [release]="release()"
-        />
+        @if (!closedAs(a.lifecycleStatus)) {
+          <app-permit-release
+            [permitNumber]="permit()?.permitNumber ?? null"
+            [issuedDate]="permit() ? formatDate(permit()!.issuedDate) : null"
+            [release]="release()"
+          />
+        }
 
         @if (missingRequired().length > 0) {
           <div class="card" style="border:1px solid var(--danger-200, #f5c2c7); background:var(--danger-50, #fff5f5);">
@@ -403,7 +445,7 @@ export class ApplicationDetailsPage {
   protected fees(): {
     lineItems: { code: string; name: string; amountCentavos: number | null }[];
     totalCentavos: number; balanceCentavos: number; opsNumber: string | null;
-    canPay: boolean; pendingVerification: boolean;
+    canPay: boolean; pendingVerification: boolean; dueDate: string | null;
   } | null {
     const a = this.app();
     const real = this.store.orderOfPaymentFor(this.id());
@@ -417,8 +459,10 @@ export class ApplicationDetailsPage {
           { code: 'structural', name: 'Structural Fee', amountCentavos: real.fees.structural },
           { code: 'electrical', name: 'Electrical Fee', amountCentavos: real.fees.electrical },
           { code: 'others', name: 'Other Fees', amountCentavos: real.fees.others },
-        ],
+        // Only the fees that apply: ₱0.00 lines beside the real ones read as charges (QA TC-05).
+        ].filter((line) => line.amountCentavos > 0),
         totalCentavos: real.totalCentavos,
+        dueDate: real.dueDate ?? null,
         balanceCentavos: paid ? 0 : real.totalCentavos,
         opsNumber: real.number,
         canPay: a.paymentStatus === 'Not Yet Available' || a.paymentStatus === 'Overdue',
@@ -429,8 +473,54 @@ export class ApplicationDetailsPage {
     if (!demo) return null;
     return {
       lineItems: demo.lineItems, totalCentavos: demo.totalCentavos, balanceCentavos: demo.balanceCentavos,
-      opsNumber: demo.opsNumber, canPay: demo.balanceCentavos > 0, pendingVerification: false,
+      opsNumber: demo.opsNumber, canPay: demo.balanceCentavos > 0, pendingVerification: false, dueDate: null,
     };
+  }
+
+  /**
+   * How a closed application ended, for the card that replaces its progress
+   * bar (QA TC-34); null while it is still open.
+   */
+  protected closedAs(status: string): { title: string; verb: string; detail: string } | null {
+    switch (status) {
+      case 'Cancelled':
+        return {
+          title: 'Withdrawn', verb: 'Withdrawn',
+          detail: 'The Municipality will not process this application further. You can file a new application at any time.',
+        };
+      case 'Rejected':
+        return {
+          title: 'Not approved', verb: 'Rejected',
+          detail: 'The office\'s reasons are on the timeline below. You can file a new application at any time.',
+        };
+      case 'Expired':
+        return {
+          title: 'Expired', verb: 'Expired',
+          detail: 'This application lapsed without being completed. You can file a new application at any time.',
+        };
+      default:
+        return null;
+    }
+  }
+
+  /** When the application reached its closing status, from its own timeline. */
+  protected closedOn(status: string): string | null {
+    const entries = this.realTimeline() ?? [];
+    const last = [...entries].reverse().find((entry) => entry.status === status);
+    return last?.occurredAt ?? null;
+  }
+
+  /** The Details step's answers, labelled; null when none were given. */
+  protected projectDetails(a: ApplicationRecord): { label: string; value: string }[] | null {
+    const form = a.form ?? {};
+    const text = (key: string): string => (typeof form[key] === 'string' ? (form[key] as string).trim() : '');
+    const rows = [
+      { label: 'Project / Business Address', value: (a.location ?? '').trim() },
+      { label: 'Scope of Work / Purpose', value: text('scopeOfWork') },
+      { label: 'Professional in Charge', value: text('professionalName') },
+      { label: 'PRC License No.', value: text('prcNumber') },
+    ].filter((row) => row.value !== '');
+    return rows.length > 0 ? rows : null;
   }
 
   /** Re-fetches `realTimeline` after a real write on this application (e.g. `cancel()`) — otherwise the Status Timeline kept showing its pre-write history until the next full page reload. */

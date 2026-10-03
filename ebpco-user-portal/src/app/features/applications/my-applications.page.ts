@@ -2,10 +2,39 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApplicationStore } from '../../core/stores/application.store';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { ApplicantStatus, applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
+import { ApplicationLifecycleStatus, applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
+import { ApplicationRecord } from '../../core/domain/application.model';
 import { formatDate } from '../../core/utils/ids';
 
-const FILTERS: (ApplicantStatus | 'All')[] = ['All', 'Draft', 'Submitted', 'Under Review', 'Payment Verification', 'Approved', 'Ready for Release', 'Rejected'];
+interface ApplicationFilter {
+  label: string;
+  /** null: every application. */
+  statuses: readonly ApplicationLifecycleStatus[] | null;
+  /** Shown only while some application is in it. */
+  onlyWhenUsed?: boolean;
+}
+
+/**
+ * One tab for every status a citizen can see on a row (QA TC-35, 2026-10-03:
+ * Completed, Cancelled and Revision Required had none, so a returned,
+ * withdrawn or finished application could not be listed on its own). Each
+ * tab names the words on the pills it lists.
+ */
+const FILTERS: readonly ApplicationFilter[] = [
+  { label: 'All', statuses: null },
+  { label: 'Draft', statuses: ['Draft'] },
+  { label: 'Submitted', statuses: ['Submitted', 'Received'] },
+  { label: 'Under Review', statuses: ['Document Verification', 'Under Evaluation'] },
+  { label: 'Revision Required', statuses: ['Revision Required'] },
+  { label: 'Payment', statuses: ['Assessed', 'Payment Submitted', 'Payment Under Verification', 'Payment Verified', 'For Approval'] },
+  { label: 'Approved', statuses: ['Approved', 'Permit Generated'] },
+  { label: 'Ready for Release', statuses: ['Ready for Release'] },
+  { label: 'Released', statuses: ['Released'] },
+  { label: 'Completed', statuses: ['Completed'] },
+  { label: 'Rejected', statuses: ['Rejected'] },
+  { label: 'Cancelled', statuses: ['Cancelled'] },
+  { label: 'Expired', statuses: ['Expired'], onlyWhenUsed: true },
+];
 
 @Component({
   selector: 'app-my-applications',
@@ -21,8 +50,11 @@ const FILTERS: (ApplicantStatus | 'All')[] = ['All', 'Draft', 'Submitted', 'Unde
       </div>
 
       <div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
-        @for (f of filters; track f) {
-          <button class="btn btn-sm" [class.btn-primary]="filter() === f" [class.btn-secondary]="filter() !== f" (click)="filter.set(f)">{{ f }}</button>
+        @for (f of visibleFilters(); track f.label) {
+          <button class="btn btn-sm" [class.btn-primary]="filter() === f.label" [class.btn-secondary]="filter() !== f.label"
+                  [attr.aria-pressed]="filter() === f.label" (click)="filter.set(f.label)">
+            {{ f.label }} <span style="opacity:.75;">({{ countIn(f) }})</span>
+          </button>
         }
       </div>
 
@@ -67,13 +99,22 @@ export class MyApplicationsPage {
   protected readonly formatDate = formatDate;
   protected readonly applicantStatusOf = applicantStatusOf;
   protected readonly applicantStatusLabel = applicantStatusLabel;
-  protected readonly filters = FILTERS;
-  readonly filter = signal<ApplicantStatus | 'All'>('All');
+  readonly filter = signal<string>('All');
 
-  filtered() {
-    const f = this.filter();
-    const all = this.store.myApplications();
-    if (f === 'All') return all;
-    return all.filter((a) => applicantStatusOf(a.lifecycleStatus) === f);
+  protected visibleFilters(): readonly ApplicationFilter[] {
+    return FILTERS.filter((f) => !f.onlyWhenUsed || this.countIn(f) > 0 || this.filter() === f.label);
+  }
+
+  protected countIn(f: ApplicationFilter): number {
+    return this.store.myApplications().filter((a) => this.inFilter(a, f)).length;
+  }
+
+  filtered(): ApplicationRecord[] {
+    const f = FILTERS.find((candidate) => candidate.label === this.filter()) ?? FILTERS[0];
+    return this.store.myApplications().filter((a) => this.inFilter(a, f));
+  }
+
+  private inFilter(a: ApplicationRecord, f: ApplicationFilter): boolean {
+    return f.statuses === null || f.statuses.includes(a.lifecycleStatus);
   }
 }

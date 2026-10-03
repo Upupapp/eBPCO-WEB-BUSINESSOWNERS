@@ -6,14 +6,17 @@ import { ApplicationStore } from '../../core/stores/application.store';
 import { BUSINESS_CATEGORIES, BusinessCategory } from '../../core/domain/business.model';
 import { CASTILLA_BARANGAYS } from '../../core/domain/ph-reference-data';
 import { ToastService } from '../../shared/ui/toast.service';
+import { registrationDateProblem, registrationNumberProblem } from '../../core/domain/registration-number';
 
 /**
  * BUS-004 — Edit Business.
  *
- * Shows only what is the citizen's to change. The registration number, the
- * date registered and the business's status are shown as facts on the details
- * page and are absent from this form: they are the Municipality's, and a field
- * offering to change one would misrepresent who decides.
+ * Shows only what is the citizen's to change. The business's status is the
+ * Municipality's and is absent from this form. The DTI/SEC/CDA registration
+ * number and date are what the citizen typed, so they are theirs to correct
+ * until an application filed under the business reaches the office (QA
+ * TC-24, 2026-10-03: a mistyped "x" could never be fixed); after that the
+ * office relies on them, and the form shows them read-only with who to ask.
  *
  * The notice about filed applications is not decoration. A citizen who renames
  * their business here reasonably expects the change to follow through to work
@@ -70,6 +73,33 @@ import { ToastService } from '../../shared/ui/toast.service';
             </select>
           </div>
 
+          @if (store.usingReal()) {
+            @if (registrationLocked()) {
+              <div class="field">
+                <span class="small muted" style="display:block; margin-bottom:4px;">DTI / SEC / CDA Registration</span>
+                <div><strong>{{ registrationNumber }}</strong> · registered {{ dateRegistered || 'date not on file' }}</div>
+                <p class="small muted" style="margin:6px 0 0;">
+                  An application filed under this business has reached the office, which now relies on these details.
+                  To correct them, ask the Office of the Building Official.
+                </p>
+              </div>
+            } @else {
+              <div class="form-row">
+                <div class="field">
+                  <label for="edit-business-registration-number">DTI / SEC / CDA Registration No.<span class="required">*</span></label>
+                  <input id="edit-business-registration-number" class="input" [(ngModel)]="registrationNumber" autocomplete="off" />
+                </div>
+                <div class="field">
+                  <label for="edit-business-date-registered">Date Registered<span class="required">*</span></label>
+                  <input id="edit-business-date-registered" class="input" type="date" [(ngModel)]="dateRegistered" />
+                </div>
+              </div>
+              <p class="small muted" style="margin:-4px 0 10px;">
+                You can correct these until you file an application for this business.
+              </p>
+            }
+          }
+
           @if (openApplicationCount() > 0) {
             <div class="card" style="background:var(--warning-100); border:1px solid var(--warning-text); color:var(--warning-text); margin-top:6px;">
               <strong>This will not change applications already filed.</strong>
@@ -101,7 +131,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 })
 export class EditBusinessPage {
   private readonly route = inject(ActivatedRoute);
-  private readonly store = inject(BusinessStore);
+  protected readonly store = inject(BusinessStore);
   private readonly applications = inject(ApplicationStore);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
@@ -119,6 +149,8 @@ export class EditBusinessPage {
   city = '';
   province = '';
   registrationNumber = '';
+  dateRegistered = '';
+  private originalRegistration = { registrationNumber: '', dateRegistered: '' };
 
   private readonly loaded = signal(false);
 
@@ -132,6 +164,8 @@ export class EditBusinessPage {
       this.city = b.city;
       this.province = b.province;
       this.registrationNumber = b.registrationNumber;
+      this.dateRegistered = (b.dateRegistered ?? '').slice(0, 10);
+      this.originalRegistration = { registrationNumber: this.registrationNumber, dateRegistered: this.dateRegistered };
       this.loaded.set(true);
     }
   }
@@ -147,12 +181,27 @@ export class EditBusinessPage {
       .filter((a) => a.businessId === this.id && a.lifecycleStatus !== 'Draft').length;
   }
 
+  /** The office's cut-off, the same as the server's: an application under this business has left Draft. */
+  registrationLocked(): boolean {
+    return this.openApplicationCount() > 0;
+  }
+
   protected readonly saving = signal(false);
 
   async save(): Promise<void> {
     if (!this.name.trim() || !this.street.trim() || !this.barangay.trim() || !this.city.trim() || !this.province.trim()) {
       this.error.set('Please complete every required field.');
       return;
+    }
+    const registrationChanged = this.store.usingReal() && !this.registrationLocked()
+      && (this.registrationNumber.trim() !== this.originalRegistration.registrationNumber
+        || this.dateRegistered !== this.originalRegistration.dateRegistered);
+    if (registrationChanged) {
+      const problem = registrationNumberProblem(this.registrationNumber) ?? registrationDateProblem(this.dateRegistered);
+      if (problem) {
+        this.error.set(problem);
+        return;
+      }
     }
     const input = {
       name: this.name,
@@ -161,6 +210,9 @@ export class EditBusinessPage {
       barangay: this.barangay,
       city: this.city,
       province: this.province,
+      ...(registrationChanged
+        ? { registration: { registrationNumber: this.registrationNumber.trim(), dateRegistered: this.dateRegistered } }
+        : {}),
     };
 
     if (this.store.usingReal()) {

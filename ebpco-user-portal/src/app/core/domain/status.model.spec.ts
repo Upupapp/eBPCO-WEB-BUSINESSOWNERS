@@ -1,4 +1,4 @@
-import { applicantStatusLabel, applicantStatusOf } from './status.model';
+import { applicantStatusLabel, applicantStatusOf, displayReference } from './status.model';
 
 describe('applicantStatusLabel', () => {
   it('says the payment is verified once the Cashier has verified it', () => {
@@ -25,5 +25,16 @@ describe('applicantStatusLabel', () => {
   it('leaves the filter category unchanged', () => {
     expect(applicantStatusOf('For Approval')).toBe('Payment Verification');
     expect(applicantStatusOf('Payment Verified')).toBe('Payment Verification');
+  });
+});
+
+/** QA TC-37 (2026-10-03): a draft took an official E-BPCO number. The server now gives it a DRAFT- placeholder. */
+describe('displayReference', () => {
+  it('shows a draft as having no number yet', () => {
+    expect(displayReference('DRAFT-1A2B3C4D5E')).toBe('Draft (no number yet)');
+  });
+
+  it('shows a filed application\'s number as it is', () => {
+    expect(displayReference('E-BPCO-2026-000002')).toBe('E-BPCO-2026-000002');
   });
 });

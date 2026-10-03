@@ -128,6 +128,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
     }
     .blank-form-link strong { color: var(--primary-600, #a5182a); }
     .blank-form-link a { font-weight: 600; }
+    .review-head { display: flex; justify-content: space-between; align-items: center; margin: 18px 0 6px; }
 
     /* Documents step: one card per document (see the template's own comment). */
     .docs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
@@ -398,7 +399,7 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           <div class="field"><label for="application-wizard-scope-of-work-4">Scope of Work / Purpose<span class="required">*</span></label><textarea id="application-wizard-scope-of-work-4" class="input" rows="3" [(ngModel)]="scopeOfWork" placeholder="Briefly describe the work or purpose of this application"></textarea></div>
           <div class="form-row">
             <div class="field"><label for="application-wizard-professional-in-charge-5">Professional in Charge (if any)</label><input id="application-wizard-professional-in-charge-5" class="input" [(ngModel)]="professionalName" placeholder="Engineer / Architect name" appCapitalizeName /></div>
-            <div class="field"><label for="application-wizard-prc-license-no-6">PRC License No.</label><input id="application-wizard-prc-license-no-6" class="input" [(ngModel)]="prcNumber" /></div>
+            <div class="field"><label for="application-wizard-prc-license-no-6">PRC License No.</label><input id="application-wizard-prc-license-no-6" class="input" [(ngModel)]="prcNumber" inputmode="numeric" maxlength="7" placeholder="7 digits, e.g. 0012345" /><div class="hint">The 7-digit number on the professional's PRC ID.</div></div>
           </div>
           @if (error()) { <div class="field error">{{ error() }}</div> }
           <div style="display:flex; gap:10px;">
@@ -616,6 +617,22 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
               <tr><td class="muted">Documents Attached</td><td>{{ attachedCount() }} of {{ documents.length }}</td></tr>
             </tbody>
           </table>
+          <!--
+            What the citizen typed in Details, to check before submitting (QA
+            TC-22, 2026-10-03): the review used to leave all of it out.
+          -->
+          <div class="review-head">
+            <span class="card-title" style="margin:0;">Project details</span>
+            <button type="button" class="link-button" (click)="step.set(2)">Edit</button>
+          </div>
+          <table class="table">
+            <tbody>
+              <tr><td class="muted">Project / Business Address</td><td>{{ projectAddress || '—' }}</td></tr>
+              <tr><td class="muted">Scope of Work / Purpose</td><td style="white-space:pre-line;">{{ scopeOfWork || '—' }}</td></tr>
+              <tr><td class="muted">Professional in Charge</td><td>{{ professionalName || 'None named' }}</td></tr>
+              <tr><td class="muted">PRC License No.</td><td>{{ prcNumber || 'None given' }}</td></tr>
+            </tbody>
+          </table>
           <hr class="divider" />
           <label class="checkbox-row" style="margin-bottom:8px;">
             <input type="checkbox" [(ngModel)]="understandRequirements" /> I understand the application requirements and certify the information provided is true and correct.
@@ -628,6 +645,8 @@ function fileTypeFromName(name: string): SavedDocumentFileType {
           <label class="checkbox-row" style="margin-bottom:14px;">
             <input type="checkbox" [(ngModel)]="agreeTerms" /> I agree to the
             <button type="button" class="link-button" (click)="openLegalModal.set('terms')">Terms &amp; Conditions</button>
+            and have read the
+            <button type="button" class="link-button" (click)="openLegalModal.set('privacy')">Privacy Notice</button>
           </label>
           @if (openLegalModal(); as doc) {
             <app-legal-modal [document]="doc" (close)="openLegalModal.set(null)" />
@@ -1119,6 +1138,7 @@ export class ApplicationWizardPage {
       attached[doc.requirementCode] = {
         kind: 'attached', documentId: doc.id, fileName: doc.fileName, fileType: fileTypeFromName(doc.fileName),
       };
+      if (doc.sha256) this.slotHashes[doc.requirementCode] = doc.sha256;
       ids[doc.requirementCode] = doc.id;
       this.attachedToServer.add(doc.id);
     }
@@ -1197,10 +1217,45 @@ export class ApplicationWizardPage {
     await this.reuseExisting(d, item, fileInput);
   }
 
+  /**
+   * The content fingerprint of what each requirement has attached, so one
+   * file cannot stand as two different documents (QA TC-21, 2026-10-03: the
+   * land title uploaded again as the Survey Plan was accepted and counted).
+   * From the file itself for an upload, from the server for a resumed draft.
+   */
+  private readonly slotHashes: Record<string, string> = {};
+
+  /** The requirement already holding a file with this fingerprint, other than `exceptId`. */
+  private holderOf(hash: string | null, exceptId: string): RequirementDocument | undefined {
+    if (hash === null) return undefined;
+    const holderId = Object.entries(this.slotHashes).find(([id, h]) => id !== exceptId && h === hash)?.[0];
+    return holderId === undefined ? undefined : this.documents.find((doc) => doc.id === holderId);
+  }
+
+  private sameFileMessage(fileName: string, holder: RequirementDocument, d: RequirementDocument): string {
+    return `"${fileName}" is already attached as "${holder.label}". Attach the right file for "${d.label}".`;
+  }
+
+  /** Keeps the "N missing" message true as files come and go (QA TC-31): it stayed at 14 with all 14 attached. */
+  private refreshMissingError(): void {
+    const current = this.error();
+    if (current === null || !current.startsWith('Please attach all required documents')) return;
+    const missing = this.documents.filter((doc) => this.isRequired(doc) && !this.attached[doc.id]).length;
+    this.error.set(missing === 0 ? null : `Please attach all required documents (${missing} missing).`);
+  }
+
   async onFileSelected(event: Event, d: RequirementDocument): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+    const hash = await sha256Of(file);
+    const holder = this.holderOf(hash, d.id);
+    if (holder !== undefined) {
+      this.error.set(this.sameFileMessage(file.name, holder, d));
+      input.value = '';
+      return;
+    }
+    if (hash !== null) this.slotHashes[d.id] = hash;
     // Replacing a REUSED document does not inherit its certification date.
     // The natural implementation copies the record and swaps the file, and the
     // admin note would then read "certified <old date>" over a document
@@ -1225,6 +1280,7 @@ export class ApplicationWizardPage {
     // A real id for THIS attachment, invalidated the moment a different file
     // replaces it — hence the delete before every fresh attempt below.
     this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
+    this.refreshMissingError();
     if (this.api.configured) await this.uploadReal(d, file);
   }
 
@@ -1267,6 +1323,15 @@ export class ApplicationWizardPage {
       // file to THIS requirement), so use their copy and say so, rather than
       // an error they would have to act on.
       const existing = duplicateOf(error);
+      const heldBy = existing === null ? undefined
+        : Object.entries(this.uploadedDocumentIds()).find(([id, docId]) => id !== d.id && docId === existing.id)?.[0];
+      if (heldBy !== undefined) {
+        const holder = this.documents.find((doc) => doc.id === heldBy);
+        this.uploadingRequirementId.set(null);
+        this.removeAttachment(d);
+        this.error.set(this.sameFileMessage(file.name, holder ?? d, d));
+        return;
+      }
       if (existing !== null && reuseOf === null) {
         this.uploadingRequirementId.set(null);
         await this.uploadReal(d, file, existing.id);
@@ -1342,11 +1407,19 @@ export class ApplicationWizardPage {
         if (!response.ok) throw new Error(`fetch failed: ${response.status}`);
         const blob = await response.blob();
         const file = new File([blob], real.fileName, { type: blob.type || real.contentType });
+        const hash = await sha256Of(file);
+        const holder = this.holderOf(hash, d.id);
+        if (holder !== undefined) {
+          this.error.set(this.sameFileMessage(real.fileName, holder, d));
+          return;
+        }
+        if (hash !== null) this.slotHashes[d.id] = hash;
         this.attached = {
           ...this.attached,
           [d.id]: { kind: 'upload', file, fileName: real.fileName, fileType: fileTypeFromName(real.fileName) },
         };
         this.uploadedDocumentIds.update(({ [d.id]: _drop, ...rest }) => rest);
+        this.refreshMissingError();
         await this.uploadReal(d, file, real.id);
       } catch {
         this.error.set(`Could not reuse "${real.fileName}". Try again, or upload a new file.`);
@@ -1368,7 +1441,9 @@ export class ApplicationWizardPage {
   removeAttachment(d: RequirementDocument, fileInput?: HTMLInputElement): void {
     const { [d.id]: _removed, ...rest } = this.attached;
     this.attached = rest;
+    delete this.slotHashes[d.id];
     this.uploadedDocumentIds.update(({ [d.id]: _drop, ...ids }) => ids);
+    this.refreshMissingError();
     // The native control remembers the last pick independently of our state;
     // clear it so the row does not keep naming a file that is no longer attached.
     if (fileInput) fileInput.value = '';
@@ -1476,6 +1551,12 @@ export class ApplicationWizardPage {
     }
     if (next === 3 && (!this.projectAddress || !this.scopeOfWork)) {
       this.error.set('Please complete the project address and scope of work.');
+      return;
+    }
+    // A PRC licence number is seven digits (QA TC-32, 2026-10-03: "abc" was
+    // accepted and shown to staff). Optional, so only checked when given.
+    if (next === 3 && this.prcNumber.trim() !== '' && !/^\d{7}$/.test(this.prcNumber.trim())) {
+      this.error.set("A PRC license number is the 7 digits on the professional's PRC ID, for example 0012345.");
       return;
     }
     if (next === 4) {
@@ -1675,5 +1756,21 @@ export class ApplicationWizardPage {
     } finally {
       this.submitting.set(false);
     }
+  }
+}
+
+/**
+ * A file's SHA-256, lowercase hex -- the same fingerprint the server keeps
+ * (`documents.sha256`). Null where the browser offers no Web Crypto (an old
+ * browser, or a plain-HTTP origin), in which case the same-file check falls
+ * back to the server's own duplicate answer.
+ */
+async function sha256Of(file: Blob): Promise<string | null> {
+  try {
+    if (typeof crypto === 'undefined' || crypto.subtle === undefined) return null;
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;
   }
 }

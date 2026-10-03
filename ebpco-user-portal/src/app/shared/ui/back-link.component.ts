@@ -1,10 +1,18 @@
 import { Component, computed, inject, input } from '@angular/core';
+import { Router } from '@angular/router';
 
 import { NavigationHistory } from '../../core/utils/navigation-history';
 
 /**
- * "← Back to …": returns to the screen the citizen came from, and names it.
- * Opened directly (a bookmark, a new tab), it goes to `fallback` instead.
+ * "← Back to …": the page's parent, named -- My Applications from an
+ * application, My Businesses from a business (QA TC-19, TC-29, 2026-10-03).
+ *
+ * It used to name and return to whatever screen came before, which read
+ * "Back to Application Form" right after submitting (and opened a blank new
+ * application), "Back to Register a Business" after registering one, and
+ * looped between a business and its Edit form. A fixed parent cannot do any
+ * of that. A public page (the terms, the privacy notice) still returns to
+ * where the reader came from, since that may be the sign-in screens.
  */
 @Component({
   selector: 'app-back-link',
@@ -41,13 +49,19 @@ export class BackLinkComponent {
   readonly publicPage = input(false);
 
   private readonly history = inject(NavigationHistory);
+  private readonly router = inject(Router);
 
   protected readonly text = computed(() => {
-    const label = this.history.label(this.fallbackLabel(), this.publicPage());
+    if (!this.publicPage()) return `Back to ${this.fallbackLabel()}`;
+    const label = this.history.label(this.fallbackLabel(), true);
     return label === 'Back' ? 'Back' : `Back to ${label}`;
   });
 
   protected go(): void {
-    this.history.back(this.fallback(), this.publicPage());
+    if (!this.publicPage()) {
+      void this.router.navigateByUrl(this.fallback());
+      return;
+    }
+    this.history.back(this.fallback(), true);
   }
 }

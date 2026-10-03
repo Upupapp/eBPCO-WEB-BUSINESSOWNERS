@@ -54,6 +54,9 @@ export interface PublicPermitRecord {
   issuedDate: string;
   released: boolean;
   releasedAt: string | null;
+  /** As printed on the permit, since server migration 064 (QA TC-04); null on a permit issued without them. Absent from an older server. */
+  expiresOn?: string | null;
+  approvingOffice?: string | null;
 }
 
 export interface PermitResponse {
@@ -66,6 +69,14 @@ export interface PermitResponse {
    * cannot read these cannot comply with them." Empty array when there are none.
    */
   conditions: string[];
+  /**
+   * What the permit prints about itself, since server migration 064 (QA
+   * TC-04, TC-18): its last valid day, who approved it, for which office.
+   * Null on a permit issued without them; absent from an older server.
+   */
+  expiresOn?: string | null;
+  approvingOfficial?: string | null;
+  approvingOffice?: string | null;
   /**
    * ALWAYS PRESENT, and null until an officer has prepared the release.
    * **Null is a fact to render — "not yet ready to collect" — not a missing
@@ -244,9 +255,11 @@ export interface BusinessSummary extends SubmitBusinessRequest {
 
 /**
  * `PATCH /businesses/:id` — matches `businessUpdateShape` in
- * `businesses.controller.ts`: the owner-editable subset only.
- * `registrationNumber`/`dateRegistered`/`status` are not here at all —
- * the server rejects them (`.strict()`), not just ignores them.
+ * `businesses.controller.ts`: the owner-editable subset only. `status` is
+ * not here at all — the server rejects it (`.strict()`). The registration
+ * number and date may be corrected by the owner until an application filed
+ * under the business reaches the office; after that the server answers 409
+ * and the office corrects them (QA TC-24, server migration 064).
  */
 export interface UpdateBusinessRequest {
   name: string;
@@ -255,6 +268,9 @@ export interface UpdateBusinessRequest {
   barangay: string;
   city: string;
   province: string;
+  registrationNumber?: string;
+  /** YYYY-MM-DD. */
+  dateRegistered?: string;
 }
 
 /** `GET /businesses` — `{ data }`, not a bare array. */

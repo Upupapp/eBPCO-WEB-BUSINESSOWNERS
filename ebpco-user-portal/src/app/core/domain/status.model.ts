@@ -54,6 +54,19 @@ export function isTerminalStatus(status: ApplicationLifecycleStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+/**
+ * The server's placeholder on a draft, since server migration 064 (QA
+ * TC-37, 2026-10-03): the official E-BPCO number is assigned when the
+ * application is filed, so an abandoned draft leaves no gap in the numbering.
+ */
+export const DRAFT_REFERENCE_PREFIX = 'DRAFT-';
+export const DRAFT_REFERENCE_LABEL = 'Draft (no number yet)';
+
+/** What to show for an application's number: a draft's placeholder is not one. */
+export function displayReference(reference: string): string {
+  return reference.startsWith(DRAFT_REFERENCE_PREFIX) ? DRAFT_REFERENCE_LABEL : reference;
+}
+
 /** The citizen-facing vocabulary — identical to ebpco-mobile's ApplicationStatus. Every screen in this portal renders this, never the raw 19-value lifecycle. */
 export type ApplicantStatus =
   | 'Draft'

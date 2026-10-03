@@ -5,7 +5,7 @@ import { BusinessStore } from '../../core/stores/business.store';
 import { NotificationStore } from '../../core/stores/notification.store';
 import { AuthService } from '../../core/session/auth.service';
 import { StatusPillComponent } from '../../shared/ui/status-pill.component';
-import { applicantStatusLabel, applicantStatusOf } from '../../core/domain/status.model';
+import { applicantStatusLabel, applicantStatusOf, isTerminalStatus } from '../../core/domain/status.model';
 import { fullName } from '../../core/domain/user.model';
 import { formatDate } from '../../core/utils/ids';
 import { permitVisual } from '../../core/domain/permit-visual';
@@ -80,10 +80,21 @@ export class DashboardPage {
         ?? ['Draft', 'Revision Required', 'Assessed'].includes(a.lifecycleStatus)).length;
   }
 
+  /**
+   * Permits waiting to be collected, and only those. The Ready for Release
+   * CATEGORY also holds Released and Completed (the filter tabs need that),
+   * so a permit already collected still counted here as "Ready to claim"
+   * (QA TC-33, 2026-10-03).
+   */
   readyForRelease(): number {
     return this.applications
       .myApplications()
-      .filter((a) => (a.applicantStatus ?? applicantStatusOf(a.lifecycleStatus)) === 'Ready for Release').length;
+      .filter((a) => a.lifecycleStatus === 'Ready for Release').length;
+  }
+
+  /** Open applications: a completed, withdrawn, rejected or expired one is not "active" (QA TC-33). */
+  activeApplications() {
+    return this.applications.myApplications().filter((a) => !isTerminalStatus(a.lifecycleStatus));
   }
 
   get kpis(): DashboardKpi[] {

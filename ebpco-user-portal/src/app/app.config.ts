@@ -7,6 +7,7 @@ import { citizenAuthInterceptor } from './core/api/citizen-auth.interceptor';
 import { AuthService } from './core/session/auth.service';
 import { UploadLimitsService } from './core/api/upload-limits.service';
 import { NavigationHistory } from './core/utils/navigation-history';
+import { LiveRefresh } from './core/utils/live-refresh';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -32,6 +33,11 @@ export const appConfig: ApplicationConfig = {
     // From the first navigation on, so a Back link knows the screen before.
     provideAppInitializer(() => {
       inject(NavigationHistory);
+    }),
+    // Statuses and notifications stay current while the portal is open: on
+    // every page opened, on returning to the tab, and once a minute (QA TC-20).
+    provideAppInitializer(() => {
+      inject(LiveRefresh);
     }),
   ],
 };

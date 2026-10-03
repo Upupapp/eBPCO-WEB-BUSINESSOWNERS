@@ -81,9 +81,11 @@
 
         @if (applications.myApplications().length === 0) {
           <div class="empty-state">No applications yet. <a routerLink="/permits">Start your first application.</a></div>
+        } @else if (activeApplications().length === 0) {
+          <div class="empty-state">No application is in progress. <a routerLink="/applications">See your past applications.</a></div>
         } @else {
           <div class="application-list">
-            @for (app of applications.myApplications(); track app.id) {
+            @for (app of activeApplications(); track app.id) {
               @let visual = applicationVisual(app.permitType);
               <a [routerLink]="['/applications', app.id]" class="application-row">
                 <div class="application-icon" [style.background]="visual.bg" [style.color]="visual.fg">

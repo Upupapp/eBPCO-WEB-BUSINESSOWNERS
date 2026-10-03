@@ -54,6 +54,14 @@ export interface ApplicationRecord {
   permitNumber: string | null;
   issuedDate: string | null;
   expiryDate: string | null;
+  /**
+   * What the citizen typed in the wizard's Details step: the project address
+   * and `form` (scopeOfWork, professionalName, prcNumber). Shown back on the
+   * application page (QA TC-23, 2026-10-03), where it never appeared. Absent
+   * on local-only rows.
+   */
+  location?: string | null;
+  form?: Readonly<Record<string, unknown>>;
 }
 
 export interface StatusTimelineEntry {

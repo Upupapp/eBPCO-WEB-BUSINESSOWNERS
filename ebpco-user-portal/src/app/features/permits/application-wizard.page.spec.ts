@@ -114,7 +114,7 @@ describe('Attachments carry the file, not just its name', () => {
       // bytes the office already holds and carries no File; an upload carries
       // the real one. This test is about the upload half.
       attached: Record<string, { kind: 'upload'; file: File } | { kind: 'reused' }>;
-      onFileSelected(e: Event, d: { id: string; label: string }): void;
+      onFileSelected(e: Event, d: { id: string; label: string }): Promise<void>;
     };
 
     const chosen = new File([new Uint8Array([9, 8, 7, 6])], 'my-survey-plan.pdf', { type: 'application/pdf' });
@@ -122,7 +122,7 @@ describe('Attachments carry the file, not just its name', () => {
     // The shape the handler actually reads: event.target.files[0].
     // (jsdom has no DataTransfer, so the FileList is supplied directly.)
     const event = { target: { files: [chosen] } } as unknown as Event;
-    page.onFileSelected(event, requirement);
+    await page.onFileSelected(event, requirement);
 
     // What the wizard is holding must BE the file, not a copy of its name.
     const slot = page.attached[requirement.id];
@@ -141,5 +141,45 @@ describe('Attachments carry the file, not just its name', () => {
     expect(stored.file).toBe(chosen);
     expect(await stored.file!.arrayBuffer()).toEqual(await chosen.arrayBuffer());
     expect(stored.file!.size).toBe(4);
+  });
+});
+
+/**
+ * QA TC-21 (2026-10-03): the land title uploaded again as the Survey Plan was
+ * accepted and counted as a second document. One file stands as one document.
+ */
+describe('The same file attached to two requirements', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('is refused for the second, naming where it is already attached', async () => {
+    TestBed.configureTestingModule({
+      imports: [ApplicationWizardPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CitizenIdentityApi, useClass: FakeCitizenIdentityApi },
+        { provide: ActivatedRoute, useValue: {
+            snapshot: { queryParamMap: convertToParamMap({ type: 'Zoning / Locational Clearance' }) } } },
+      ],
+    });
+    await TestBed.inject(AuthService).login('juan.delacruz@example.com', 'Password1');
+    const fixture = TestBed.createComponent(ApplicationWizardPage);
+    fixture.detectChanges();
+    const page = fixture.componentInstance as unknown as {
+      documents: { id: string; label: string; required: boolean }[];
+      attached: Record<string, unknown>;
+      error(): string | null;
+      onFileSelected(e: Event, d: { id: string; label: string }): Promise<void>;
+    };
+
+    const [first, second] = page.documents;
+    const bytes = new Uint8Array([1, 1, 2, 3, 5, 8]);
+    await page.onFileSelected({ target: { files: [new File([bytes], 'title.pdf')], value: '' } } as unknown as Event, first);
+    await page.onFileSelected({ target: { files: [new File([bytes], 'title-copy.pdf')], value: '' } } as unknown as Event, second);
+
+    expect(page.attached[first.id]).toBeDefined();
+    expect(page.attached[second.id]).toBeUndefined();
+    expect(page.error()).toContain(`already attached as "${first.label}"`);
   });
 });

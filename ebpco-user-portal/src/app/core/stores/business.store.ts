@@ -10,12 +10,16 @@ import { ApiError } from '../api/problem';
 /**
  * What a citizen may change about their own business.
  *
- * Deliberately NOT the whole of `Business`. `registrationNumber` and
- * `dateRegistered` are system-generated, `ownerApplicantId` is who the record
- * belongs to, and `status` is the Municipality's judgement — a form that let a
- * citizen set their own business to Active would be offering them a decision
- * that is not theirs to make. Those four are unreachable from here by
+ * Deliberately NOT the whole of `Business`. `ownerApplicantId` is who the
+ * record belongs to, and `status` is the Municipality's judgement — a form
+ * that let a citizen set their own business to Active would be offering them
+ * a decision that is not theirs to make. Both are unreachable from here by
  * construction rather than by the form omitting them.
+ *
+ * `registration` is the DTI/SEC/CDA number and date the citizen typed, and
+ * theirs to correct until an application filed under the business reaches
+ * the office (QA TC-24, 2026-10-03: a mistyped number could never be fixed).
+ * The server enforces that cut-off; the demo build does not offer it.
  */
 export interface EditBusinessInput {
   name: string;
@@ -24,6 +28,7 @@ export interface EditBusinessInput {
   barangay: string;
   city: string;
   province: string;
+  registration?: { registrationNumber: string; dateRegistered: string };
 }
 
 export interface RegisterBusinessInput {
@@ -245,6 +250,12 @@ export class BusinessStore {
         barangay: input.barangay.trim(),
         city: input.city.trim(),
         province: input.province.trim(),
+        ...(input.registration
+          ? {
+            registrationNumber: input.registration.registrationNumber.trim(),
+            dateRegistered: input.registration.dateRegistered,
+          }
+          : {}),
       }));
       await this.refreshMine();
       return { ok: true };

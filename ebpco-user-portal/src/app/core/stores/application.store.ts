@@ -9,6 +9,7 @@ import {
   LIFECYCLE_SEQUENCE,
   NEXT_STEP_TEXT,
   applicantStatusOf,
+  displayReference,
 } from '../domain/status.model';
 import { ApplicationDocument, DocumentStatus, SavedDocumentFileType } from '../domain/document.model';
 import { Assessment, AssessmentLineItem, ILLUSTRATIVE_FEE_BASIS } from '../domain/assessment.model';
@@ -74,7 +75,8 @@ let appSeq = 3000;
 function fromServerSummary(row: ApplicationSummary, applicantId: string): ApplicationRecord {
   return {
     id: row.id,
-    applicationNumber: row.referenceNumber,
+    // A draft's DRAFT- placeholder is not a number to quote (QA TC-37).
+    applicationNumber: displayReference(row.referenceNumber),
     businessId: row.businessId ?? '',
     businessName: row.businessName ?? '',
     applicantId,
@@ -96,6 +98,8 @@ function fromServerSummary(row: ApplicationSummary, applicantId: string): Applic
     permitNumber: null,
     issuedDate: null,
     expiryDate: null,
+    location: row.location ?? null,
+    form: row.form ?? {},
   };
 }
 
@@ -437,17 +441,17 @@ export class ApplicationStore {
         // the server does not return a row for a permit nobody issued.
         provenance: 'issued',
         conditions: real.conditions,
-        // Neither the endpoint nor the `generated_permits` table carries
-        // these — see `GeneratedPermit.standing`'s own doc comment ("NOTHING
-        // sets this today; it is the seam the backend fills") and
-        // `approvingOfficial`/`approvingOffice`'s. Honestly null, not guessed.
+        // `standing` is still carried by nothing -- see `GeneratedPermit
+        // .standing`'s own doc comment. The validity, approving official and
+        // office are recorded since server migration 064 (QA TC-04); null on
+        // a permit issued before, honestly, not guessed.
         standing: null,
         issuedDateValue: new Date(real.issuedDate),
         issuedDate: real.issuedDate,
-        expiryDateValue: null,
-        expiryDate: null,
-        approvingOfficial: null,
-        approvingOffice: null,
+        expiryDateValue: real.expiresOn ? new Date(real.expiresOn) : null,
+        expiryDate: real.expiresOn ?? null,
+        approvingOfficial: real.approvingOfficial ?? null,
+        approvingOffice: real.approvingOffice ?? null,
       };
     }
     return this.permitsByApp()[applicationId];

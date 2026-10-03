@@ -6,6 +6,7 @@ import { BUSINESS_CATEGORIES, BusinessCategory } from '../../core/domain/busines
 import { CASTILLA_BARANGAYS } from '../../core/domain/ph-reference-data';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
+import { registrationDateProblem, registrationNumberProblem } from '../../core/domain/registration-number';
 
 @Component({
   selector: 'app-register-business',
@@ -53,11 +54,12 @@ import { CitizenApiClient } from '../../core/api/citizen-api.client';
           <div class="form-row">
             <div class="field">
               <label for="register-business-registration-number-7">DTI / SEC / CDA Registration No.<span class="required">*</span></label>
-              <input id="register-business-registration-number-7" class="input" [(ngModel)]="registrationNumber" />
+              <input id="register-business-registration-number-7" class="input" [(ngModel)]="registrationNumber"
+                     placeholder="As printed on the certificate" autocomplete="off" />
             </div>
             <div class="field">
               <label for="register-business-date-registered-8">Date Registered<span class="required">*</span></label>
-              <input id="register-business-date-registered-8" class="input" type="date" [(ngModel)]="dateRegistered" />
+              <input id="register-business-date-registered-8" class="input" type="date" [(ngModel)]="dateRegistered" [max]="today" />
             </div>
           </div>
         }
@@ -98,6 +100,7 @@ export class RegisterBusinessPage {
   /** Required only for a real submission — see class doc and the server's `businessShape`. */
   registrationNumber = '';
   dateRegistered = '';
+  protected readonly today = localToday();
 
   async submit(): Promise<void> {
     if (!this.name || !this.street || !this.barangay || !this.city || !this.province) {
@@ -128,12 +131,12 @@ export class RegisterBusinessPage {
       this.error.set('Please complete all required fields.');
       return;
     }
-    // A DTI/SEC/CDA registration cannot predate its own issuance — accepted
-    // a date years in the future with no check at all until now (found live
-    // 2026-09-25). Same reasoning register.page.ts's own DOB check already
-    // applies to a citizen's date of birth.
-    if (new Date(this.dateRegistered) > new Date()) {
-      this.error.set('Date Registered cannot be in the future.');
+    // The same checks the server makes (QA TC-24, 2026-10-03: "x" was
+    // accepted as a registration number). A registration cannot be dated in
+    // the future either (found live 2026-09-25).
+    const problem = registrationNumberProblem(this.registrationNumber) ?? registrationDateProblem(this.dateRegistered);
+    if (problem) {
+      this.error.set(problem);
       return;
     }
     this.submitting.set(true);
@@ -145,7 +148,7 @@ export class RegisterBusinessPage {
         barangay: this.barangay,
         city: this.city,
         province: this.province,
-        registrationNumber: this.registrationNumber,
+        registrationNumber: this.registrationNumber.trim(),
         dateRegistered: this.dateRegistered,
       });
       if (!result.ok) {
@@ -158,4 +161,10 @@ export class RegisterBusinessPage {
       this.submitting.set(false);
     }
   }
+}
+
+/** Today in the citizen's own calendar, as YYYY-MM-DD, for a date input's max. */
+function localToday(): string {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }

@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { BFP_FSIS_URL, PERMIT_TYPE_GROUPS, PermitType } from '../../core/domain/permit.model';
 import { REQUIREMENTS_CATALOG } from '../../core/domain/requirements-catalog';
 import { BusinessStore } from '../../core/stores/business.store';
@@ -16,7 +16,7 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
           <h1>Permit Services</h1>
           <div class="subtitle">Browse requirements before you start, or begin a new application.</div>
         </div>
-        <a routerLink="/permits/apply" [queryParams]="{ type: 'generic' }" class="btn btn-secondary">Start Generic Application</a>
+        <a routerLink="/permits/apply" [queryParams]="startParams('generic')" class="btn btn-secondary">Start Generic Application</a>
       </div>
 
       @if (businesses.usingReal() && businesses.myBusinesses().length === 0) {
@@ -79,7 +79,7 @@ import { RequirementsModalComponent } from '../../shared/ui/requirements-modal.c
                 <button class="btn btn-secondary btn-sm btn-block" (click)="openRequirements(type)">
                   View Requirements
                 </button>
-                <a class="btn btn-primary btn-sm btn-block" [routerLink]="['/permits/apply']" [queryParams]="{ type }">Start Application</a>
+                <a class="btn btn-primary btn-sm btn-block" [routerLink]="['/permits/apply']" [queryParams]="startParams(type)">Start Application</a>
               </div>
             </div>
           }
@@ -186,6 +186,16 @@ export class PermitCatalogPage {
   protected readonly bfpFsisUrl = BFP_FSIS_URL;
   protected readonly catalog = REQUIREMENTS_CATALOG;
   protected readonly viewingRequirementsFor = signal<PermitType | null>(null);
+  /**
+   * The business the citizen came from, when they started at its own "Apply
+   * for Permit": carried into the wizard so it opens with that business
+   * already chosen (QA TC-30, 2026-10-03). It used to be dropped here.
+   */
+  private readonly fromBusiness = inject(ActivatedRoute).snapshot.queryParamMap.get('businessId');
+
+  protected startParams(type: PermitType | 'generic'): Record<string, string> {
+    return this.fromBusiness ? { type, businessId: this.fromBusiness } : { type };
+  }
 
   openRequirements(type: PermitType): void {
     this.viewingRequirementsFor.set(type);

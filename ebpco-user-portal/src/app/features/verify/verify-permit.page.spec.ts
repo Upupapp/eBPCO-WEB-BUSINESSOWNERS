@@ -66,6 +66,22 @@ describe('VerifyPermitPage', () => {
     expect(text).not.toContain('No permit with this number');
   });
 
+  it('offers a box to type a number into when opened without one (QA TC-28)', () => {
+    const { text, calls } = render('', () => of(ISSUED));
+    expect(calls).toEqual([]);
+    expect(text).toContain('Permit number');
+    expect(text).not.toContain('No permit with this number is on record');
+  });
+
+  it('shows the expiry and approving office as printed, still without calling it Valid', () => {
+    const { text } = render('FP-2026-000003', () => of({
+      ...ISSUED, expiresOn: '2027-09-27', approvingOffice: 'Municipal Engineering Office',
+    }));
+    expect(text).toContain('Expires (as printed)');
+    expect(text).toContain('Municipal Engineering Office');
+    expect(text).not.toContain('Valid');
+  });
+
   it('gives the real MEO contact on every path', () => {
     for (const answer of [() => of(ISSUED), () => throwError(() => ({ status: 404 }))]) {
       const { text } = render('FP-2026-000003', answer as () => Observable<PublicPermitRecord>);

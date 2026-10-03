@@ -75,6 +75,7 @@ export const routes: Routes = [
       { path: 'payments', loadComponent: () => import('./features/payments/payments-list.page').then((m) => m.PaymentsListPage) },
       { path: 'payments/:applicationId', loadComponent: () => import('./features/payments/payment-flow.page').then((m) => m.PaymentFlowPage) },
       { path: 'payments/:applicationId/receipt', loadComponent: () => import('./features/payments/payment-receipt.page').then((m) => m.PaymentReceiptPage) },
+      { path: 'payments/:applicationId/order', loadComponent: () => import('./features/payments/order-of-payment.page').then((m) => m.OrderOfPaymentPage) },
       { path: 'notifications', loadComponent: () => import('./features/notifications/notifications.page').then((m) => m.NotificationsPage) },
       { path: 'profile', loadComponent: () => import('./features/profile/profile.page').then((m) => m.ProfilePage) },
       { path: 'help', loadComponent: () => import('./features/profile/help-support.page').then((m) => m.HelpSupportPage) },

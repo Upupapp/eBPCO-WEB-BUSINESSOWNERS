@@ -17,6 +17,12 @@ import { BackLinkComponent } from '../../shared/ui/back-link.component';
 @Component({
   selector: 'app-payment-flow',
   imports: [FormsModule, RouterLink, BackLinkComponent],
+  styles: [`
+    .confirm-pay {
+      margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+      border: 1px solid var(--primary-100); background: var(--primary-50);
+    }
+  `],
   template: `
     @if (app(); as a) {
       <div class="page" style="max-width:560px;">
@@ -41,14 +47,27 @@ import { BackLinkComponent } from '../../shared/ui/back-link.component';
             }
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="muted">Total Assessment</span><strong>{{ pesos(asmt.totalCentavos) }}</strong></div>
             <div style="display:flex; justify-content:space-between;"><span class="muted">Balance Due</span><strong style="color:var(--danger-text)">{{ pesos(asmt.balanceCentavos) }}</strong></div>
+            <a class="btn btn-secondary btn-sm" style="margin-top:12px;" [routerLink]="['/payments', a.id, 'order']">Print Order of Payment</a>
           </div>
 
           <div class="card">
             <div class="card-title">Payment Method</div>
-            <div style="display:flex; gap:10px; margin-bottom:14px;">
-              <button class="btn btn-sm" [class.btn-primary]="method() === 'Bank Transfer'" [class.btn-secondary]="method() !== 'Bank Transfer'" (click)="method.set('Bank Transfer')">Bank Transfer</button>
-              <button class="btn btn-sm" [class.btn-primary]="method() === 'Onsite'" [class.btn-secondary]="method() !== 'Onsite'" (click)="method.set('Onsite')">Onsite Payment</button>
-            </div>
+            <!--
+              Bank Transfer is offered only once the Municipality publishes a
+              deposit account (DEFAULT_BANK_INFO). Until then it opened first
+              on a "not available yet" notice and the citizen had to switch
+              (QA TC-25, 2026-10-03): Onsite is the method, shown as such.
+            -->
+            @if (bank) {
+              <div style="display:flex; gap:10px; margin-bottom:14px;">
+                <button class="btn btn-sm" [class.btn-primary]="method() === 'Bank Transfer'" [class.btn-secondary]="method() !== 'Bank Transfer'" (click)="method.set('Bank Transfer')">Bank Transfer</button>
+                <button class="btn btn-sm" [class.btn-primary]="method() === 'Onsite'" [class.btn-secondary]="method() !== 'Onsite'" (click)="method.set('Onsite')">Onsite Payment</button>
+              </div>
+            } @else {
+              <p class="small muted" style="margin:0 0 12px;">
+                Pay onsite at the Municipal Hall. Bank transfer will be offered here once the Municipality publishes its deposit account.
+              </p>
+            }
 
             @if (method() === 'Bank Transfer') {
               @if (bank; as b) {
@@ -90,8 +109,27 @@ import { BackLinkComponent } from '../../shared/ui/back-link.component';
             }
 
             @if (error()) { <div class="field error" style="margin-top:10px;">{{ error() }}</div> }
-            @if (method() !== 'Bank Transfer' || bank) {
-              <button class="btn btn-primary btn-block" style="margin-top:14px;" [disabled]="submitting()" (click)="submit(a.id)">
+            @if (confirmingOnsite() && asmt) {
+              <!--
+                Marking an onsite payment declares that money changed hands, so
+                it is asked once, plainly (QA TC-27, 2026-10-03: one click did
+                it, with no confirmation).
+              -->
+              <div class="confirm-pay" role="alertdialog" aria-labelledby="confirm-pay-title">
+                <strong id="confirm-pay-title">Have you paid {{ pesos(asmt.totalCentavos) }} at the {{ engineer.name }}?</strong>
+                <p class="small" style="margin:6px 0 10px;">
+                  Only mark it paid once you have paid and have your Official Receipt. Your balance stays
+                  {{ pesos(asmt.balanceCentavos) }} until the Cashier verifies the payment.
+                </p>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="btn btn-primary btn-sm" [disabled]="submitting()" (click)="submit(a.id)">
+                    {{ submitting() ? 'Sending…' : 'Yes, I have paid' }}
+                  </button>
+                  <button class="btn btn-secondary btn-sm" [disabled]="submitting()" (click)="confirmingOnsite.set(false)">Not yet</button>
+                </div>
+              </div>
+            } @else if (method() !== 'Bank Transfer' || bank) {
+              <button class="btn btn-primary btn-block" style="margin-top:14px;" [disabled]="submitting()" (click)="onPay(a.id)">
                 {{ submitting() ? 'Sending…' : (method() === 'Bank Transfer' ? 'Submit Payment' : 'Mark as Paid') }}
               </button>
             }
@@ -122,7 +160,10 @@ export class PaymentFlowPage {
   protected readonly engineer = MUNICIPAL_ENGINEER;
   protected readonly hallAddress = MUNICIPAL_HALL_ADDRESS;
   protected readonly pesos = pesos;
-  readonly method = signal<PaymentMethod>('Bank Transfer');
+  // Onsite unless the Municipality has published a deposit account (QA TC-25).
+  readonly method = signal<PaymentMethod>(DEFAULT_BANK_INFO ? 'Bank Transfer' : 'Onsite');
+  /** Asking "have you paid?" before an onsite payment is declared (QA TC-27). */
+  readonly confirmingOnsite = signal(false);
   readonly error = signal<string | null>(null);
   readonly submitting = signal(false);
   proofFileName: string | null = null;
@@ -198,6 +239,16 @@ export class PaymentFlowPage {
     const file = input.files?.[0] ?? null;
     this.proofFile = file;
     this.proofFileName = file?.name ?? null;
+  }
+
+  /** Onsite asks first; a bank transfer carries its own proof and goes straight through. */
+  onPay(applicationId: string): void {
+    if (this.method() === 'Onsite') {
+      this.error.set(null);
+      this.confirmingOnsite.set(true);
+      return;
+    }
+    void this.submit(applicationId);
   }
 
   async submit(applicationId: string): Promise<void> {
@@ -285,10 +336,13 @@ export class PaymentFlowPage {
         this.error.set(result.error);
         return;
       }
+      // Says what is true now: the balance stands until the Cashier verifies
+      // the payment (QA TC-27: "this settles your balance" sat above an
+      // unchanged balance).
       this.toast.success(
         result.settles
-          ? 'Payment submitted to the Municipality — this settles your balance, pending verification.'
-          : 'Payment submitted to the Municipality, pending verification.',
+          ? 'Payment sent for verification. Once the Cashier verifies it, your balance will be settled.'
+          : 'Payment sent for verification.',
       );
       this.router.navigate(['/applications', applicationId]);
     } finally {

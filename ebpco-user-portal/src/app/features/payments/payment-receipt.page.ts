@@ -318,9 +318,10 @@ export class PaymentReceiptPage {
       const real = this.realOrderOfPayment();
       if (!real) return undefined;
       return {
+        // Only the fees that apply (QA TC-05): a ₱0.00 line read as a charge.
         lineItems: FEE_LINES.map((line) => ({
           code: line.code, name: line.name, amountCentavos: real.fees[line.code],
-        })),
+        })).filter((line) => line.amountCentavos > 0),
         // Pay-in-full, not instalments — the real backend has no partial-payment
         // concept (PaymentService.checkSettles is a binary "does this amount
         // clear the Order", never a running balance). Paid means zero owed.

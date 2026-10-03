@@ -1,4 +1,4 @@
-import { PRIVACY_POLICY_SECTIONS, PRIVACY_POLICY_TEXT } from './legal-copy';
+import { PRIVACY_POLICY_SECTIONS, PRIVACY_POLICY_TEXT, TERMS_SECTIONS } from './legal-copy';
 
 const ALL = PRIVACY_POLICY_SECTIONS.flatMap((s) => [s.heading, ...s.paragraphs]).join('\n');
 
@@ -45,5 +45,24 @@ describe('Privacy notice (F-6: informed consent needs a real notice)', () => {
 
   it('does not assert bare DPA compliance in place of disclosing anything', () => {
     expect(PRIVACY_POLICY_TEXT).not.toContain('in accordance with the Philippine Data Privacy Act');
+  });
+});
+
+/** QA TC-36 (2026-10-03): the Terms & Conditions a citizen agrees to on every application were one sentence. */
+describe('Terms & Conditions', () => {
+  const TERMS = TERMS_SECTIONS.flatMap((s) => [s.heading, ...s.paragraphs]).join('\n');
+
+  it('covers the account, what is submitted, fees, the permit, withdrawal and data', () => {
+    for (const heading of ['Your account', 'What you submit', 'Fees and payment', 'Your permit', 'Withdrawing an application', 'Your data']) {
+      expect(TERMS_SECTIONS.map((s) => s.heading)).toContain(heading);
+    }
+  });
+
+  it('invents no fee, deadline or processing time the Municipality has not published', () => {
+    expect(TERMS).not.toMatch(/\u20B1|PHP\s?\d|\bwithin \d+ (working )?days\b/);
+  });
+
+  it('no longer says the public verification page is unconnected', () => {
+    expect(PRIVACY_POLICY_SECTIONS.flatMap((s) => s.paragraphs).join('\n')).not.toContain('does not yet check');
   });
 });

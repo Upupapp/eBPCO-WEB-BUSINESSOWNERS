@@ -1,4 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Location } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { CitizenApiClient } from '../../core/api/citizen-api.client';
 import { PublicPermitRecord } from '../../core/api/citizen-api.models';
@@ -7,7 +9,7 @@ import { PermitType } from '../../core/domain/permit.model';
 import { MUNICIPAL_ENGINEER } from '../../core/domain/lgu-contact';
 import { formatDate } from '../../core/utils/ids';
 
-type LookupState = 'loading' | 'found' | 'not-found' | 'unavailable';
+type LookupState = 'idle' | 'loading' | 'found' | 'not-found' | 'unavailable';
 
 /**
  * Public, no-login verification page — the destination the QR block on every
@@ -25,6 +27,7 @@ type LookupState = 'loading' | 'found' | 'not-found' | 'unavailable';
  */
 @Component({
   selector: 'app-verify-permit',
+  imports: [FormsModule],
   template: `
     <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--bg);">
       <div class="card" style="width:100%; max-width:440px; text-align:center;">
@@ -34,7 +37,26 @@ type LookupState = 'loading' | 'found' | 'not-found' | 'unavailable';
           Municipality of Castilla, Sorsogon — Electronic Building Permit and Certificate of Occupancy
         </p>
 
+        <!--
+          For a number typed off a paper permit (QA TC-28, 2026-10-03): /verify
+          on its own said "No permit with this number is on record" with
+          nowhere to type one.
+        -->
+        <form class="verify-form" (ngSubmit)="search()" role="search">
+          <label for="verify-permit-number" class="small muted" style="display:block; text-align:left; margin-bottom:4px;">Permit number</label>
+          <div style="display:flex; gap:8px;">
+            <input id="verify-permit-number" class="input" name="permitNumber" [(ngModel)]="typed"
+                   placeholder="e.g. BP-2026-000001" autocomplete="off" style="flex:1; min-width:0;" />
+            <button type="submit" class="btn btn-primary" [disabled]="state() === 'loading'">Verify</button>
+          </div>
+        </form>
+
         @switch (state()) {
+          @case ('idle') {
+            <p class="small muted" style="margin-top:16px;">
+              Type the permit number printed on the permit, or scan its QR code.
+            </p>
+          }
           @case ('loading') {
             <p class="muted">Checking the Municipality’s records…</p>
           }
@@ -62,8 +84,14 @@ type LookupState = 'loading' | 'found' | 'not-found' | 'unavailable';
                 </div>
                 <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
                   <dt class="small muted">Issuing Office</dt>
-                  <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ issuingOffice() }}</dd>
+                  <dd style="margin:0; font-weight:700; font-size:14px; text-align:right;">{{ r.approvingOffice ?? issuingOffice() }}</dd>
                 </div>
+                @if (r.expiresOn) {
+                  <div style="display:flex; justify-content:space-between; gap:12px; border-bottom:1px solid var(--border-light); padding-bottom:6px;">
+                    <dt class="small muted">Expires (as printed)</dt>
+                    <dd style="margin:0; font-weight:700; font-size:14px;">{{ formatDate(r.expiresOn) }}</dd>
+                  </div>
+                }
                 <div style="display:flex; justify-content:space-between; gap:12px;">
                   <dt class="small muted">Released to the holder</dt>
                   <dd style="margin:0; font-weight:700; font-size:14px;">{{ r.released ? (r.releasedAt ? formatDate(r.releasedAt) : 'Yes') : 'Not yet' }}</dd>
@@ -109,6 +137,8 @@ export class VerifyPermitPage {
 
   protected readonly state = signal<LookupState>('loading');
   protected readonly record = signal<PublicPermitRecord | null>(null);
+  protected typed = '';
+  private readonly location = inject(Location);
 
   /** From this portal's own catalogue of which office issues which permit type; generic when the type is unknown here. */
   protected readonly issuingOffice = computed(() => {
@@ -118,11 +148,35 @@ export class VerifyPermitPage {
   });
 
   constructor() {
-    const number = this.route.snapshot.paramMap.get('permitNumber')?.trim();
-    if (!number || !this.api.configured) {
-      this.state.set(number ? 'unavailable' : 'not-found');
+    const number = this.route.snapshot.paramMap.get('permitNumber')?.trim() ?? '';
+    this.typed = number;
+    if (number === '') {
+      this.state.set('idle');
       return;
     }
+    this.lookup(number);
+  }
+
+  /** The typed number: looked up, and put in the address so the result can be shared. */
+  protected search(): void {
+    const number = this.typed.trim().toUpperCase();
+    if (number === '') return;
+    this.typed = number;
+    try {
+      this.location.replaceState(`/verify/${encodeURIComponent(number)}`);
+    } catch {
+      // The address is a convenience; the lookup does not depend on it.
+    }
+    this.lookup(number);
+  }
+
+  private lookup(number: string): void {
+    this.record.set(null);
+    if (!this.api.configured) {
+      this.state.set('unavailable');
+      return;
+    }
+    this.state.set('loading');
     this.api.verifyPermit(number).subscribe({
       next: (r) => { this.record.set(r); this.state.set('found'); },
       error: (e: { status?: number }) => this.state.set(e?.status === 404 ? 'not-found' : 'unavailable'),
